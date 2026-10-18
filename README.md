@@ -16,7 +16,7 @@ npm run build
 
 ## Cloudflare deployment
 
-Every push to `master` builds and deploys the Worker to `chess.coobyk.com` with GitHub Actions. Configure these repository settings once:
+Every push to `main` builds and deploys the Worker to `chess.coobyk.com` with GitHub Actions. Configure this repository setting once:
 
 - Repository secret `CLOUDFLARE_API_TOKEN` with permission to deploy Workers
 
