@@ -18,7 +18,6 @@ npm run build
 
 Every push to `master` builds and deploys the Worker to `chess.coobyk.com` with GitHub Actions. Configure these repository settings once:
 
-- Repository variable `CLOUDFLARE_ACCOUNT_ID`
 - Repository secret `CLOUDFLARE_API_TOKEN` with permission to deploy Workers
 
 The workflow can also be started manually from the Actions tab.

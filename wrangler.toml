@@ -1,4 +1,5 @@
 name = "goonchess"
+account_id = "bde77f9c2a0a3740e0f502b18fd5c2c6"
 compatibility_date = "2026-10-12"
 assets = { directory = "./dist" }
 workers_dev = true
