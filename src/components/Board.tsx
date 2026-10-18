@@ -51,8 +51,8 @@ export default function Board() {
   }
 
   return (
-    <div className="inline-block border border-neutral-700 bg-neutral-900 p-1 relative">
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${w}, 1fr)`, gap: 0, position: 'relative' }}>
+    <div className="inline-block self-start border border-neutral-700 bg-neutral-900 p-1 relative">
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${w}, 56px)`, gridTemplateRows: `repeat(${h}, 56px)`, gap: 0, position: 'relative' }}>
         {Array.from({ length: h }, (_, y) =>
           Array.from({ length: w }, (_, x) => {
             const tile = ruleset.board.tiles[y][x];
