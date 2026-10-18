@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  --bg: #0a0a0a;
+  --fg: #e5e5e5;
+}
+
+html, body, #root { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); }

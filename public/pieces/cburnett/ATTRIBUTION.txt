@@ -1,0 +1,7 @@
+Chess piece SVGs (Cburnett / default Lichess piece set)
+
+Author: Colin M. L. Burnett
+License: Creative Commons Attribution-ShareAlike 3.0 (CC BY-SA 3.0)
+Source: https://github.com/lichess-org/lila/tree/master/public/piece/cburnett
+
+These SVGs are bundled locally for the chessboard and captured-piece display.
