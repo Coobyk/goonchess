@@ -2,9 +2,32 @@
 
 # goonchess
 
-Created in [T3 Code](https://t3.codes).
+A client-side chess **variant maker**. Build a board, paint terrain, design piece
+movement, place the starting army, then play it — all in the browser.
 
-A zero-dependency client-side chess variant builder. Deployable to Cloudflare Pages.
+Deployable to Cloudflare Workers with GitHub Actions.
+
+## Features
+
+- **Play view** — full rules engine with legal-move hints, hover previews, check
+  and checkmate detection, promotion, undo and move history.
+- **Maker view** with four tabs and a live board preview:
+  - **Board** — size from 3×3 to 16×16, square colors and five palettes,
+    terrain brushes: open, wall, void, two-way portals and one-way portals.
+  - **Pieces** — click a movement grid to design leapers and sliders, give a
+    piece a separate capture pattern, and set restrictions: jump, must capture,
+    uncapturable, royal, moves once, mirror for the opposing team, plus
+    first-move-only patterns (pawn double steps).
+  - **Setup** — drag pieces from the palette onto the board, erase, mirror and
+    copy a side; setup validation warns about missing royal pieces.
+  - **Rules** — variant name and description, team names/colors/forward
+    direction, and win conditions: checkmate, capture the royal, elimination and
+    a point target.
+- **Special effects** — swap positions on capture, explosions with a radius, and
+  spawning another piece type.
+- **Built-in Shadcn UI** — Radix primitives, dark-first theme with a light mode.
+- **Library, links and JSON** — save named variants locally, share an encoded
+  link, or import/export the raw JSON.
 
 ## Dev
 
@@ -16,7 +39,8 @@ npm run build
 
 ## Cloudflare deployment
 
-Every push to `main` builds and deploys the Worker to `chess.coobyk.com` with GitHub Actions. Configure this repository setting once:
+Every push to `main` builds and deploys the Worker to `chess.coobyk.com` with
+GitHub Actions. Configure this repository setting once:
 
 - Repository secret `CLOUDFLARE_API_TOKEN` with permission to deploy Workers
 
