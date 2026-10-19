@@ -376,20 +376,30 @@ export function PiecesTab() {
           </CardHeader>
           <CardContent className="space-y-3">
             {piece.effects.map((eff, i) => (
-              <div key={i} className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
-                <span className="text-sm font-medium capitalize">{eff.kind}</span>
+              <div key={i} className="space-y-3 rounded-lg border p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium capitalize">{eff.kind}</span>
+                  <Button variant="ghost" size="icon-sm" onClick={() => setEffect(i, null)}>
+                    <Trash2 className="text-muted-foreground" />
+                  </Button>
+                </div>
                 {eff.kind === 'explosion' && (
-                  <div className="flex flex-1 items-center gap-3">
-                    <Label className="text-xs">Radius</Label>
-                    <Slider
-                      min={1}
-                      max={3}
-                      step={1}
-                      value={[eff.radius]}
-                      onValueChange={([v]) => setEffect(i, { kind: 'explosion', radius: v })}
-                      className="max-w-40"
-                    />
-                    <span className="font-mono text-xs">{eff.radius}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs">Radius</Label>
+                      <Slider
+                        min={1}
+                        max={3}
+                        step={1}
+                        value={[eff.radius]}
+                        onValueChange={([v]) => setEffect(i, { kind: 'explosion', radius: v })}
+                        className="max-w-40"
+                      />
+                      <span className="font-mono text-xs">{eff.radius}</span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Destroys every enemy piece within the radius. The mover's own team is unharmed.
+                    </p>
                   </div>
                 )}
                 {eff.kind === 'spawn' && (
@@ -445,9 +455,6 @@ export function PiecesTab() {
                     </div>
                   </div>
                 )}
-                <Button variant="ghost" size="icon-sm" onClick={() => setEffect(i, null)}>
-                  <Trash2 className="text-muted-foreground" />
-                </Button>
               </div>
             ))}
             <div className="flex flex-wrap gap-2">

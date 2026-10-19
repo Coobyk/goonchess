@@ -288,7 +288,8 @@ export function chaosLab(): Variant {
     schema: 1,
     id: 'chaos',
     name: 'Chaos Lab',
-    description: 'Portals, walls, uncapturable gems and a bomber that explodes on impact.',
+    description:
+      'Portals, walls, uncapturable gems and a bomber whose blasts destroy enemies but spare its own side.',
     board,
     teams: [
       { id: 'white', name: 'Ivory', color: '#f4f1ea', forward: 'up' },

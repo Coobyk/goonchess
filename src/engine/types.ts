@@ -158,11 +158,22 @@ export interface Move {
   promotionTypeId?: string
 }
 
+/** Visual record of an explosion that happened during a move. */
+export interface Blast {
+  /** Centre of the blast (the moving piece's final square). */
+  x: number
+  y: number
+  radius: number
+  /** Squares whose occupant was destroyed by the blast. */
+  victims: Vec[]
+}
+
 export interface MoveRecord {
   move: Move
   team: string
   notation: string
   capturedName?: string
+  blasts?: Blast[]
 }
 
 export interface PieceInstance {

@@ -1,4 +1,5 @@
 import type {
+  Blast,
   Effect,
   GameState,
   Move,
@@ -327,9 +328,12 @@ export function applyMove(
   }
 
   // Effects
+  let blastRoyal = false
+  const blasts: Blast[] = []
   for (const eff of move.effects) {
     if (eff.kind === 'explosion') {
       const { radius } = eff
+      const victims: Vec[] = []
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
           if (dx === 0 && dy === 0) continue
@@ -340,13 +344,20 @@ export function applyMove(
           if (!occ || occ === move.pieceId) continue
           const oInst = next.pieces[occ]
           if (!oInst) continue
+          // Friendly fire is off: a blast never harms the moving team.
+          if (oInst.team === inst.team) continue
           const oPiece = next.pieceTypes[oInst.typeId]
           next.captured.push({ team: oInst.team, typeId: oInst.typeId, by: inst.team })
-          if (oPiece) next.scores[inst.team] = (next.scores[inst.team] ?? 0) + oPiece.value
+          if (oPiece) {
+            next.scores[inst.team] = (next.scores[inst.team] ?? 0) + oPiece.value
+            if (oPiece.flags.royal) blastRoyal = true
+          }
           delete next.pieces[occ]
           next.board[ey][ex] = null
+          victims.push({ x: ex, y: ey })
         }
       }
+      blasts.push({ x: fx, y: fy, radius, victims })
     } else if (eff.kind === 'spawn') {
       const spawnPiece = next.pieceTypes[eff.pieceTypeId]
       if (spawnPiece) {
@@ -385,6 +396,7 @@ export function applyMove(
     team: state.turn,
     notation: notationFor(state, move, piece, capturedPiece),
     capturedName: capturedPiece?.name,
+    blasts: blasts.length ? blasts : undefined,
   }
   next.moveHistory = [...next.moveHistory, record]
 
@@ -393,7 +405,9 @@ export function applyMove(
   const idx = order.indexOf(next.turn)
   next.turn = order[(idx + 1) % order.length]
 
-  if (compute) detectOutcome(next, inst.team, { capturedRoyal: !!capturedPiece?.flags.royal })
+  if (compute) {
+    detectOutcome(next, inst.team, { capturedRoyal: !!capturedPiece?.flags.royal || blastRoyal })
+  }
   return next
 }
 
