@@ -11,6 +11,10 @@ Deployable to Cloudflare Workers with GitHub Actions.
 
 - **Play view** — full rules engine with legal-move hints, hover previews, check
   and checkmate detection, promotion, undo and move history.
+- **Animated moves** — a piece glides to the square it landed on instead of
+  teleporting. A capture fades out as the mover arrives, a swap sends both
+  pieces on their way, a portal swallows the piece and spits it out at the
+  other end, and an explosion only fires once the mover has landed.
 - **Maker view** with four tabs and a live board preview:
   - **Board** — size from 3×3 to 16×16, square colors and five palettes,
     terrain brushes: open, wall, void, two-way portals and one-way portals.

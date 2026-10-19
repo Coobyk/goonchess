@@ -1,32 +1,35 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BoardShell, tileBackground } from './BoardShell'
 import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
+import { MoveAnimationLayer } from './MoveAnimationLayer'
 import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
 import type { Move } from '@/engine/types'
+import { BLAST_STAGGER, useMoveAnimation } from '@/lib/moveAnimation'
 import { cn } from '@/lib/utils'
 
 const BLAST_DURATION = 620
-const BLAST_STAGGER = 55
 const SPARK_ANGLES = [0, 60, 120, 180, 240, 300]
 
 function BlastOverlay({
   distance,
   radius,
   cell,
+  baseDelay,
 }: {
   distance: number
   radius: number
   cell: number
+  baseDelay: number
 }) {
   // Surrounding squares get a staggered ember flash so the blast reads as a wave.
   if (distance !== 0) {
     return (
       <span
-        className="blast-cell pointer-events-none absolute inset-0 z-30"
+        className="blast-cell pointer-events-none absolute inset-0 z-40"
         style={
           {
-            '--blast-delay': `${distance * BLAST_STAGGER}ms`,
+            '--blast-delay': `${baseDelay + distance * BLAST_STAGGER}ms`,
             background:
               'radial-gradient(circle, rgba(253,186,116,0.45), rgba(249,115,22,0.2) 60%, transparent 82%)',
           } as CSSProperties
@@ -39,17 +42,23 @@ function BlastOverlay({
   const size = (radius * 2 + 1) * cell
   return (
     <span
-      className="pointer-events-none absolute top-1/2 left-1/2 z-30"
+      className="pointer-events-none absolute top-1/2 left-1/2 z-40"
       style={{ width: size, height: size, marginLeft: -size / 2, marginTop: -size / 2 }}
     >
       <span
         className="blast-core absolute inset-0 rounded-full"
-        style={{
-          background:
-            'radial-gradient(circle, rgba(255,247,224,0.92), rgba(253,186,116,0.72) 22%, rgba(249,115,22,0.32) 48%, transparent 64%)',
-        }}
+        style={
+          {
+            '--blast-delay': `${baseDelay}ms`,
+            background:
+              'radial-gradient(circle, rgba(255,247,224,0.92), rgba(253,186,116,0.72) 22%, rgba(249,115,22,0.32) 48%, transparent 64%)',
+          } as CSSProperties
+        }
       />
-      <span className="blast-ring absolute inset-[4%] rounded-full border-[3px] border-amber-200/80" />
+      <span
+        className="blast-ring absolute inset-[4%] rounded-full border-[3px] border-amber-200/80"
+        style={{ '--blast-delay': `${baseDelay}ms` } as CSSProperties}
+      />
       {SPARK_ANGLES.map((angle) => (
         <span
           key={angle}
@@ -59,6 +68,7 @@ function BlastOverlay({
               height: Math.round(cell * 1.1),
               width: 3,
               '--spark-angle': `${angle}deg`,
+              '--blast-delay': `${baseDelay}ms`,
             } as CSSProperties
           }
         />
@@ -83,6 +93,15 @@ export function GameBoard() {
   const lastMove = lastRecord?.move
   const historyLen = game.moveHistory.length
 
+  // Pieces glide from where they were to where they landed.
+  const { anim, duration: moveDuration } = useMoveAnimation(game)
+  const hiddenPieces = useMemo(() => {
+    const ids = new Set<string>()
+    for (const f of anim?.flights ?? []) ids.add(f.pieceId)
+    for (const p of anim?.pops ?? []) ids.add(p.pieceId)
+    return ids
+  }, [anim])
+
   // Play a blast animation when a *new* move sets off an explosion (not on undo).
   const [blast, setBlast] = useState<{ id: number; x: number; y: number; radius: number } | null>(null)
   const blastSeq = useRef(0)
@@ -103,12 +122,13 @@ export function GameBoard() {
       y: blastSource.y,
       radius: blastSource.radius,
     })
+    // The shockwave only fires once the moving piece has landed.
     const timer = window.setTimeout(
       () => setBlast(null),
-      BLAST_DURATION + blastSource.radius * BLAST_STAGGER + 120,
+      BLAST_DURATION + blastSource.radius * BLAST_STAGGER + 120 + moveDuration,
     )
     return () => window.clearTimeout(timer)
-  }, [historyLen, blastSource])
+  }, [historyLen, blastSource, moveDuration])
 
 
   const hoverMoves: Move[] = useMemo(() => {
@@ -139,7 +159,19 @@ export function GameBoard() {
 
   return (
     <div ref={container} className="w-full">
-      <BoardShell width={cols} height={rows} cellSize={cell}>
+      <BoardShell
+        width={cols}
+        height={rows}
+        cellSize={cell}
+        overlay={
+          <MoveAnimationLayer
+            anim={anim}
+            cell={cell}
+            pieceTypes={pieceTypes}
+            teamIndex={teamIndex}
+          />
+        }
+      >
         {Array.from({ length: rows }, (_, y) =>
           Array.from({ length: cols }, (_, x) => {
             const tile = variant.board.tiles[y]?.[x]
@@ -189,14 +221,20 @@ export function GameBoard() {
                   />
                 )}
 
-                {piece && pieceType && (
+                {piece && pieceType && !hiddenPieces.has(piece.id) && (
                   <span className="relative z-10">
                     <PieceGlyph piece={pieceType} teamIndex={teamIndex(piece.team)} size={Math.round(cell * 0.78)} />
                   </span>
                 )}
 
                 {inBlast && (
-                  <BlastOverlay key={blast!.id} distance={blastDistance} radius={blast!.radius} cell={cell} />
+                  <BlastOverlay
+                    key={blast!.id}
+                    distance={blastDistance}
+                    radius={blast!.radius}
+                    cell={cell}
+                    baseDelay={moveDuration}
+                  />
                 )}
 
                 {hasDest && !captures && (

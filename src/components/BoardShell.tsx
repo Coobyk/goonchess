@@ -8,6 +8,7 @@ export function BoardShell({
   children,
   className,
   showLabels = true,
+  overlay,
 }: {
   width: number
   height: number
@@ -15,6 +16,8 @@ export function BoardShell({
   children: ReactNode
   className?: string
   showLabels?: boolean
+  /** Drawn on top of the squares, aligned to the grid. */
+  overlay?: ReactNode
 }) {
   const ranks = Array.from({ length: height }, (_, i) => height - i)
   const files = Array.from({ length: width }, (_, i) => String.fromCharCode(97 + i))
@@ -35,13 +38,14 @@ export function BoardShell({
           </div>
         )}
         <div
-          className="board-grid-shadow grid overflow-hidden rounded-lg"
+          className="board-grid-shadow grid relative overflow-hidden rounded-lg"
           style={{
             gridTemplateColumns: `repeat(${width}, ${cellSize}px)`,
             gridTemplateRows: `repeat(${height}, ${cellSize}px)`,
           }}
         >
           {children}
+          {overlay}
         </div>
         {showLabels && (
           <div
