@@ -23,11 +23,17 @@ Deployable to Cloudflare Workers with GitHub Actions.
   - **Rules** — variant name and description, team names/colors/forward
     direction, and win conditions: checkmate, capture the royal, elimination and
     a point target.
-- **Special effects** — swap positions on capture, explosions with a radius, and
-  spawning another piece type.
+- **Special effects** — swap positions on capture, exploding with a radius (the
+  blast wipes out every enemy piece inside it, spares the mover's own team, and
+  plays a shockwave animation on the board), and spawning another piece type.
 - **Built-in Shadcn UI** — Radix primitives, dark-first theme with a light mode.
 - **Library, links and JSON** — save named variants locally, share an encoded
   link, or import/export the raw JSON.
+- **Short share links** — a variant is packed into a compact array form
+  (index references instead of random ids, a bitfield for flags, only non-empty
+  squares stored) and deflated into a URL-safe code, so a full 8×8 set fits in
+  roughly 500 characters instead of several thousand. Links use the `#v2=`
+  hash; older `#v=` links still load.
 
 ## Dev
 

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Copy, Download, FileJson, Link2, Upload } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { encodeVariant } from '@/lib/encoding'
+import { variantToHash } from '@/lib/encoding'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -29,7 +29,10 @@ export function ShareDialog({
   const [error, setError] = useState<string | null>(null)
 
   const json = exportVariant()
-  const url = `${window.location.origin}${window.location.pathname}#v=${encodeVariant(variant)}`
+  const url = useMemo(
+    () => `${window.location.origin}${window.location.pathname}${variantToHash(variant)}`,
+    [variant],
+  )
 
   const copy = async (text: string, label: string) => {
     try {
@@ -58,7 +61,8 @@ export function ShareDialog({
             <FileJson className="size-4" /> Share &amp; import
           </DialogTitle>
           <DialogDescription>
-            Links embed the whole variant in the URL. JSON is handy for backups and hand-editing.
+            Links pack the whole variant into a compressed, URL-safe code. JSON is handy for backups
+            and hand-editing.
           </DialogDescription>
         </DialogHeader>
 
@@ -87,7 +91,8 @@ export function ShareDialog({
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Anyone opening the link gets this exact variant. Long variants make long links.
+              Anyone opening the link gets this exact variant. The whole thing is packed and
+              deflated into <span className="font-mono">{url.length}</span> characters.
             </p>
           </TabsContent>
 
