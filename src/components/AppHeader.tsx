@@ -74,7 +74,7 @@ export function AppHeader() {
         <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <div className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm">
-              <img src="/pieces/cburnett/wN.svg" alt="goonchess" className="size-6" />
+              <img src="/logo.svg" alt="goonchess" className="size-7" />
             </div>
             <div className="hidden min-w-0 sm:block">
               <div className="flex items-center gap-2">

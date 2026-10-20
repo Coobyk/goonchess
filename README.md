@@ -1,4 +1,4 @@
-<img src="assets/icon.svg" width="64" height="64" alt="">
+<img src="public/logo.svg" width="64" height="64" alt="">
 
 # goonchess
 
