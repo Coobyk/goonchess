@@ -277,7 +277,7 @@ export function GameBoard() {
   const teamIndex = (id: string) => variant.teams.findIndex((t) => t.id === id)
 
   return (
-    <div ref={container} className="w-full">
+    <div ref={container} className="flex w-full justify-center">
       <BoardShell
         width={cols}
         height={rows}
