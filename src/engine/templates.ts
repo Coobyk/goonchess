@@ -68,6 +68,7 @@ export function makePiece(
       royal: false,
       movesOnce: false,
       mirror: true,
+      enPassant: false,
       ...partial.flags,
     },
     effects: partial.effects ?? [],
@@ -99,6 +100,7 @@ export function classicChess(): Variant {
     value: 1,
     move: [leaper([{ x: 0, y: -1 }])],
     capture: [leaper([{ x: -1, y: -1 }, { x: 1, y: -1 }])],
+    flags: { enPassant: true },
   })
   const doubleStep = slider([{ x: 0, y: -1 }], 2)
   doubleStep.firstMoveOnly = true
@@ -149,6 +151,7 @@ export function miniChess(): Variant {
     value: 1,
     move: [leaper([{ x: 0, y: -1 }])],
     capture: [leaper([{ x: -1, y: -1 }, { x: 1, y: -1 }])],
+    flags: { enPassant: true },
   })
   const miniDouble = slider([{ x: 0, y: -1 }], 2)
   miniDouble.firstMoveOnly = true
@@ -314,6 +317,7 @@ export function blankVariant(width = 8, height = 8): Variant {
     value: 1,
     move: [leaper([{ x: 0, y: -1 }])],
     capture: [leaper([{ x: -1, y: -1 }, { x: 1, y: -1 }])],
+    flags: { enPassant: true },
   })
   return {
     schema: 1,

@@ -82,6 +82,8 @@ export interface PieceFlags {
   movesOnce: boolean
   /** Mirror the movement patterns vertically for the opposing team. */
   mirror: boolean
+  /** May capture a piece that just stepped two squares past an attacked square. */
+  enPassant: boolean
 }
 
 export type Effect =
@@ -152,6 +154,8 @@ export interface Move {
   to: Vec
   pieceId: string
   capturedId?: string
+  /** Where the captured piece stood, when it is not the destination (en passant). */
+  capturedAt?: Vec
   effects: Effect[]
   /** Final square after portals. */
   finalTo: Vec

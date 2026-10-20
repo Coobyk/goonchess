@@ -10,7 +10,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
 ## Features
 
 - **Play view** — full rules engine with legal-move hints, hover previews, check
-  and checkmate detection, promotion, undo and move history.
+  and checkmate detection, promotion, castling-free en passant, undo and move
+  history.
 - **Animated moves** — a piece glides to the square it landed on instead of
   teleporting. A capture fades out as the mover arrives, a swap sends both
   pieces on their way, a portal swallows the piece and spits it out at the

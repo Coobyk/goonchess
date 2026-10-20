@@ -121,7 +121,7 @@ export function planMove(prev: GameState, game: GameState): MoveAnim | null {
         key: 'captured',
         typeId: captured.typeId,
         team: captured.team,
-        at: move.finalTo,
+        at: move.capturedAt ?? move.finalTo,
         delay: Math.max(0, landing - fade),
         duration: fade,
       })

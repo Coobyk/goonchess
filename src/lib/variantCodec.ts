@@ -40,6 +40,7 @@ const FLAGS: [keyof PieceFlags, number][] = [
   ['royal', 8],
   ['movesOnce', 16],
   ['mirror', 32],
+  ['enPassant', 64],
 ]
 
 const DEFAULT_TEAMS: Variant['teams'] = [
@@ -265,6 +266,7 @@ function unpackFlags(bits: number): PieceFlags {
     royal: false,
     movesOnce: false,
     mirror: false,
+    enPassant: false,
   }
   for (const [key, bit] of FLAGS) flags[key] = (bits & bit) !== 0
   return flags

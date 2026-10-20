@@ -199,8 +199,65 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
   run(piece.move, 'move', !hasCapturePattern)
   if (hasCapturePattern) run(piece.capture, 'capture', true)
 
+  if (piece.flags.enPassant) {
+    const enPassant = enPassantMove(state, x, y, inst, piece, seen)
+    if (enPassant) moves.push(enPassant)
+  }
+
   if (piece.flags.mustCapture) return moves.filter((m) => !!m.capturedId)
   return moves
+}
+
+/**
+ * En passant, in the generic sense: a piece flagged `enPassant` may capture an
+ * enemy piece that just crossed a square this piece attacks, as long as both
+ * pieces are adjacent and the enemy crossed exactly two squares.
+ */
+function enPassantMove(
+  state: GameState,
+  x: number,
+  y: number,
+  inst: GameState['pieces'][string],
+  piece: PieceType,
+  seen: Set<string>,
+): Move | null {
+  const last = state.moveHistory[state.moveHistory.length - 1]
+  if (!last) return null
+  const previous = last.move
+  const jumped = state.pieces[previous.pieceId]
+  if (!jumped || jumped.team === inst.team) return null
+  const jumpedPiece = state.pieceTypes[jumped.typeId]
+  if (!jumpedPiece?.flags.enPassant || jumpedPiece.flags.uncapturable) return null
+
+  const dx = previous.finalTo.x - previous.from.x
+  const dy = previous.finalTo.y - previous.from.y
+  // Only a straight two-square crossing leaves a square to capture onto.
+  if (Math.abs(dx) + Math.abs(dy) !== 2 || (dx !== 0 && dy !== 0)) return null
+  const skipped = { x: previous.from.x + dx / 2, y: previous.from.y + dy / 2 }
+  // The jumper must be standing right beside us after landing.
+  if (Math.abs(previous.finalTo.x - x) + Math.abs(previous.finalTo.y - y) !== 1) return null
+  if (state.board[skipped.y]?.[skipped.x] !== null) return null
+  if (seen.has(`${skipped.x},${skipped.y}`)) return null
+
+  // The skipped square must be one of our capture steps.
+  const patterns = piece.capture.length > 0 ? piece.capture : piece.move
+  const attacksIt = patterns.some((pattern) =>
+    pattern.vectors.some((raw) => {
+      const v = orient(state.variant, piece, inst.team, raw)
+      return x + v.x === skipped.x && y + v.y === skipped.y
+    }),
+  )
+  if (!attacksIt) return null
+
+  return {
+    from: { x, y },
+    to: skipped,
+    pieceId: inst.id,
+    capturedId: previous.pieceId,
+    capturedAt: { ...previous.finalTo },
+    effects: piece.effects.map((e) => ({ ...e })),
+    finalTo: skipped,
+  }
 }
 
 export function isInCheck(state: GameState, teamId: string): boolean {
@@ -297,6 +354,11 @@ export function applyMove(
       next.pieces[move.capturedId].hasMoved = true
     } else {
       delete next.pieces[move.capturedId]
+      // En passant takes a piece that is not standing on the landing square.
+      const capturedAt = move.capturedAt ?? move.finalTo
+      if (next.board[capturedAt.y]?.[capturedAt.x] === move.capturedId) {
+        next.board[capturedAt.y][capturedAt.x] = null
+      }
       next.captured.push({ team: capturedInst.team, typeId: capturedInst.typeId, by: inst.team })
       if (capturedPiece) {
         next.scores[inst.team] = (next.scores[inst.team] ?? 0) + capturedPiece.value
@@ -421,7 +483,8 @@ function notationFor(
   const to = squareName(state.variant, move.finalTo.x, move.finalTo.y)
   const cap = move.capturedId ? 'x' : '-'
   const suffix = capturedPiece ? ` (${capturedPiece.name})` : ''
-  return `${piece.name} ${from}${cap}${to}${suffix}`
+  const enPassant = move.capturedAt ? ' e.p.' : ''
+  return `${piece.name} ${from}${cap}${to}${enPassant}${suffix}`
 }
 
 /* -------------------------------------------------------------- outcome */
