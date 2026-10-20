@@ -15,7 +15,7 @@ const VOLUME: Record<SoundName, number> = {
   check: 0.55,
   promote: 0.55,
   explosion: 0.7,
-  win: 0.6,
+  win: 0.7,
   draw: 0.45,
 }
 

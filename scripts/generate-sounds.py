@@ -149,7 +149,7 @@ def make_win(source: np.ndarray) -> np.ndarray:
     segment = highpass(segment, 80)
     fade = int(SR * 0.08)
     segment[-fade:] *= np.linspace(1, 0, fade)
-    return normalize(segment, 0.8)
+    return normalize(segment, 0.9)
 
 
 def make_promote() -> np.ndarray:
