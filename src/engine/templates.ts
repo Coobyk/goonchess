@@ -69,6 +69,7 @@ export function makePiece(
       movesOnce: false,
       mirror: true,
       enPassant: false,
+      dice: false,
       ...partial.flags,
     },
     effects: partial.effects ?? [],
@@ -307,6 +308,59 @@ export function bombQueen(): Variant {
   }
 }
 
+/* -------------------------------------------------------- lucky rollers */
+
+/**
+ * Every other piece throws a die to decide how it moves: a knight one roll,
+ * a slider the next. The royal piece is the only one that always walks.
+ */
+export function luckyRollers(): Variant {
+  const king = makePiece({ name: 'King', icon: 'king', value: 0, move: [leaper(ALL8)], flags: { royal: true } })
+  const roller = makePiece({
+    name: 'Roller',
+    icon: 'knight',
+    value: 3,
+    move: [leaper(KNIGHT), slider(ORTH, 2)],
+    flags: { dice: true, jump: true },
+  })
+  const pawn = makePiece({
+    name: 'Pawn',
+    icon: 'pawn',
+    value: 1,
+    move: [leaper([{ x: 0, y: -1 }])],
+    capture: [leaper([{ x: -1, y: -1 }, { x: 1, y: -1 }])],
+  })
+
+  const pieceTypes = [king, roller, pawn]
+  const setup: SetupPiece[] = []
+  const back = [roller, roller, pawn, pawn, king, pawn, pawn, roller]
+  for (const team of ['black', 'white']) {
+    const rank = team === 'black' ? 0 : 7
+    const pawnRank = team === 'black' ? 1 : 6
+    back.forEach((piece, x) => put(setup, piece.id, team, x, rank))
+    for (let x = 0; x < 8; x++) put(setup, pawn.id, team, x, pawnRank)
+  }
+
+  return {
+    schema: 1,
+    id: 'rollers',
+    name: 'Lucky Rollers',
+    description:
+      'The rollers throw a die to move: a knight one roll, a slider the next. Nothing is certain.',
+    board: emptyBoard(8, 8),
+    teams: [
+      { id: 'white', name: 'White', color: '#f4f1ea', forward: 'up' },
+      { id: 'black', name: 'Black', color: '#3f3f46', forward: 'down' },
+    ],
+    pieceTypes,
+    setup,
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+    ],
+  }
+}
+
 /* ------------------------------------------------------------ chaos lab */
 
 export function chaosLab(): Variant {
@@ -461,6 +515,7 @@ export const TEMPLATES: { id: string; name: string; description: string; build: 
   { id: 'mini', name: 'Mini Chess', description: 'Fast 6×6', build: miniChess },
   { id: 'horses', name: 'Only Horses', description: 'Every piece jumps', build: onlyHorses },
   { id: 'bomb-queen', name: 'Bomb Queen', description: 'A queen that detonates', build: bombQueen },
+  { id: 'rollers', name: 'Lucky Rollers', description: 'They roll to move', build: luckyRollers },
   { id: 'chaos', name: 'Chaos Lab', description: 'Portals and bombers', build: chaosLab },
 ]
 

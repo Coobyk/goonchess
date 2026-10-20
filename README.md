@@ -11,21 +11,34 @@ Deployable to Cloudflare Workers with GitHub Actions.
 
 - **Play view** — full rules engine with legal-move hints, hover previews, check
   and checkmate detection, castling, promotion, en passant, undo and move
-  history.
+  history. A piece may promote into a choice of pieces, and the player picks.
 - **Opponent bot** — play against a bot in any variant. It searches with the
   same rules engine the game uses, so it understands custom pieces, portals and
   blasts; three strengths, from a casual opponent to a deep search. The search
   runs in a worker, so the board stays responsive while it thinks. The bot can
   take a fixed side or a random one that is rolled for every new game, and two
   bots can play each other, each with its own strength, while you watch.
+- **Analysis** — the bot looks at the position on the board and says what it
+  thinks: a score for the first army and the line it would play.
+- **Puzzles** — positions taken from games the bot played against itself, each
+  with a capture that cannot be taken back. The panel counts the ones you solve.
+- **Chess clocks** — time per side with an increment, from 1+0 to 15+10. The
+  clock starts with the first move, and the bot never uses more than a third of
+  its time.
+- **Replay and export** — step through any game again, and write it out as a
+  picture, an animated GIF or a video (MP4 where the browser can record it).
+  Positions also export as PNG, as PGN with algebraic notation, and as FEN,
+  which imports back into the Maker.
+- **Keyboard play** — the arrow keys move a cursor over the board, Enter plays,
+  and every move is announced for screen readers.
 - **Rulebook** — `/rulebook` renders a human-readable guide from the current
   variant: starting board, terrain key, armies, win conditions, movement and
   capture patterns, flags, effects, promotions and the active display settings.
 - **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
   piece is a horse and every horse jumps), **Bomb Queen** (a queen that steps
-  one square in any direction and detonates on every capture), Chaos Lab
-  (portals, walls, uncapturable gems and bombers) and blank boards to start
-  from.
+  one square in any direction and detonates on every capture), **Lucky Rollers**
+  (pieces that throw a die to decide how they move), Chaos Lab (portals, walls,
+  uncapturable gems and bombers) and blank boards to start from.
 - **Sound** — a bundled CC0 sound set for moves, captures, checks, promotions,
   explosions and game endings, with a mute toggle.
 - **Threat visualizer** — an optional overlay with arrows from each attacker to
@@ -45,13 +58,15 @@ Deployable to Cloudflare Workers with GitHub Actions.
     terrain brushes: open, wall, void, two-way portals and one-way portals.
   - **Pieces** — click a movement grid to design leapers and sliders, give a
     piece a separate capture pattern, and set restrictions: jump, must capture,
-    uncapturable, royal, moves once, mirror for the opposing team, plus
-    first-move-only patterns (pawn double steps).
+    uncapturable, royal, moves once, mirror for the opposing team, rolls a die
+    to pick its pattern, plus first-move-only patterns (pawn double steps).
   - **Setup** — drag pieces from the palette onto the board, erase, mirror and
     copy a side; setup validation warns about missing royal pieces.
   - **Rules** — variant name and description, team names/colors/forward
     direction, and win conditions: checkmate, capture the royal, elimination and
     a point target.
+- **Undo and redo** — every change in the Maker can be taken back, so a
+    mis-click is never the end of an idea.
 - **Special effects** — swap positions on capture, exploding with a radius (the
   blast wipes out every enemy piece inside it, spares the mover's own team, and
   plays a shockwave animation on the board), and spawning another piece type.

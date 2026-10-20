@@ -84,6 +84,8 @@ export interface PieceFlags {
   mirror: boolean
   /** May capture a piece that just stepped two squares past an attacked square. */
   enPassant: boolean
+  /** Rolls a die to pick how it moves. */
+  dice: boolean
 }
 
 export type Effect =
@@ -167,6 +169,8 @@ export interface Move {
   /** Final square after portals. */
   finalTo: Vec
   promotionTypeId?: string
+  /** The die this move was made with, for a piece that rolls to move. */
+  roll?: number
   /** The pieces this move may promote into. The player picks one. */
   promotionOptions?: string[]
   /** Set when this move is a king-side or queen-side castle. */
@@ -213,6 +217,8 @@ export interface GameState {
   captured: { team: string; typeId: string; by: string }[]
   winner: string | 'draw' | null
   scores: Record<string, number>
+  /** The die a piece rolled to pick its move, while it is being chosen. */
+  roll?: { pieceId: string; value: number }
   status:
     | 'active'
     | 'checkmate'

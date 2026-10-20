@@ -181,6 +181,7 @@ export function normalizeVariant(input: unknown): Variant | null {
         movesOnce: false,
         mirror: true,
         enPassant: false,
+        dice: false,
         ...((p.flags ?? {}) as Partial<NonNullable<typeof p.flags>>),
       },
       effects: p.effects ?? [],
@@ -434,6 +435,7 @@ export const useAppStore = create<AppState>((set, get) => {
           movesOnce: false,
           mirror: true,
           enPassant: false,
+          dice: false,
           ...piece?.flags,
         },
         effects: piece?.effects ?? [],
@@ -536,7 +538,15 @@ export const useAppStore = create<AppState>((set, get) => {
       if (pieceId) {
         const inst = game.pieces[pieceId]
         if (inst && inst.team === game.turn) {
-          set({ selected: { x, y }, legalMoves: getLegalMoves(game, x, y) })
+          // A piece that rolls to move gets its die rolled when it is picked up.
+          const piece = game.pieceTypes[inst.typeId]
+          let position = game
+          if (piece?.flags.dice) {
+            const value = 1 + Math.floor(Math.random() * 6)
+            position = { ...game, roll: { pieceId, value } }
+            set({ game: position })
+          }
+          set({ selected: { x, y }, legalMoves: getLegalMoves(position, x, y) })
           return
         }
       }

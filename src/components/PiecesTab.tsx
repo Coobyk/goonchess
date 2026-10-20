@@ -126,6 +126,7 @@ export function PiecesTab() {
     { key: 'movesOnce', label: 'Moves once', hint: 'Frozen after its first move.' },
     { key: 'mirror', label: 'Mirror for other team', hint: 'Rotates the pattern vertically for the opposing team.' },
     { key: 'enPassant', label: 'En passant', hint: 'May capture an enemy that just crossed an attacked square in a two-square step.' },
+    { key: 'dice', label: 'Rolls a die', hint: 'Throws a die to pick which of its movement patterns it uses.' },
   ]
 
   return (

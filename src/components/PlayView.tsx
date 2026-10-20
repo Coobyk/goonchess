@@ -5,6 +5,7 @@ import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
 import { PuzzlePanel } from './PuzzlePanel'
+import { StatsPanel } from './StatsPanel'
 import { ReplayView } from './ReplayView'
 import { BotPlayer } from './BotPlayer'
 import { ClockFor, ClockTicker } from './ClockTicker'
@@ -547,6 +548,7 @@ export function PlayView() {
         <LiveAnnouncer />
         <AnalysisPanel />
         <PuzzlePanel />
+        <StatsPanel />
         <Card className="py-4">
           <CardHeader className="px-4">
             <CardTitle className="flex items-center justify-between text-sm">

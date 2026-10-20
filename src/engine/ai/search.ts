@@ -138,16 +138,38 @@ function hasRoyal(state: GameState, teamId: string) {
 /** Every legal move of the side to move, with the state it leads to. */
 function allLegalMoves(state: GameState): MoveOption[] {
   const out: MoveOption[] = []
-  for (const option of legalOptionsForTeam(state, state.turn)) {
-    const choices = option.move.promotionOptions
-    if (!choices || choices.length < 2) {
+  const dicePieces = Object.values(state.pieces).filter(
+    (p) => p.team === state.turn && state.pieceTypes[p.typeId]?.flags.dice,
+  )
+  // A piece that rolls a die is tried with every roll.
+  const rolledStates: GameState[] = dicePieces.length
+    ? dicePieces.flatMap((piece) =>
+        [1, 2, 3, 4, 5, 6].map((value) => ({
+          ...state,
+          roll: { pieceId: piece.id, value },
+        })),
+      )
+    : [state]
+
+  const seen = new Set<string>()
+  for (const rolled of rolledStates) {
+    for (const option of legalOptionsForTeam(rolled, state.turn)) {
+      const choices = option.move.promotionOptions
+      if (choices && choices.length > 1) {
+        // A piece that may promote into several things is tried as each.
+        for (const typeId of choices) {
+          const move = { ...option.move, promotionTypeId: typeId }
+          const key = `${move.pieceId}|${move.finalTo.x},${move.finalTo.y}|${typeId}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          out.push({ move, next: applyMove(state, move, { compute: false }) })
+        }
+        continue
+      }
+      const key = `${option.move.pieceId}|${option.move.finalTo.x},${option.move.finalTo.y}|${option.move.roll ?? 0}`
+      if (seen.has(key)) continue
+      seen.add(key)
       out.push(option)
-      continue
-    }
-    // A piece that may promote into several things is tried as each of them.
-    for (const typeId of choices) {
-      const move = { ...option.move, promotionTypeId: typeId }
-      out.push({ move, next: applyMove(state, move, { compute: false }) })
     }
   }
   return out

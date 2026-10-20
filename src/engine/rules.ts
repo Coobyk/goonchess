@@ -97,6 +97,14 @@ export function createInitialState(variant: Variant): GameState {
   }
 }
 
+/** The pattern a die picked out of a piece's patterns. */
+function dicePattern(patterns: MovePattern[], roll: number): MovePattern[] {
+  const list = patterns.filter(Boolean)
+  if (!list.length) return []
+  const index = ((Math.max(1, roll) - 1) % list.length + list.length) % list.length
+  return [list[index]]
+}
+
 export function movesFor(state: GameState, x: number, y: number): Move[] {
   const { variant } = state
   const pieceId = state.board[y]?.[x]
@@ -144,6 +152,7 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
         effects: piece.effects.map((e) => ({ ...e })),
         finalTo: final,
         promotionOptions: promotion,
+        roll: piece.flags.dice ? roll : undefined,
       })
       return
     }
@@ -163,17 +172,21 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
       effects: piece.effects.map((e) => ({ ...e })),
       finalTo: final,
       promotionOptions: promotion,
+      roll: piece.flags.dice ? roll : undefined,
     })
   }
 
-  const pieces = (patterns: MovePattern[]) => patterns.filter(Boolean)
+  // The die a piece rolled while it was being chosen.
+  const roll = piece.flags.dice ? (state.roll?.pieceId === pieceId ? state.roll.value : 1) : 0
 
   const run = (
     patterns: MovePattern[],
     mode: 'move' | 'capture',
     allowCapture: boolean,
   ) => {
-    for (const pattern of pieces(patterns)) {
+    // A piece that rolls a die uses only the pattern the die picked.
+    const list = piece.flags.dice ? dicePattern(patterns, roll) : patterns
+    for (const pattern of list) {
       if (pattern.firstMoveOnly && inst.hasMoved) continue
       for (const raw of pattern.vectors) {
         const v = orient(variant, piece, inst.team, raw)
@@ -208,7 +221,6 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
   const hasCapturePattern = piece.capture.length > 0
   run(piece.move, 'move', !hasCapturePattern)
   if (hasCapturePattern) run(piece.capture, 'capture', true)
-
   if (piece.flags.enPassant) {
     const enPassant = enPassantMove(state, x, y, inst, piece, seen)
     if (enPassant) moves.push(enPassant)
@@ -675,6 +687,8 @@ export function applyMove(
 ): GameState {
   const compute = options.compute ?? true
   const next: GameState = cloneState(state)
+  // The die has been used; the next piece rolls its own.
+  next.roll = undefined
   const inst = next.pieces[move.pieceId]
   if (!inst) return next
   const piece = next.pieceTypes[inst.typeId]
@@ -865,7 +879,8 @@ function notationFor(
   const suffix = capturedPiece ? ` (${capturedPiece.name})` : ''
   const enPassant = move.capturedAt ? ' e.p.' : ''
   const promotion = promotionName ? `=${promotionName}` : ''
-  return `${piece.name} ${from}${cap}${to}${promotion}${enPassant}${suffix}`
+  const roll = move.roll ? ` (${move.roll})` : ''
+  return `${piece.name} ${from}${cap}${to}${promotion}${roll}${enPassant}${suffix}`
 }
 
 /* ------------------------------------------------------- algebraic notation */
