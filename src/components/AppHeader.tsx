@@ -14,7 +14,6 @@ import {
 import { TEMPLATES, blankVariant } from '@/engine/templates'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
-import { Badge } from './ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,9 +56,6 @@ export function AppHeader() {
             <div className="hidden min-w-0 sm:block">
               <div className="flex items-center gap-2">
                 <span className="truncate text-sm font-semibold tracking-tight">goonchess</span>
-                <Badge variant="secondary" className="hidden px-1.5 py-0 text-[10px] md:inline-flex">
-                  variant lab
-                </Badge>
               </div>
               <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
                 {variant.name}

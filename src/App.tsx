@@ -19,7 +19,7 @@ export default function App() {
         <footer className="border-t">
           <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs lg:px-8">
             <span>Every rule is editable. Nothing is fixed.</span>
-            <span className="font-mono">goonchess / variant lab</span>
+            <span className="font-mono">goonchess</span>
           </div>
         </footer>
         <Toaster theme={theme} position="bottom-right" closeButton richColors />
