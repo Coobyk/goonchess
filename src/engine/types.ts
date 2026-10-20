@@ -178,6 +178,8 @@ export interface MoveRecord {
   notation: string
   capturedName?: string
   blasts?: Blast[]
+  /** Release point of a dragged move, in board units, for the drop animation. */
+  origin?: Vec
 }
 
 export interface PieceInstance {

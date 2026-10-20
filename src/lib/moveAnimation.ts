@@ -71,7 +71,7 @@ function span(a: Vec, b: Vec) {
 }
 
 /** Builds the animation for the move that was just played. */
-export function planMove(prev: GameState, game: GameState, origin?: Vec | null): MoveAnim | null {
+export function planMove(prev: GameState, game: GameState): MoveAnim | null {
   if (game.moveHistory.length <= prev.moveHistory.length) return null
   const record = game.moveHistory[game.moveHistory.length - 1]
   const move = record.move
@@ -98,7 +98,7 @@ export function planMove(prev: GameState, game: GameState, origin?: Vec | null):
   const throughPortal = move.to.x !== move.finalTo.x || move.to.y !== move.finalTo.y
   // A dragged piece is already under the cursor, so its flight starts there
   // instead of snapping back to the square it came from.
-  const start = origin ?? move.from
+  const start = record.origin ?? move.from
   const travel = Math.min(MAX_MS, BASE_MS + PER_SQUARE_MS * span(start, move.to))
   let landing: number
 
@@ -183,14 +183,14 @@ export function planMove(prev: GameState, game: GameState, origin?: Vec | null):
  * Tracks the animation of the latest move. The plan is known during the very
  * first render after a move, so a piece is never drawn in two places at once.
  */
-export function useMoveAnimation(game: GameState, origin?: Vec | null) {
+export function useMoveAnimation(game: GameState) {
   const [anim, setAnim] = useState<MoveAnim | null>(null)
   const [duration, setDuration] = useState(0)
   const [prevGame, setPrevGame] = useState<GameState | null>(null)
 
   // Derive the animation of the move that was just played.
   if (prevGame !== game) {
-    const plan = prevGame ? planMove(prevGame, game, origin) : null
+    const plan = prevGame ? planMove(prevGame, game) : null
     setAnim(plan)
     setDuration(plan?.duration ?? 0)
     setPrevGame(game)

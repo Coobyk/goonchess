@@ -326,6 +326,8 @@ export function hasAnyLegalMove(state: GameState, teamId: string): boolean {
 
 interface ApplyOptions {
   compute?: boolean
+  /** Where the player released a dragged piece, in board units. */
+  origin?: Vec
 }
 
 export function applyMove(
@@ -459,6 +461,7 @@ export function applyMove(
     notation: notationFor(state, move, piece, capturedPiece),
     capturedName: capturedPiece?.name,
     blasts: blasts.length ? blasts : undefined,
+    origin: options.origin,
   }
   next.moveHistory = [...next.moveHistory, record]
 

@@ -78,7 +78,7 @@ interface AppState {
   setPointThreshold: (n: number) => void
 
   /* game */
-  selectSquare: (x: number, y: number) => void
+  selectSquare: (x: number, y: number, origin?: Vec) => void
   resetGame: () => void
   undo: () => void
 
@@ -398,13 +398,13 @@ export const useAppStore = create<AppState>((set, get) => {
       })
     },
 
-    selectSquare: (x, y) => {
+    selectSquare: (x, y, origin) => {
       const { game, selected, legalMoves } = get()
       if (game.winner) return
       if (selected) {
         const move = legalMoves.find((m) => m.finalTo.x === x && m.finalTo.y === y)
         if (move) {
-          const next = applyMove(game, move)
+          const next = applyMove(game, move, { origin })
           set({
             game: next,
             selected: null,
