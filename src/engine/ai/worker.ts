@@ -12,6 +12,8 @@ export interface BotRequest {
   team: string
   level: BotLevel
   seed: number
+  /** Overrides the level's time budget, for playing against a clock. */
+  timeBudgetMs?: number
 }
 
 export interface BotReply {
@@ -29,9 +31,9 @@ const scope = self as unknown as {
 }
 
 scope.onmessage = (event) => {
-  const { id, state, team, level, seed } = event.data
+  const { id, state, team, level, seed, timeBudgetMs } = event.data
   try {
-    const result = searchBestMove(state, { team, level, seed })
+    const result = searchBestMove(state, { team, level, seed, timeBudgetMs })
     scope.postMessage({
       id,
       move: result.move,

@@ -1,6 +1,7 @@
 import type { Variant } from '@/engine/types'
 import { DEFAULT_THREAT_SETTINGS, type ThreatSettings } from '@/engine/threats'
 import { normalizeBotSettings, type BotSettings } from '@/engine/ai/botSettings'
+import { NO_CLOCK, type ClockSettings } from './clock'
 
 const VARIANT_KEY = 'goonchess:variant'
 const LIBRARY_KEY = 'goonchess:library'
@@ -9,6 +10,7 @@ const SOUND_KEY = 'goonchess:sound'
 const THREAT_KEY = 'goonchess:threats'
 const TURN_VIEW_KEY = 'goonchess:turn-view'
 const BOT_KEY = 'goonchess:bot'
+const CLOCK_KEY = 'goonchess:clock'
 
 export type TurnView = 'off' | 'board' | 'pieces'
 
@@ -64,3 +66,9 @@ export const saveTurnView = (v: TurnView) => write(TURN_VIEW_KEY, v)
 export const loadBotSettings = (): BotSettings =>
   normalizeBotSettings(read<unknown>(BOT_KEY, {}))
 export const saveBotSettings = (v: BotSettings) => write(BOT_KEY, v)
+
+export const loadClockSettings = (): ClockSettings => ({
+  ...NO_CLOCK,
+  ...read<Partial<ClockSettings>>(CLOCK_KEY, {}),
+})
+export const saveClockSettings = (v: ClockSettings) => write(CLOCK_KEY, v)

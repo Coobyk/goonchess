@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { BotWorker } from '@/lib/bot'
 import { LEVELS } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam } from '@/engine/ai/botSettings'
+import { clockIsOn } from '@/lib/clock'
 import { getLegalMoves } from '@/engine/rules'
 import type { GameState, Move } from '@/engine/types'
 
@@ -18,6 +19,8 @@ export function BotPlayer() {
   const game = useAppStore((s) => s.game)
   const bot = useAppStore((s) => s.bot)
   const botSide = useAppStore((s) => s.botSide)
+  const clock = useAppStore((s) => s.clock)
+  const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
   const worker = useRef<BotWorker | null>(null)
   const running = useRef(false)
@@ -50,8 +53,13 @@ export function BotPlayer() {
     const level = botLevelFor(bot, team)
     const state = game
     const seed = Math.floor(Math.random() * 1e9)
+    // With a clock running, the bot never uses more than a third of its time.
+    const remaining = clockState.times[team] ?? 0
+    const budget = clockIsOn(clock)
+      ? Math.max(200, Math.min(LEVELS[level].timeBudgetMs, remaining / 3 - 800))
+      : undefined
 
-    void client.think(state, team, level, seed).then((result) => {
+    void client.think(state, team, level, seed, budget).then((result) => {
       running.current = false
       setBotThinking(false)
       const store = useAppStore.getState()

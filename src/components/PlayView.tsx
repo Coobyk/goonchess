@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
-import { Bot, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2 } from 'lucide-react'
+import { Bot, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { BotPlayer } from './BotPlayer'
+import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
 import { WinConfetti } from './WinConfetti'
 import { Badge } from './ui/badge'
@@ -20,6 +21,7 @@ import { isInCheck } from '@/engine/rules'
 import { computeThreats, mergeThreats, threatSummary } from '@/engine/threats'
 import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
+import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
 import { playSound } from '@/lib/sound'
 
 const STATUS_TEXT: Record<string, string> = {
@@ -28,6 +30,7 @@ const STATUS_TEXT: Record<string, string> = {
   eliminated: 'Army eliminated',
   points: 'Point target reached',
   stalemate: 'Stalemate — draw',
+  timeout: 'Time ran out',
 }
 
 /** The three strengths, as a compact row of buttons. */
@@ -71,6 +74,8 @@ export function PlayView() {
   const pendingPromotion = useAppStore((s) => s.pendingPromotion)
   const choosePromotion = useAppStore((s) => s.choosePromotion)
   const cancelPromotion = useAppStore((s) => s.cancelPromotion)
+  const clock = useAppStore((s) => s.clock)
+  const setClock = useAppStore((s) => s.setClock)
   const botThinking = useAppStore((s) => s.botThinking)
 
   const threatReport = useMemo(() => {
@@ -106,6 +111,7 @@ export function PlayView() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <WinConfetti />
       <BotPlayer />
+      <ClockTicker />
       <div className="flex flex-col items-center gap-4">
         {pendingPromotion && (
           <div
@@ -275,6 +281,44 @@ export function PlayView() {
                   {bot.mode === 'all'
                     ? 'Every side is played by a bot — sit back and watch. Set a strength for each side.'
                     : "The bot plays with goonchess' own rules engine, so it works in every variant — custom pieces, portals, blasts and all."}
+                </p>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant={clockIsOn(clock) ? 'secondary' : 'outline'} size="sm">
+                <Timer /> Clock
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="center">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium">Time control</p>
+                  <p className="text-muted-foreground text-xs">
+                    Minutes per side, with seconds added after every move. The clock starts with the
+                    first move and stops when the game ends.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {CLOCK_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      size="sm"
+                      variant={
+                        clock.minutes === preset.minutes && clock.increment === preset.increment
+                          ? 'secondary'
+                          : 'outline'
+                      }
+                      onClick={() => setClock({ minutes: preset.minutes, increment: preset.increment })}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Changing the time control restarts the clock.
                 </p>
               </div>
             </PopoverContent>
@@ -497,8 +541,12 @@ export function PlayView() {
             <Card key={team.id} className="py-4">
               <CardHeader className="px-4">
                 <CardTitle className="flex items-center gap-2 text-sm">
-                  <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
+                  <span
+                    className="size-2.5 rounded-full ring-1 ring-black/20"
+                    style={{ backgroundColor: team.color }}
+                  />
                   {team.name}
+                  <ClockFor team={team.id} />
                   <span className="text-muted-foreground ml-auto text-xs font-normal">
                     {lost.length} lost
                   </span>

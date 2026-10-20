@@ -52,13 +52,19 @@ export class BotWorker {
   }
 
   /** Starts a search. The promise resolves with the move the bot picked. */
-  think(state: GameState, team: string, level: BotLevel, seed = Date.now()): Promise<BotResult> {
+  think(
+    state: GameState,
+    team: string,
+    level: BotLevel,
+    seed = Date.now(),
+    timeBudgetMs?: number,
+  ): Promise<BotResult> {
     this.cancel()
     const worker = this.ensureWorker()
     const id = this.nextId++
     return new Promise<BotResult>((resolve) => {
       this.pending = { id, resolve }
-      const request: BotRequest = { id, state, team, level, seed }
+      const request: BotRequest = { id, state, team, level, seed, timeBudgetMs }
       worker.postMessage(request)
     })
   }

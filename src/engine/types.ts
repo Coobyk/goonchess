@@ -211,5 +211,12 @@ export interface GameState {
   captured: { team: string; typeId: string; by: string }[]
   winner: string | 'draw' | null
   scores: Record<string, number>
-  status: 'active' | 'checkmate' | 'stalemate' | 'royal-captured' | 'eliminated' | 'points'
+  status:
+    | 'active'
+    | 'checkmate'
+    | 'stalemate'
+    | 'royal-captured'
+    | 'eliminated'
+    | 'points'
+    | 'timeout'
 }

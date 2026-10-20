@@ -73,6 +73,8 @@ export interface SearchOptions {
   level: BotLevel
   /** Seed for the tie breaker, so two games differ. */
   seed?: number
+  /** Overrides the level's time budget — used when a clock is running. */
+  timeBudgetMs?: number
 }
 
 export interface SearchResult {
@@ -308,7 +310,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   const started = performance.now()
   const ctx: SearchContext = {
     team: options.team,
-    deadline: started + profile.timeBudgetMs,
+    deadline: started + (options.timeBudgetMs ?? profile.timeBudgetMs),
     nodes: 0,
     aborted: false,
     quiescence: profile.quiescence,

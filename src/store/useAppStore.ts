@@ -12,6 +12,7 @@ import {
 import { variantFromHash } from '@/lib/encoding'
 import {
   loadBotSettings,
+  loadClockSettings,
   loadLibrary,
   loadSoundEnabled,
   loadTheme,
@@ -19,6 +20,7 @@ import {
   loadTurnView,
   loadVariant,
   saveBotSettings,
+  saveClockSettings,
   saveLibrary,
   saveTheme,
   saveThreatSettings,
@@ -28,6 +30,12 @@ import {
   type TurnView,
 } from '@/lib/persist'
 import { preloadSounds, setSoundEnabled as applySoundEnabled } from '@/lib/sound'
+import {
+  clockIsOn,
+  initialClockState,
+  type ClockSettings,
+  type ClockState,
+} from '@/lib/clock'
 import { pushRoute, routeFromLocation } from '@/lib/router'
 
 export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
@@ -52,6 +60,8 @@ interface AppState {
   /** The side the bot plays in the current game, when it plays one side. */
   botSide: string | null
   botThinking: boolean
+  clock: ClockSettings
+  clockState: ClockState
 
   selectedPieceTypeId: string | null
   brush: Brush
@@ -101,6 +111,10 @@ interface AppState {
   /* bot */
   setBot: (patch: Partial<BotSettings>) => void
   setBotThinking: (thinking: boolean) => void
+
+  /* clock */
+  setClock: (settings: ClockSettings) => void
+  tickClock: () => void
 
   /* library */
   addCurrentToLibrary: (name?: string) => void
@@ -190,6 +204,7 @@ export const useAppStore = create<AppState>((set, get) => {
   applyThemeToDom(loadTheme())
 
   const initialBot = { ...DEFAULT_BOT_SETTINGS, ...loadBotSettings() }
+  const initialClock = loadClockSettings()
 
   /** The side the bot plays right now — rolled for every new game. */
   const sideFor = (bot: BotSettings, variant: Variant, previous: string | null) => {
@@ -224,6 +239,8 @@ export const useAppStore = create<AppState>((set, get) => {
     bot: initialBot,
     botSide: sideFor(initialBot, initial, null),
     botThinking: false,
+    clock: initialClock,
+    clockState: initialClockState(initialClock, initial.teams.map((t) => t.id)),
     selected: null,
     legalMoves: [],
     undoStack: [],
@@ -492,14 +509,55 @@ export const useAppStore = create<AppState>((set, get) => {
     cancelPromotion: () => set({ pendingPromotion: null }),
 
     playMove: (move, origin, promotionTypeId) => {
-      const { game } = get()
+      const { game, clock, clockState } = get()
       if (game.winner) return
+
+      // The clock runs while the player thinks, so the time is settled first.
+      const now = Date.now()
+      let clockNext = clockState
+      if (clockIsOn(clock) && clockState.running && clockState.lastMoveAt !== null) {
+        const mover = game.turn
+        const elapsed = now - clockState.lastMoveAt
+        const left = Math.max(0, (clockState.times[mover] ?? 0) - elapsed)
+        if (left <= 0) {
+          // The flag fell before the move was made.
+          const order = game.variant.teams.map((t) => t.id)
+          const index = order.indexOf(mover)
+          set({
+            game: { ...game, winner: order[(index + 1) % order.length], status: 'timeout' },
+            clockState: {
+              ...clockState,
+              times: { ...clockState.times, [mover]: 0 },
+              lastMoveAt: null,
+              running: false,
+            },
+            selected: null,
+            legalMoves: [],
+          })
+          return
+        }
+        clockNext = {
+          times: { ...clockState.times, [mover]: left + clock.increment * 1000 },
+          lastMoveAt: now,
+          running: true,
+        }
+      } else if (clockIsOn(clock)) {
+        // The first move starts the clock and still earns the increment.
+        const mover = game.turn
+        clockNext = {
+          times: { ...clockState.times, [mover]: (clockState.times[mover] ?? 0) + clock.increment * 1000 },
+          lastMoveAt: now,
+          running: true,
+        }
+      }
+
       const next = applyMove(game, { ...move, promotionTypeId }, { origin })
       set({
         game: next,
         selected: null,
         legalMoves: [],
         undoStack: [...get().undoStack, game],
+        clockState: clockNext,
       })
     },
 
@@ -510,6 +568,7 @@ export const useAppStore = create<AppState>((set, get) => {
         selected: null,
         legalMoves: [],
         undoStack: [],
+        clockState: initialClockState(get().clock, variant.teams.map((t) => t.id)),
         // A new game means a new side for a bot that plays at random.
         botSide: sideFor(get().bot, variant, get().botSide),
       })
@@ -539,6 +598,46 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setBotThinking: (botThinking) => set({ botThinking }),
+
+    setClock: (settings) => {
+      saveClockSettings(settings)
+      set({
+        clock: settings,
+        clockState: initialClockState(settings, get().variant.teams.map((t) => t.id)),
+      })
+    },
+
+    tickClock: () => {
+      const { clock, clockState, game } = get()
+      if (!clockIsOn(clock) || game.winner) return
+      if (!clockState.running || clockState.lastMoveAt === null) return
+      const now = Date.now()
+      const elapsed = now - clockState.lastMoveAt
+      if (elapsed <= 0) return
+      const side = game.turn
+      const left = (clockState.times[side] ?? 0) - elapsed
+      if (left <= 0) {
+        // The flag fell: the other side wins.
+        const order = game.variant.teams.map((t) => t.id)
+        const index = order.indexOf(side)
+        const winner = order[(index + 1) % order.length]
+        const times = { ...clockState.times, [side]: 0 }
+        set({
+          clockState: { ...clockState, times, lastMoveAt: null, running: false },
+          game: { ...game, winner, status: 'timeout' },
+          selected: null,
+          legalMoves: [],
+        })
+        return
+      }
+      set({
+        clockState: {
+          ...clockState,
+          times: { ...clockState.times, [side]: left },
+          lastMoveAt: now,
+        },
+      })
+    },
 
     addCurrentToLibrary: (name) => {
       const { variant, library } = get()
