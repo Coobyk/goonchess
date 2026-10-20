@@ -1,8 +1,10 @@
+import { useEffect } from 'react'
 import { AppHeader } from './components/AppHeader'
 import { MakerView } from './components/MakerView'
 import { PlayView } from './components/PlayView'
 import { Toaster } from './components/ui/sonner'
 import { TooltipProvider } from './components/ui/tooltip'
+import { pathFor, replaceRoute, routeFromLocation } from './lib/router'
 import { useAppStore } from './store/useAppStore'
 
 const buildTimeLabel = new Intl.DateTimeFormat(undefined, {
@@ -13,6 +15,19 @@ const buildTimeLabel = new Intl.DateTimeFormat(undefined, {
 export default function App() {
   const view = useAppStore((s) => s.view)
   const theme = useAppStore((s) => s.theme)
+
+  useEffect(() => {
+    const sync = () => useAppStore.getState().applyRoute(routeFromLocation())
+    window.addEventListener('popstate', sync)
+
+    // Unknown or non-canonical paths get rewritten to a real route.
+    const route = routeFromLocation()
+    if (window.location.pathname !== pathFor(route.view, route.makerTab)) {
+      replaceRoute(route.view, route.makerTab)
+    }
+
+    return () => window.removeEventListener('popstate', sync)
+  }, [])
 
   return (
     <TooltipProvider>

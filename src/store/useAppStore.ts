@@ -17,6 +17,7 @@ import {
   type SavedVariant,
 } from '@/lib/persist'
 import { playSound, preloadSounds, setSoundEnabled as applySoundEnabled } from '@/lib/sound'
+import { pushRoute, routeFromLocation } from '@/lib/router'
 
 export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
 export type View = 'play' | 'maker'
@@ -43,6 +44,7 @@ interface AppState {
   /* navigation */
   setView: (view: View) => void
   setMakerTab: (tab: MakerTab) => void
+  applyRoute: (route: { view: View; makerTab: MakerTab }) => void
   setTheme: (theme: Theme) => void
   setSoundEnabled: (enabled: boolean) => void
   setThreats: (patch: Partial<ThreatSettings>) => void
@@ -145,6 +147,7 @@ export function normalizeVariant(input: unknown): Variant | null {
 
 export const useAppStore = create<AppState>((set, get) => {
   const initial = initialVariant()
+  const initialRoute = routeFromLocation()
   applyThemeToDom(loadTheme())
 
   const commit = (variant: Variant) => {
@@ -155,8 +158,8 @@ export const useAppStore = create<AppState>((set, get) => {
   return {
     variant: initial,
     game: createInitialState(initial),
-    view: 'play',
-    makerTab: 'board',
+    view: initialRoute.view,
+    makerTab: initialRoute.makerTab,
     theme: loadTheme(),
     soundEnabled: loadSoundEnabled(),
     threats: loadThreatSettings(),
@@ -168,8 +171,15 @@ export const useAppStore = create<AppState>((set, get) => {
     brush: { mode: 'terrain', terrain: 'wall', team: initial.teams[0]?.id ?? 'white', typeId: null },
     portalPending: null,
 
-    setView: (view) => set({ view }),
-    setMakerTab: (makerTab) => set({ makerTab }),
+    setView: (view) => {
+      set({ view })
+      pushRoute(view, get().makerTab)
+    },
+    setMakerTab: (makerTab) => {
+      set({ makerTab })
+      if (get().view === 'maker') pushRoute('maker', makerTab)
+    },
+    applyRoute: ({ view, makerTab }) => set({ view, makerTab }),
     setTheme: (theme) => {
       saveTheme(theme)
       applyThemeToDom(theme)
