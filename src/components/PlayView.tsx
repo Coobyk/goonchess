@@ -19,6 +19,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { isInCheck } from '@/engine/rules'
 import { computeThreats, mergeThreats, threatSummary } from '@/engine/threats'
 import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
+import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
 import { playSound } from '@/lib/sound'
 
 const STATUS_TEXT: Record<string, string> = {
@@ -27,6 +28,31 @@ const STATUS_TEXT: Record<string, string> = {
   eliminated: 'Army eliminated',
   points: 'Point target reached',
   stalemate: 'Stalemate — draw',
+}
+
+/** The three strengths, as a compact row of buttons. */
+function StrengthButtons({
+  level,
+  onChange,
+}: {
+  level: BotLevel
+  onChange: (level: BotLevel) => void
+}) {
+  return (
+    <div className="grid shrink-0 grid-cols-3 gap-1">
+      {(Object.keys(LEVEL_LABELS) as BotLevel[]).map((option) => (
+        <Button
+          key={option}
+          size="sm"
+          className="h-7 px-1 text-xs"
+          variant={level === option ? 'secondary' : 'outline'}
+          onClick={() => onChange(option)}
+        >
+          {LEVEL_LABELS[option]}
+        </Button>
+      ))}
+    </div>
+  )
 }
 
 export function PlayView() {
@@ -81,7 +107,11 @@ export function PlayView() {
           <Alert className="w-full max-w-xl">
             <Trophy className="size-4" />
             <AlertTitle>
-              {game.winner === 'draw' ? 'Draw' : `${variant.teams.find((t) => t.id === game.winner)?.name ?? game.winner} wins`}
+              {game.winner === 'draw'
+                ? 'Draw'
+                : `${variant.teams.find((t) => t.id === game.winner)?.name ?? game.winner}${
+                    isBotTeam(bot, game.winner) ? ' (bot)' : ''
+                  } wins`}
             </AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-4">
               <span>{STATUS_TEXT[game.status] ?? 'Game over'}</span>
@@ -102,15 +132,17 @@ export function PlayView() {
 
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant={bot.team ? 'secondary' : 'outline'} size="sm">
+              <Button variant={bot.mode === 'off' ? 'outline' : 'secondary'} size="sm">
                 {botThinking ? (
                   <Loader2 className="animate-spin" />
                 ) : (
                   <Bot />
                 )}
-                {bot.team
-                  ? `Bot · ${variant.teams.find((t) => t.id === bot.team)?.name ?? ''}`
-                  : 'Opponent'}
+                {bot.mode === 'all'
+                  ? 'Bots vs bots'
+                  : bot.mode === 'one'
+                    ? `Bot · ${variant.teams.find((t) => t.id === bot.team)?.name ?? ''}`
+                    : 'Opponent'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80" align="center">
@@ -120,46 +152,87 @@ export function PlayView() {
                   <ToggleGroup
                     type="single"
                     className="w-full"
-                    value={bot.team ?? 'none'}
+                    value={bot.mode}
                     onValueChange={(value) => {
                       if (!value) return
-                      setBot({ team: value === 'none' ? null : value })
+                      const mode = value as BotSettings['mode']
+                      setBot({
+                        mode,
+                        team: mode === 'one' ? (bot.team ?? variant.teams[0]?.id ?? null) : bot.team,
+                      })
                     }}
                   >
-                    <ToggleGroupItem value="none" className="flex-1">
+                    <ToggleGroupItem value="off" className="flex-1">
                       Two players
                     </ToggleGroupItem>
-                    {variant.teams.map((team) => (
-                      <ToggleGroupItem key={team.id} value={team.id} className="flex-1">
-                        Bot · {team.name}
-                      </ToggleGroupItem>
-                    ))}
+                    <ToggleGroupItem value="one" className="flex-1">
+                      One bot
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="all" className="flex-1">
+                      Bots vs bots
+                    </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
 
-                {bot.team && (
+                {bot.mode === 'one' && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">The bot plays</Label>
+                    <ToggleGroup
+                      type="single"
+                      className="w-full"
+                      value={bot.team ?? ''}
+                      onValueChange={(value) => value && setBot({ team: value })}
+                    >
+                      {variant.teams.map((team) => (
+                        <ToggleGroupItem key={team.id} value={team.id} className="flex-1">
+                          {team.name}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  </div>
+                )}
+
+                {bot.mode !== 'off' && (
                   <div className="space-y-2">
                     <Label className="text-sm">Strength</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(Object.keys(LEVEL_LABELS) as BotLevel[]).map((level) => (
-                        <Button
-                          key={level}
-                          size="sm"
-                          variant={bot.level === level ? 'secondary' : 'outline'}
-                          onClick={() => setBot({ level })}
-                        >
-                          {LEVEL_LABELS[level]}
-                        </Button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{LEVEL_HINTS[bot.level]}</p>
+                    {bot.mode === 'all'
+                      ? variant.teams.map((team) => (
+                          <div key={team.id} className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm">{team.name}</span>
+                            <StrengthButtons
+                              level={botLevelFor(bot, team.id)}
+                              onChange={(level) =>
+                                setBot({ levels: { ...bot.levels, [team.id]: level } })
+                              }
+                            />
+                          </div>
+                        ))
+                      : bot.team && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm">
+                              {variant.teams.find((t) => t.id === bot.team)?.name}
+                            </span>
+                            <StrengthButtons
+                              level={botLevelFor(bot, bot.team)}
+                              onChange={(level) =>
+                                setBot({ levels: { ...bot.levels, [bot.team!]: level } })
+                              }
+                            />
+                          </div>
+                        )}
+                    <p className="text-xs text-muted-foreground">
+                      {bot.mode === 'all'
+                        ? 'Each side plays with the strength you pick for it.'
+                        : LEVEL_HINTS[botLevelFor(bot, bot.team ?? variant.teams[0]?.id ?? '')]}
+                    </p>
                   </div>
                 )}
 
                 <Separator />
                 <p className="text-xs text-muted-foreground">
-                  The bot plays with goonchess&apos; own rules engine, so it works in every
-                  variant — custom pieces, portals, blasts and all.
+                  {bot.mode === 'all'
+                    ? 'Every side is played by a bot — sit back and watch. Set a strength for each side.'
+                    : "The bot plays with goonchess' own rules engine, so it works in every variant — custom pieces, portals, blasts and all."}
                 </p>
               </div>
             </PopoverContent>

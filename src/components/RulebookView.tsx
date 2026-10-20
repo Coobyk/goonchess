@@ -533,7 +533,8 @@ export function RulebookView() {
               </p>
               <p>
                 The <span className="text-foreground font-medium">Opponent</span> menu turns a
-                side over to a bot. It plays by the same rules as you do, in this very variant.
+                side over to a bot. It plays by the same rules as you do, in this very variant —
+                and two bots can play each other while you watch.
               </p>
             </CardContent>
           </Card>

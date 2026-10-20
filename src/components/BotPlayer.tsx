@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { BotWorker } from '@/lib/bot'
 import { LEVELS } from '@/engine/ai/search'
+import { botLevelFor, isBotTeam } from '@/engine/ai/botSettings'
 import { getLegalMoves } from '@/engine/rules'
 import type { GameState, Move } from '@/engine/types'
 
@@ -10,7 +11,8 @@ import type { GameState, Move } from '@/engine/types'
  *
  * The search runs in a worker, so the board stays usable while the bot thinks.
  * The move it returns is checked against the rules engine before it is played,
- * so a bot can never make an illegal move.
+ * so a bot can never make an illegal move. When both sides are bots, each one
+ * plays with the strength that is set for its side.
  */
 export function BotPlayer() {
   const game = useAppStore((s) => s.game)
@@ -30,8 +32,9 @@ export function BotPlayer() {
   }, [])
 
   useEffect(() => {
-    const team = bot.team
-    if (!team || game.winner || game.turn !== team) {
+    const team = game.turn
+    const botTurn = isBotTeam(bot, team)
+    if (!botTurn || game.winner) {
       worker.current?.cancel()
       running.current = false
       setBotThinking(false)
@@ -43,7 +46,7 @@ export function BotPlayer() {
 
     const client = worker.current ?? new BotWorker()
     worker.current = client
-    const level = bot.level
+    const level = botLevelFor(bot, team)
     const state = game
     const seed = Math.floor(Math.random() * 1e9)
 
@@ -51,7 +54,7 @@ export function BotPlayer() {
       running.current = false
       setBotThinking(false)
       const store = useAppStore.getState()
-      if (store.bot.team !== team) return
+      if (!isBotTeam(store.bot, team)) return
       if (store.game !== state) {
         // The position changed while the bot was thinking — think again.
         bump()
@@ -67,7 +70,7 @@ export function BotPlayer() {
         useAppStore.getState().playMove(move)
       }, wait)
     })
-  }, [bot.level, bot.team, game, retry, setBotThinking])
+  }, [bot, game, retry, setBotThinking])
 
   return null
 }

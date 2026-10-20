@@ -3,7 +3,7 @@ import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine
 import { applyMove, createInitialState, getLegalMoves, uid } from '@/engine/rules'
 import { defaultVariant } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
-import { DEFAULT_BOT_SETTINGS, type BotSettings } from '@/engine/ai/botSettings'
+import { DEFAULT_BOT_SETTINGS, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
 import { variantFromHash } from '@/lib/encoding'
 import {
   loadBotSettings,
@@ -414,7 +414,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const { game, selected, legalMoves, bot } = get()
       if (game.winner) return
       // The bot plays its own side — the human cannot touch it.
-      if (bot.team && game.turn === bot.team) return
+      if (isBotTeam(bot, game.turn)) return
       if (selected) {
         const move = legalMoves.find((m) => m.finalTo.x === x && m.finalTo.y === y)
         if (move) {
@@ -455,7 +455,7 @@ export const useAppStore = create<AppState>((set, get) => {
       let prev = rest[rest.length - 1]
       // When the bot is playing, take back its move and the human's with it,
       // so it is the human's turn again.
-      if (bot.team && prev && prev.turn === bot.team && rest.length > 1) {
+      if (prev && isBotTeam(bot, prev.turn) && rest.length > 1) {
         rest = rest.slice(0, -1)
         prev = rest[rest.length - 1]
       }
