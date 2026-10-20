@@ -43,7 +43,10 @@ Deployable to Cloudflare Workers with GitHub Actions.
   (pieces that throw a die to decide how they move), Chaos Lab (portals, walls,
   uncapturable gems and bombers) and blank boards to start from.
 - **Sound** — a bundled CC0 sound set for moves, captures, checks, promotions,
-  explosions and game endings, with a mute toggle.
+  explosions and game endings, with a mute toggle. It comes in **packs**: real
+  wooden pieces, chiptune **8-bit** blips, and a **meme** pack with vine booms
+  and sad trombones. The speaker button in the header switches packs — adding
+  your own is a folder of files and one line of code.
 - **Threat visualizer** — an optional overlay with arrows from each attacker to
   the piece it can capture, plus attacked-square coverage and rings for hanging
   or defended pieces, for the side to move or both armies at once.

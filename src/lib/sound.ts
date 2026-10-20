@@ -1,4 +1,5 @@
 import { loadSoundEnabled, saveSoundEnabled } from './persist'
+import { DEFAULT_PACK, findPack } from './soundPacks'
 
 export type SoundName =
   | 'move'
@@ -20,16 +21,29 @@ const VOLUME: Record<SoundName, number> = {
 }
 
 let enabled = loadSoundEnabled()
+let packId = DEFAULT_PACK
 const elements = new Map<SoundName, HTMLAudioElement>()
 
 function source(name: SoundName) {
   let audio = elements.get(name)
   if (!audio) {
-    audio = new Audio(`/sounds/${name}.mp3`)
+    audio = new Audio(`${findPack(packId).dir}/${name}.mp3`)
     audio.preload = 'auto'
     elements.set(name, audio)
   }
   return audio
+}
+
+/** Swaps the sound pack. The cached files belong to the old one. */
+export function setSoundPack(id: string) {
+  if (id === packId) return
+  packId = id
+  elements.clear()
+  if (enabled) preloadSounds()
+}
+
+export function currentSoundPack() {
+  return packId
 }
 
 /** Warm the cache once, after the first interaction. */

@@ -15,6 +15,7 @@ import {
   loadClockSettings,
   loadLibrary,
   loadSoundEnabled,
+  loadSoundPack,
   loadTheme,
   loadThreatSettings,
   loadTurnView,
@@ -22,6 +23,7 @@ import {
   saveBotSettings,
   saveClockSettings,
   saveLibrary,
+  saveSoundPack,
   saveTheme,
   saveThreatSettings,
   saveTurnView,
@@ -29,7 +31,11 @@ import {
   type SavedVariant,
   type TurnView,
 } from '@/lib/persist'
-import { preloadSounds, setSoundEnabled as applySoundEnabled } from '@/lib/sound'
+import {
+  preloadSounds,
+  setSoundEnabled as applySoundEnabled,
+  setSoundPack as applySoundPack,
+} from '@/lib/sound'
 import {
   clockIsOn,
   initialClockState,
@@ -49,6 +55,7 @@ interface AppState {
   makerTab: MakerTab
   theme: Theme
   soundEnabled: boolean
+  soundPack: string
   threats: ThreatSettings
   turnView: TurnView
   library: SavedVariant[]
@@ -77,6 +84,7 @@ interface AppState {
   applyRoute: (route: { view: View; makerTab: MakerTab }) => void
   setTheme: (theme: Theme) => void
   setSoundEnabled: (enabled: boolean) => void
+  setSoundPack: (pack: string) => void
   setThreats: (patch: Partial<ThreatSettings>) => void
   setTurnView: (view: TurnView) => void
 
@@ -213,6 +221,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
   const initialBot = { ...DEFAULT_BOT_SETTINGS, ...loadBotSettings() }
   const initialClock = loadClockSettings()
+  const initialPack = loadSoundPack()
+  // The sound module keeps the pack it plays from, so it has to start there.
+  applySoundPack(initialPack)
 
   /** The side the bot plays right now — rolled for every new game. */
   const sideFor = (bot: BotSettings, variant: Variant, previous: string | null) => {
@@ -260,6 +271,7 @@ export const useAppStore = create<AppState>((set, get) => {
     makerTab: initialRoute.makerTab,
     theme: loadTheme(),
     soundEnabled: loadSoundEnabled(),
+    soundPack: initialPack,
     threats: loadThreatSettings(),
     turnView: loadTurnView(),
     library: loadLibrary(),
@@ -297,6 +309,12 @@ export const useAppStore = create<AppState>((set, get) => {
       if (enabled) preloadSounds()
       set({ soundEnabled: enabled })
     },
+    setSoundPack: (pack) => {
+      saveSoundPack(pack)
+      applySoundPack(pack)
+      set({ soundPack: pack })
+    },
+
     setThreats: (patch) => {
       const threats = { ...get().threats, ...patch }
       saveThreatSettings(threats)

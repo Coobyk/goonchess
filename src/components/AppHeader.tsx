@@ -15,7 +15,13 @@ import {
 } from 'lucide-react'
 import { TEMPLATES, blankVariant } from '@/engine/templates'
 import { useAppStore } from '@/store/useAppStore'
+import { SOUND_PACKS, findPack } from '@/lib/soundPacks'
+import { playSound } from '@/lib/sound'
 import { Button } from './ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Separator } from './ui/separator'
+import { Switch } from './ui/switch'
+import { cn } from '@/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +43,8 @@ export function AppHeader() {
   const variant = useAppStore((s) => s.variant)
   const soundEnabled = useAppStore((s) => s.soundEnabled)
   const setSoundEnabled = useAppStore((s) => s.setSoundEnabled)
+  const soundPack = useAppStore((s) => s.soundPack)
+  const setSoundPack = useAppStore((s) => s.setSoundPack)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
 
@@ -132,15 +140,61 @@ export function AppHeader() {
               </Button>
             </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
-              title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
-              onClick={() => setSoundEnabled(!soundEnabled)}
-            >
-              {soundEnabled ? <Volume2 /> : <VolumeX />}
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Sound settings"
+                  title="Sound settings"
+                >
+                  {soundEnabled ? <Volume2 /> : <VolumeX />}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Sounds</p>
+                      <p className="text-muted-foreground text-xs">
+                        {soundEnabled ? 'On' : 'Muted'}
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label="Enable sounds"
+                      checked={soundEnabled}
+                      onCheckedChange={setSoundEnabled}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium">Sound pack</p>
+                    {SOUND_PACKS.map((pack) => (
+                      <button
+                        key={pack.id}
+                        type="button"
+                        onClick={() => {
+                          setSoundPack(pack.id)
+                          playSound('move')
+                        }}
+                        className={cn(
+                          'flex w-full flex-col items-start gap-0.5 rounded-lg border px-2.5 py-2 text-left transition-colors',
+                          soundPack === pack.id
+                            ? 'border-primary bg-primary/10'
+                            : 'hover:bg-muted',
+                        )}
+                      >
+                        <span className="text-sm font-medium">{pack.name}</span>
+                        <span className="text-muted-foreground text-xs">{pack.description}</span>
+                      </button>
+                    ))}
+                    <p className="text-muted-foreground pt-1 text-[11px]">
+                      {findPack(soundPack).credit}
+                    </p>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             <ThemeToggle />
 
             <DropdownMenu>

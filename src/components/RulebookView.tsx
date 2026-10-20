@@ -15,6 +15,7 @@ import {
 import type { Effect, MovePattern, PieceType, TeamConfig, Terrain, Vec } from '@/engine/types'
 import type { ThreatSettings } from '@/engine/threats'
 import { useAppStore } from '@/store/useAppStore'
+import { findPack } from '@/lib/soundPacks'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -155,6 +156,7 @@ export function RulebookView() {
   const threats = useAppStore((s) => s.threats)
   const turnView = useAppStore((s) => s.turnView)
   const soundEnabled = useAppStore((s) => s.soundEnabled)
+  const soundPack = useAppStore((s) => s.soundPack)
 
   const { board, teams, pieceTypes, setup, winConditions } = variant
 
@@ -588,7 +590,7 @@ export function RulebookView() {
                   </div>
                   <p className="text-muted-foreground mt-1 text-sm">
                     {soundEnabled
-                      ? 'Move, capture, check, promotion, explosion and game-ending sounds are on.'
+                      ? `Move, capture, check, promotion, explosion and game-ending sounds are on, from the ${findPack(soundPack).name} pack.`
                       : 'Muted. Use the speaker button in the header to turn sounds back on.'}
                   </p>
                 </div>
