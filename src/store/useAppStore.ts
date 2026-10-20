@@ -9,12 +9,15 @@ import {
   loadSoundEnabled,
   loadTheme,
   loadThreatSettings,
+  loadTurnView,
   loadVariant,
   saveLibrary,
   saveTheme,
   saveThreatSettings,
+  saveTurnView,
   saveVariant,
   type SavedVariant,
+  type TurnView,
 } from '@/lib/persist'
 import { playSound, preloadSounds, setSoundEnabled as applySoundEnabled } from '@/lib/sound'
 import { pushRoute, routeFromLocation } from '@/lib/router'
@@ -31,6 +34,7 @@ interface AppState {
   theme: Theme
   soundEnabled: boolean
   threats: ThreatSettings
+  turnView: TurnView
   library: SavedVariant[]
 
   selected: Vec | null
@@ -48,6 +52,7 @@ interface AppState {
   setTheme: (theme: Theme) => void
   setSoundEnabled: (enabled: boolean) => void
   setThreats: (patch: Partial<ThreatSettings>) => void
+  setTurnView: (view: TurnView) => void
 
   /* variant editing */
   updateVariant: (updater: (v: Variant) => Variant) => void
@@ -163,6 +168,7 @@ export const useAppStore = create<AppState>((set, get) => {
     theme: loadTheme(),
     soundEnabled: loadSoundEnabled(),
     threats: loadThreatSettings(),
+    turnView: loadTurnView(),
     library: loadLibrary(),
     selected: null,
     legalMoves: [],
@@ -194,6 +200,10 @@ export const useAppStore = create<AppState>((set, get) => {
       const threats = { ...get().threats, ...patch }
       saveThreatSettings(threats)
       set({ threats })
+    },
+    setTurnView: (turnView) => {
+      saveTurnView(turnView)
+      set({ turnView })
     },
 
     updateVariant: (updater) => {

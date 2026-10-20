@@ -16,16 +16,27 @@ const FLIGHT_CLASS: Record<Flight['kind'], string> = {
 export function MoveAnimationLayer({
   anim,
   cell,
+  cols,
+  rows,
+  flip,
+  rotation,
   pieceTypes,
   teamIndex,
 }: {
   anim: MoveAnim | null
   cell: number
+  cols: number
+  rows: number
+  flip: boolean
+  rotation: number
   pieceTypes: Record<string, PieceType>
   teamIndex: (teamId: string) => number
 }) {
   if (!anim) return null
   const size = Math.round(cell * 0.78)
+  const left = (x: number) => (flip ? cols - 1 - x : x) * cell
+  const top = (y: number) => (flip ? rows - 1 - y : y) * cell
+  const spin = rotation ? `rotate(${rotation}deg)` : undefined
 
   return (
     <div key={anim.id} className="pointer-events-none absolute inset-0 z-30">
@@ -38,8 +49,8 @@ export function MoveAnimationLayer({
             className="piece-dissolve absolute flex items-center justify-center"
             style={
               {
-                left: d.at.x * cell,
-                top: d.at.y * cell,
+                left: left(d.at.x),
+                top: top(d.at.y),
                 width: cell,
                 height: cell,
                 '--dissolve-delay': `${d.delay}ms`,
@@ -47,7 +58,9 @@ export function MoveAnimationLayer({
               } as CSSProperties
             }
           >
-            <PieceGlyph piece={type} teamIndex={teamIndex(d.team)} size={size} />
+            <span className="inline-flex" style={{ transform: spin }}>
+              <PieceGlyph piece={type} teamIndex={teamIndex(d.team)} size={size} />
+            </span>
           </span>
         )
       })}
@@ -61,15 +74,17 @@ export function MoveAnimationLayer({
             className="piece-pop absolute flex items-center justify-center"
             style={
               {
-                left: p.at.x * cell,
-                top: p.at.y * cell,
+                left: left(p.at.x),
+                top: top(p.at.y),
                 width: cell,
                 height: cell,
                 '--pop-delay': `${p.delay}ms`,
               } as CSSProperties
             }
           >
-            <PieceGlyph piece={type} teamIndex={teamIndex(p.team)} size={size} />
+            <span className="inline-flex" style={{ transform: spin }}>
+              <PieceGlyph piece={type} teamIndex={teamIndex(p.team)} size={size} />
+            </span>
           </span>
         )
       })}
@@ -83,12 +98,12 @@ export function MoveAnimationLayer({
             className={`${FLIGHT_CLASS[f.kind]} absolute`}
             style={
               {
-                left: f.from.x * cell,
-                top: f.from.y * cell,
+                left: left(f.from.x),
+                top: top(f.from.y),
                 width: cell,
                 height: cell,
-                '--fly-dx': `${(f.to.x - f.from.x) * cell}px`,
-                '--fly-dy': `${(f.to.y - f.from.y) * cell}px`,
+                '--fly-dx': `${(f.to.x - f.from.x) * cell * (flip ? -1 : 1)}px`,
+                '--fly-dy': `${(f.to.y - f.from.y) * cell * (flip ? -1 : 1)}px`,
                 '--fly-duration': `${f.duration}ms`,
                 '--fly-delay': `${f.delay}ms`,
               } as CSSProperties
@@ -101,7 +116,9 @@ export function MoveAnimationLayer({
                   : 'flex h-full w-full items-center justify-center'
               }
             >
-              <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} />
+              <span className="inline-flex" style={{ transform: spin }}>
+                <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} />
+              </span>
             </span>
           </span>
         )

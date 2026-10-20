@@ -18,6 +18,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
   pieces and defended pieces, for the side to move or both armies at once.
 - **Win confetti** — a canvas volley in the winner's colours, skipped when the
   visitor prefers reduced motion.
+- **Turn view** — for two players sharing a screen: leave the board alone, flip
+  it 180° after every turn, or rotate only the pieces so they face the player
+  whose turn it is.
 - **Animated moves** — a piece glides to the square it landed on instead of
   teleporting. A capture fades out as the mover arrives, a swap sends both
   pieces on their way, a portal swallows the piece and spits it out at the

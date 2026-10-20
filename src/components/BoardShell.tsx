@@ -8,6 +8,7 @@ export function BoardShell({
   children,
   className,
   showLabels = true,
+  flip = false,
   overlay,
 }: {
   width: number
@@ -16,11 +17,15 @@ export function BoardShell({
   children: ReactNode
   className?: string
   showLabels?: boolean
+  /** Show the board from the other side: ranks and files count backwards. */
+  flip?: boolean
   /** Drawn on top of the squares, aligned to the grid. */
   overlay?: ReactNode
 }) {
-  const ranks = Array.from({ length: height }, (_, i) => height - i)
-  const files = Array.from({ length: width }, (_, i) => String.fromCharCode(97 + i))
+  const ranks = Array.from({ length: height }, (_, i) => (flip ? i + 1 : height - i))
+  const files = Array.from({ length: width }, (_, i) =>
+    String.fromCharCode(97 + (flip ? width - 1 - i : i)),
+  )
 
   return (
     <div className={cn('inline-flex select-none flex-col', className)}>

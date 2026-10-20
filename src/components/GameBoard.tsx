@@ -85,6 +85,7 @@ export function GameBoard() {
   const legalMoves = useAppStore((s) => s.legalMoves)
   const selectSquare = useAppStore((s) => s.selectSquare)
   const threatSettings = useAppStore((s) => s.threats)
+  const turnView = useAppStore((s) => s.turnView)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [container, width] = useElementWidth<HTMLDivElement>()
 
@@ -147,9 +148,11 @@ export function GameBoard() {
     suppressClickUntil.current = performance.now() + 150
 
     const rect = dragState.grid.getBoundingClientRect()
-    const tx = Math.floor((e.clientX - rect.left) / cell)
-    const ty = Math.floor((e.clientY - rect.top) / cell)
-    if (tx >= 0 && ty >= 0 && tx < cols && ty < rows) selectSquare(tx, ty)
+    const rawX = Math.floor((e.clientX - rect.left) / cell)
+    const rawY = Math.floor((e.clientY - rect.top) / cell)
+    if (rawX >= 0 && rawY >= 0 && rawX < cols && rawY < rows) {
+      selectSquare(flipBoard ? cols - 1 - rawX : rawX, flipBoard ? rows - 1 - rawY : rawY)
+    }
   }
 
   const cancelDrag = () => {
@@ -180,6 +183,18 @@ export function GameBoard() {
     for (const p of anim?.pops ?? []) ids.add(p.pieceId)
     return ids
   }, [anim])
+
+  // Flip the view or rotate the pieces only after the move animation lands.
+  const sideIndex = variant.teams.findIndex((team) => team.id === turn)
+  const targetOrientation = turnView !== 'off' && sideIndex % 2 === 1 ? 1 : 0
+  const [orientation, setOrientation] = useState(targetOrientation)
+  useEffect(() => {
+    if (orientation === targetOrientation) return
+    const timer = window.setTimeout(() => setOrientation(targetOrientation), moveDuration + 120)
+    return () => window.clearTimeout(timer)
+  }, [orientation, targetOrientation, moveDuration])
+  const flipBoard = turnView === 'board' && orientation === 1
+  const rotatePieces = turnView === 'pieces' && orientation === 1
 
   // Play a blast animation when a *new* move sets off an explosion (not on undo).
   const [blast, setBlast] = useState<{ id: number; x: number; y: number; radius: number } | null>(null)
@@ -259,17 +274,24 @@ export function GameBoard() {
         width={cols}
         height={rows}
         cellSize={cell}
+        flip={flipBoard}
         overlay={
           <MoveAnimationLayer
             anim={anim}
             cell={cell}
+            cols={cols}
+            rows={rows}
+            flip={flipBoard}
+            rotation={rotatePieces ? 180 : 0}
             pieceTypes={pieceTypes}
             teamIndex={teamIndex}
           />
         }
       >
-        {Array.from({ length: rows }, (_, y) =>
-          Array.from({ length: cols }, (_, x) => {
+        {Array.from({ length: rows }, (_, dy) =>
+          Array.from({ length: cols }, (_, dx) => {
+            const x = flipBoard ? cols - 1 - dx : dx
+            const y = flipBoard ? rows - 1 - dy : dy
             const tile = variant.board.tiles[y]?.[x]
             const pieceId = board[y][x]
             const piece = pieceId ? game.pieces[pieceId] : null
@@ -342,7 +364,15 @@ export function GameBoard() {
                       isSelected && 'piece-selected z-20',
                     )}
                   >
-                    <PieceGlyph piece={pieceType} teamIndex={teamIndex(piece.team)} size={Math.round(cell * 0.78)} />
+                    <span
+                      className="inline-flex"
+                      style={{
+                        transform: rotatePieces ? 'rotate(180deg)' : undefined,
+                        transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
+                      }}
+                    >
+                      <PieceGlyph piece={pieceType} teamIndex={teamIndex(piece.team)} size={Math.round(cell * 0.78)} />
+                    </span>
                   </span>
                 )}
 
@@ -385,11 +415,16 @@ export function GameBoard() {
             style={{ left: drag.clientX, top: drag.clientY }}
           >
             <span className="piece-dragging inline-flex drop-shadow-2xl">
-              <PieceGlyph
-                piece={type}
-                teamIndex={teamIndex(inst.team)}
-                size={Math.round(cell * 0.86)}
-              />
+              <span
+                className="inline-flex"
+                style={{ transform: rotatePieces ? 'rotate(180deg)' : undefined }}
+              >
+                <PieceGlyph
+                  piece={type}
+                  teamIndex={teamIndex(inst.team)}
+                  size={Math.round(cell * 0.86)}
+                />
+              </span>
             </span>
           </div>
         )

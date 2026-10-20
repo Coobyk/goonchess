@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
-import { RotateCcw, Undo2, Trophy, ShieldAlert } from 'lucide-react'
+import { RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2 } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { PieceGlyph } from './PieceGlyph'
 import { WinConfetti } from './WinConfetti'
@@ -35,6 +35,8 @@ export function PlayView() {
   const canUndo = useAppStore((s) => s.undoStack.length > 0)
   const threatSettings = useAppStore((s) => s.threats)
   const setThreats = useAppStore((s) => s.setThreats)
+  const turnView = useAppStore((s) => s.turnView)
+  const setTurnView = useAppStore((s) => s.setTurnView)
 
   const threatReport = useMemo(() => {
     if (!threatSettings.show) return null
@@ -170,6 +172,48 @@ export function PlayView() {
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant={turnView !== 'off' ? 'secondary' : 'outline'} size="sm">
+                <FlipHorizontal2 /> Turn view
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="center">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium">Turn view</p>
+                  <p className="text-xs text-muted-foreground">
+                    For two players sharing one screen. The change happens after each move lands.
+                  </p>
+                </div>
+                <ToggleGroup
+                  type="single"
+                  className="w-full"
+                  value={turnView}
+                  onValueChange={(value) => {
+                    if (value) setTurnView(value as 'off' | 'board' | 'pieces')
+                  }}
+                >
+                  <ToggleGroupItem value="off" className="flex-1">
+                    Off
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="board" className="flex-1">
+                    Flip board
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="pieces" className="flex-1">
+                    Turn pieces
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-foreground">Flip board</span> rotates the whole board 180° so
+                  the side to move is at the bottom. <span className="text-foreground">Turn pieces</span>{' '}
+                  keeps the squares still and rotates the pieces to face the player whose turn it is —
+                  handy when the opponent sits across an iPad.
+                </p>
               </div>
             </PopoverContent>
           </Popover>

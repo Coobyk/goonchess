@@ -6,6 +6,9 @@ const LIBRARY_KEY = 'goonchess:library'
 const THEME_KEY = 'goonchess:theme'
 const SOUND_KEY = 'goonchess:sound'
 const THREAT_KEY = 'goonchess:threats'
+const TURN_VIEW_KEY = 'goonchess:turn-view'
+
+export type TurnView = 'off' | 'board' | 'pieces'
 
 export interface SavedVariant {
   id: string
@@ -49,3 +52,9 @@ export const loadThreatSettings = (): ThreatSettings => ({
   ...read<Partial<ThreatSettings>>(THREAT_KEY, {}),
 })
 export const saveThreatSettings = (v: ThreatSettings) => write(THREAT_KEY, v)
+
+export const loadTurnView = (): TurnView => {
+  const value = read<TurnView>(TURN_VIEW_KEY, 'off')
+  return value === 'board' || value === 'pieces' ? value : 'off'
+}
+export const saveTurnView = (v: TurnView) => write(TURN_VIEW_KEY, v)
