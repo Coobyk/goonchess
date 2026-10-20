@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Copy, Download, FileJson, Link2, Upload } from 'lucide-react'
+import { ClipboardType, Copy, Download, FileJson, Link2, Upload } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { variantToHash } from '@/lib/encoding'
+import { fromFen, toFen } from '@/lib/fen'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -23,9 +24,12 @@ export function ShareDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const variant = useAppStore((s) => s.variant)
+  const game = useAppStore((s) => s.game)
   const exportVariant = useAppStore((s) => s.exportVariant)
   const importVariant = useAppStore((s) => s.importVariant)
+  const loadVariantIntoMaker = useAppStore((s) => s.loadVariantIntoMaker)
   const [importText, setImportText] = useState('')
+  const [fenText, setFenText] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const json = exportVariant()
@@ -76,6 +80,9 @@ export function ShareDialog({
             </TabsTrigger>
             <TabsTrigger value="import">
               <Upload /> Import
+            </TabsTrigger>
+            <TabsTrigger value="fen">
+              <ClipboardType /> FEN
             </TabsTrigger>
           </TabsList>
 
@@ -136,6 +143,54 @@ export function ShareDialog({
             >
               <Upload /> Import variant
             </Button>
+          </TabsContent>
+          <TabsContent value="fen" className="space-y-3 pt-3">
+            <Label htmlFor="fen-input">Paste a FEN</Label>
+            <Textarea
+              id="fen-input"
+              value={fenText}
+              onChange={(e) => {
+                setFenText(e.target.value)
+                setError(null)
+              }}
+              placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+              className="h-24 font-mono text-xs"
+            />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  const result = fromFen(fenText)
+                  if (!result) {
+                    setError('That does not look like a FEN.')
+                    return
+                  }
+                  loadVariantIntoMaker(result.variant)
+                  toast.success('Position imported')
+                  setFenText('')
+                  onOpenChange(false)
+                }}
+              >
+                <Upload /> Import position
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const fen = toFen(game)
+                  if (!fen) {
+                    setError('This variant cannot be written as FEN.')
+                    return
+                  }
+                  setFenText(fen)
+                }}
+              >
+                Use the current position
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              A FEN describes a standard chess position. It is imported as a classic variant that you
+              can then edit in the Maker.
+            </p>
           </TabsContent>
         </Tabs>
       </DialogContent>

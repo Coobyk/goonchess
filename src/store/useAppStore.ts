@@ -594,7 +594,7 @@ export const useAppStore = create<AppState>((set, get) => {
         }
       }
 
-      const next = applyMove(game, { ...move, promotionTypeId }, { origin })
+      const next = applyMove(game, { ...move, promotionTypeId }, { origin, san: true })
       set({
         game: next,
         selected: null,

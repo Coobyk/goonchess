@@ -662,6 +662,8 @@ interface ApplyOptions {
   compute?: boolean
   /** Where the player released a dragged piece, in board units. */
   origin?: Vec
+  /** Work out the algebraic notation too. It costs time, so searches skip it. */
+  san?: boolean
 }
 
 export function applyMove(
@@ -827,6 +829,7 @@ export function applyMove(
       capturedPiece,
       promotionTypeId ? next.pieceTypes[promotionTypeId]?.name : undefined,
     ),
+    san: options.san ? sanFor(state, move, next) : undefined,
     capturedName: capturedPiece?.name,
     blasts: blasts.length ? blasts : undefined,
     origin: options.origin,
@@ -859,6 +862,115 @@ function notationFor(
   const enPassant = move.capturedAt ? ' e.p.' : ''
   const promotion = promotionName ? `=${promotionName}` : ''
   return `${piece.name} ${from}${cap}${to}${promotion}${enPassant}${suffix}`
+}
+
+/* ------------------------------------------------------- algebraic notation */
+
+const SAN_LETTERS: Record<string, string> = {
+  king: 'K',
+  queen: 'Q',
+  rook: 'R',
+  bishop: 'B',
+  knight: 'N',
+  pawn: 'P',
+}
+
+/**
+ * The move in algebraic notation — "Nf3", "exd5", "O-O", "e8=Q+".
+ *
+ * The position after the move is needed for the check mark, so this is only
+ * worked out for real games, not for every node of a search.
+ */
+export function sanFor(state: GameState, move: Move, next: GameState): string {
+  if (move.castle) {
+    return (move.finalTo.x > move.from.x ? 'O-O' : 'O-O-O') + checkSuffix(next)
+  }
+  const inst = state.pieces[move.pieceId]
+  const piece = inst ? state.pieceTypes[inst.typeId] : undefined
+  // A pawn has no letter; it is written by the file it comes from.
+  const letter = piece && piece.icon !== 'pawn' ? SAN_LETTERS[piece.icon] ?? '' : ''
+  const target = squareName(state.variant, move.finalTo.x, move.finalTo.y)
+
+  if (move.capturedId && !letter) {    const from = squareName(state.variant, move.from.x, move.from.y)
+    return `${from[0]}x${target}${promotionSuffix(state, move)}${checkSuffix(next)}`
+  }
+
+  let hint = ''
+  if (letter) {
+    const rivals = sameTypeRivals(state, move, piece?.icon)
+    if (rivals.length) {
+      const sameFile = rivals.some((r) => r.x === move.from.x)
+      const sameRank = rivals.some((r) => r.y === move.from.y)
+      if (!sameFile) hint = String.fromCharCode(97 + move.from.x)
+      else if (!sameRank) hint = String(state.variant.board.height - move.from.y)
+      else hint = squareName(state.variant, move.from.x, move.from.y)
+    }
+  }
+  const capture = move.capturedId ? 'x' : ''
+  return `${letter}${hint}${capture}${target}${promotionSuffix(state, move)}${checkSuffix(next)}`
+}
+
+/** Other pieces of the same kind that could also reach the same square. */
+function sameTypeRivals(state: GameState, move: Move, icon?: string) {
+  const rivals: { x: number; y: number }[] = []
+  if (!icon) return rivals
+  const inst = state.pieces[move.pieceId]
+  if (!inst) return rivals
+  for (let y = 0; y < state.board.length; y++) {
+    for (let x = 0; x < state.board[y].length; x++) {
+      if (x === move.from.x && y === move.from.y) continue
+      const id = state.board[y][x]
+      if (!id) continue
+      const other = state.pieces[id]
+      if (other.team !== inst.team) continue
+      if (state.pieceTypes[other.typeId]?.icon !== icon) continue
+      const reaches = movesFor(state, x, y).some(
+        (m) => m.finalTo.x === move.finalTo.x && m.finalTo.y === move.finalTo.y,
+      )
+      if (reaches) rivals.push({ x, y })
+    }
+  }
+  return rivals
+}
+
+function promotionSuffix(state: GameState, move: Move): string {
+  if (!move.promotionTypeId) return ''
+  const piece = state.pieceTypes[move.promotionTypeId]
+  const letter = piece ? SAN_LETTERS[piece.icon] : undefined
+  return letter ? `=${letter}` : ''
+}
+
+/** "+" when the opponent is in check, "#" when it is checkmate. */
+function checkSuffix(next: GameState): string {
+  const opponent = next.turn
+  let inCheck = false
+  for (const id in next.pieces) {
+    const inst = next.pieces[id]
+    if (inst.team !== opponent) continue
+    if (!next.pieceTypes[inst.typeId]?.flags.royal) continue
+    const at = findPiece(next, id)
+    if (!at) continue
+    for (let y = 0; y < next.board.length; y++) {
+      for (let x = 0; x < next.board[y].length; x++) {
+        const attacker = next.board[y][x]
+        if (!attacker) continue
+        const attackerInst = next.pieces[attacker]
+        if (attackerInst.team === opponent) continue
+        if (movesFor(next, x, y).some((m) => m.capturedId === id)) inCheck = true
+      }
+    }
+  }
+  if (!inCheck) return ''
+  let anyMove = false
+  for (let y = 0; y < next.board.length; y++) {
+    for (let x = 0; x < next.board[y].length; x++) {
+      const id = next.board[y][x]
+      if (!id) continue
+      if (next.pieces[id].team !== opponent) continue
+      if (getLegalMoves(next, x, y).length > 0) anyMove = true
+    }
+  }
+  return anyMove ? '+' : '#'
 }
 
 /* -------------------------------------------------------------- outcome */

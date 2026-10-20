@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
-import { Bot, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
+import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
@@ -24,6 +24,9 @@ import { computeThreats, mergeThreats, threatSummary } from '@/engine/threats'
 import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
 import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
+import { toFen } from '@/lib/fen'
+import { toPgn } from '@/lib/pgn'
+import { downloadBlob, fileNameFor, positionName, renderBoardImage } from '@/lib/image'
 import { playSound } from '@/lib/sound'
 
 const STATUS_TEXT: Record<string, string> = {
@@ -284,6 +287,72 @@ export function PlayView() {
                     ? 'Every side is played by a bot — sit back and watch. Set a strength for each side.'
                     : "The bot plays with goonchess' own rules engine, so it works in every variant — custom pieces, portals, blasts and all."}
                 </p>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download /> Export
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="center">
+              <div className="space-y-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={async () => {
+                    const blob = await renderBoardImage(game, {
+                      labels: true,
+                      highlightLastMove: true,
+                    })
+                    if (!blob) {
+                      toast.error('The board could not be drawn.')
+                      return
+                    }
+                    downloadBlob(blob, fileNameFor(positionName(game), 'png'))
+                    toast.success('Position saved as an image')
+                  }}
+                >
+                  <ImageIcon /> Save position as PNG
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    const pgn = toPgn(game)
+                    downloadBlob(
+                      new Blob([pgn], { type: 'application/x-chess-pgn' }),
+                      fileNameFor(game.variant.name, 'pgn'),
+                    )
+                    toast.success('Game exported as PGN')
+                  }}
+                >
+                  <FileText /> Export game as PGN
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={async () => {
+                    const fen = toFen(game)
+                    if (!fen) {
+                      toast.error('This variant cannot be written as FEN.')
+                      return
+                    }
+                    try {
+                      await navigator.clipboard.writeText(fen)
+                      toast.success('FEN copied')
+                    } catch {
+                      toast.error('Clipboard unavailable.')
+                    }
+                  }}
+                >
+                  <ClipboardCopy /> Copy position as FEN
+                </Button>
               </div>
             </PopoverContent>
           </Popover>

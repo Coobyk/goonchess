@@ -187,6 +187,8 @@ export interface MoveRecord {
   move: Move
   team: string
   notation: string
+  /** The move in algebraic notation, for PGN. */
+  san?: string
   capturedName?: string
   blasts?: Blast[]
   /** Release point of a dragged move, in board units, for the drop animation. */
