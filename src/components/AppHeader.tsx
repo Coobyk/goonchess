@@ -71,8 +71,8 @@ export function AppHeader() {
   return (
     <>
       <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-2 px-4 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
+          <div className="flex min-w-0 shrink-0 items-center gap-3">
             <div className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm">
               <img src="/pieces/cburnett/wN.svg" alt="goonchess" className="size-6" />
             </div>
@@ -86,7 +86,7 @@ export function AppHeader() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 md:mx-auto">
+          <div className="flex items-center gap-1.5 lg:mx-auto">
             <ToggleGroup
               type="single"
               value={view}
@@ -106,8 +106,8 @@ export function AppHeader() {
             </ToggleGroup>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1">
-            <div className="hidden items-center gap-1 md:flex">
+          <div className="ml-auto flex shrink-0 items-center gap-1 lg:ml-0">
+            <div className="hidden items-center gap-1 lg:flex">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1.5" aria-label="New variant">
@@ -145,7 +145,7 @@ export function AppHeader() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden" aria-label="More actions">
+                <Button variant="ghost" size="icon" className="lg:hidden" aria-label="More actions">
                   <Menu />
                 </Button>
               </DropdownMenuTrigger>
