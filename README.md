@@ -15,8 +15,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Opponent bot** — play against a bot in any variant. It searches with the
   same rules engine the game uses, so it understands custom pieces, portals and
   blasts; three strengths, from a casual opponent to a deep search. The search
-  runs in a worker, so the board stays responsive while it thinks. Two bots can
-  also play each other, each with its own strength, while you watch.
+  runs in a worker, so the board stays responsive while it thinks. The bot can
+  take a fixed side or a random one that is rolled for every new game, and two
+  bots can play each other, each with its own strength, while you watch.
 - **Rulebook** — `/rulebook` renders a human-readable guide from the current
   variant: starting board, terrain key, armies, win conditions, movement and
   capture patterns, flags, effects, promotions and the active display settings.

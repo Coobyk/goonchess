@@ -66,6 +66,7 @@ export function PlayView() {
   const turnView = useAppStore((s) => s.turnView)
   const setTurnView = useAppStore((s) => s.setTurnView)
   const bot = useAppStore((s) => s.bot)
+  const botSide = useAppStore((s) => s.botSide)
   const setBot = useAppStore((s) => s.setBot)
   const botThinking = useAppStore((s) => s.botThinking)
 
@@ -110,7 +111,7 @@ export function PlayView() {
               {game.winner === 'draw'
                 ? 'Draw'
                 : `${variant.teams.find((t) => t.id === game.winner)?.name ?? game.winner}${
-                    isBotTeam(bot, game.winner) ? ' (bot)' : ''
+                    isBotTeam(bot, game.winner, botSide) ? ' (bot)' : ''
                   } wins`}
             </AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-4">
@@ -141,7 +142,9 @@ export function PlayView() {
                 {bot.mode === 'all'
                   ? 'Bot vs Bot'
                   : bot.mode === 'one'
-                    ? `Bot · ${variant.teams.find((t) => t.id === bot.team)?.name ?? ''}`
+                    ? bot.side === 'random'
+                      ? 'Bot · Random'
+                      : `Bot · ${variant.teams.find((t) => t.id === bot.side)?.name ?? ''}`
                     : 'Opponent'}
               </Button>
             </PopoverTrigger>
@@ -158,7 +161,10 @@ export function PlayView() {
                       const mode = value as BotSettings['mode']
                       setBot({
                         mode,
-                        team: mode === 'one' ? (bot.team ?? variant.teams[0]?.id ?? null) : bot.team,
+                        side:
+                          mode === 'one'
+                            ? (bot.side ?? variant.teams[0]?.id ?? null)
+                            : bot.side,
                       })
                     }}
                   >
@@ -180,15 +186,25 @@ export function PlayView() {
                     <ToggleGroup
                       type="single"
                       className="w-full"
-                      value={bot.team ?? ''}
-                      onValueChange={(value) => value && setBot({ team: value })}
+                      value={bot.side ?? ''}
+                      onValueChange={(value) => value && setBot({ side: value })}
                     >
                       {variant.teams.map((team) => (
                         <ToggleGroupItem key={team.id} value={team.id} className="flex-1">
                           {team.name}
                         </ToggleGroupItem>
                       ))}
+                      <ToggleGroupItem value="random" className="flex-1">
+                        Random
+                      </ToggleGroupItem>
                     </ToggleGroup>
+                    {bot.side === 'random' && (
+                      <p className="text-xs text-muted-foreground">
+                        {botSide
+                          ? `This game the bot has ${variant.teams.find((t) => t.id === botSide)?.name ?? botSide} — you have the rest. A new game rolls again.`
+                          : 'A new game rolls the side again.'}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -207,23 +223,19 @@ export function PlayView() {
                             />
                           </div>
                         ))
-                      : bot.team && (
+                      : (
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm">
-                              {variant.teams.find((t) => t.id === bot.team)?.name}
-                            </span>
+                            <span className="truncate text-sm">Bot</span>
                             <StrengthButtons
-                              level={botLevelFor(bot, bot.team)}
-                              onChange={(level) =>
-                                setBot({ levels: { ...bot.levels, [bot.team!]: level } })
-                              }
+                              level={bot.level}
+                              onChange={(level) => setBot({ level })}
                             />
                           </div>
                         )}
                     <p className="text-xs text-muted-foreground">
                       {bot.mode === 'all'
                         ? 'Each side plays with the strength you pick for it.'
-                        : LEVEL_HINTS[botLevelFor(bot, bot.team ?? variant.teams[0]?.id ?? '')]}
+                        : LEVEL_HINTS[bot.level]}
                     </p>
                   </div>
                 )}

@@ -17,6 +17,7 @@ import type { GameState, Move } from '@/engine/types'
 export function BotPlayer() {
   const game = useAppStore((s) => s.game)
   const bot = useAppStore((s) => s.bot)
+  const botSide = useAppStore((s) => s.botSide)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
   const worker = useRef<BotWorker | null>(null)
   const running = useRef(false)
@@ -33,7 +34,7 @@ export function BotPlayer() {
 
   useEffect(() => {
     const team = game.turn
-    const botTurn = isBotTeam(bot, team)
+    const botTurn = isBotTeam(bot, team, botSide)
     if (!botTurn || game.winner) {
       worker.current?.cancel()
       running.current = false
@@ -54,7 +55,7 @@ export function BotPlayer() {
       running.current = false
       setBotThinking(false)
       const store = useAppStore.getState()
-      if (!isBotTeam(store.bot, team)) return
+      if (!isBotTeam(store.bot, team, store.botSide)) return
       if (store.game !== state) {
         // The position changed while the bot was thinking — think again.
         bump()
@@ -70,7 +71,7 @@ export function BotPlayer() {
         useAppStore.getState().playMove(move)
       }, wait)
     })
-  }, [bot, game, retry, setBotThinking])
+  }, [bot, botSide, game, retry, setBotThinking])
 
   return null
 }

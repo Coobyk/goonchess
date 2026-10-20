@@ -3,7 +3,12 @@ import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine
 import { applyMove, createInitialState, getLegalMoves, uid } from '@/engine/rules'
 import { defaultVariant } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
-import { DEFAULT_BOT_SETTINGS, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
+import {
+  DEFAULT_BOT_SETTINGS,
+  isBotTeam,
+  rollBotSide,
+  type BotSettings,
+} from '@/engine/ai/botSettings'
 import { variantFromHash } from '@/lib/encoding'
 import {
   loadBotSettings,
@@ -44,6 +49,8 @@ interface AppState {
   legalMoves: Move[]
   undoStack: GameState[]
   bot: BotSettings
+  /** The side the bot plays in the current game, when it plays one side. */
+  botSide: string | null
   botThinking: boolean
 
   selectedPieceTypeId: string | null
@@ -165,9 +172,26 @@ export const useAppStore = create<AppState>((set, get) => {
   const initialRoute = routeFromLocation()
   applyThemeToDom(loadTheme())
 
+  const initialBot = { ...DEFAULT_BOT_SETTINGS, ...loadBotSettings() }
+
+  /** The side the bot plays right now — rolled for every new game. */
+  const sideFor = (bot: BotSettings, variant: Variant, previous: string | null) => {
+    if (bot.mode !== 'one') return null
+    if (bot.side === 'random') return rollBotSide(variant, previous)
+    return bot.side
+  }
+
   const commit = (variant: Variant) => {
     saveVariant(variant)
-    set({ variant, game: createInitialState(variant), selected: null, legalMoves: [], undoStack: [] })
+    const bot = get().bot
+    set({
+      variant,
+      game: createInitialState(variant),
+      selected: null,
+      legalMoves: [],
+      undoStack: [],
+      botSide: sideFor(bot, variant, get().botSide),
+    })
   }
 
   return {
@@ -180,7 +204,8 @@ export const useAppStore = create<AppState>((set, get) => {
     threats: loadThreatSettings(),
     turnView: loadTurnView(),
     library: loadLibrary(),
-    bot: { ...DEFAULT_BOT_SETTINGS, ...loadBotSettings() },
+    bot: initialBot,
+    botSide: sideFor(initialBot, initial, null),
     botThinking: false,
     selected: null,
     legalMoves: [],
@@ -411,10 +436,10 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     selectSquare: (x, y, origin) => {
-      const { game, selected, legalMoves, bot } = get()
+      const { game, selected, legalMoves, bot, botSide } = get()
       if (game.winner) return
       // The bot plays its own side — the human cannot touch it.
-      if (isBotTeam(bot, game.turn)) return
+      if (isBotTeam(bot, game.turn, botSide)) return
       if (selected) {
         const move = legalMoves.find((m) => m.finalTo.x === x && m.finalTo.y === y)
         if (move) {
@@ -445,17 +470,28 @@ export const useAppStore = create<AppState>((set, get) => {
       })
     },
 
-    resetGame: () => set({ game: createInitialState(get().variant), selected: null, legalMoves: [], undoStack: [] }),
+    resetGame: () => {
+      const variant = get().variant
+      set({
+        game: createInitialState(variant),
+        selected: null,
+        legalMoves: [],
+        undoStack: [],
+        // A new game means a new side for a bot that plays at random.
+        botSide: sideFor(get().bot, variant, get().botSide),
+      })
+    },
 
     undo: () => {
       const stack = get().undoStack
       if (!stack.length) return
       const bot = get().bot
+      const botSide = get().botSide
       let rest = stack.slice(0, -1)
       let prev = rest[rest.length - 1]
       // When the bot is playing, take back its move and the human's with it,
       // so it is the human's turn again.
-      if (prev && isBotTeam(bot, prev.turn) && rest.length > 1) {
+      if (prev && isBotTeam(bot, prev.turn, botSide) && rest.length > 1) {
         rest = rest.slice(0, -1)
         prev = rest[rest.length - 1]
       }
@@ -466,7 +502,7 @@ export const useAppStore = create<AppState>((set, get) => {
     setBot: (patch) => {
       const bot = { ...get().bot, ...patch }
       saveBotSettings(bot)
-      set({ bot })
+      set({ bot, botSide: sideFor(bot, get().variant, get().botSide) })
     },
 
     setBotThinking: (botThinking) => set({ botThinking }),
