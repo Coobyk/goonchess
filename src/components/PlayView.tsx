@@ -139,7 +139,7 @@ export function PlayView() {
                   <Bot />
                 )}
                 {bot.mode === 'all'
-                  ? 'Bots vs bots'
+                  ? 'Bot vs Bot'
                   : bot.mode === 'one'
                     ? `Bot · ${variant.teams.find((t) => t.id === bot.team)?.name ?? ''}`
                     : 'Opponent'}
@@ -169,7 +169,7 @@ export function PlayView() {
                       One bot
                     </ToggleGroupItem>
                     <ToggleGroupItem value="all" className="flex-1">
-                      Bots vs bots
+                      Bot vs Bot
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
