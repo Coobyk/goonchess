@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
-import { RotateCcw, Undo2, Trophy, Swords, ShieldAlert } from 'lucide-react'
+import { RotateCcw, Undo2, Trophy, ShieldAlert } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { PieceGlyph } from './PieceGlyph'
 import { Badge } from './ui/badge'
@@ -32,8 +32,6 @@ export function PlayView() {
   const resetGame = useAppStore((s) => s.resetGame)
   const undo = useAppStore((s) => s.undo)
   const canUndo = useAppStore((s) => s.undoStack.length > 0)
-  const setMakerTab = useAppStore((s) => s.setMakerTab)
-  const setView = useAppStore((s) => s.setView)
   const threatSettings = useAppStore((s) => s.threats)
   const setThreats = useAppStore((s) => s.setThreats)
 
@@ -173,17 +171,6 @@ export function PlayView() {
               </div>
             </PopoverContent>
           </Popover>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setMakerTab('board')
-              setView('maker')
-            }}
-          >
-            <Swords /> Open Maker
-          </Button>
         </div>
       </div>
 
