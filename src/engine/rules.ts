@@ -204,7 +204,73 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
     if (enPassant) moves.push(enPassant)
   }
 
+  if (piece.flags.royal) moves.push(...castlingMoves(state, x, y, inst, piece, seen))
+
   if (piece.flags.mustCapture) return moves.filter((m) => !!m.capturedId)
+  return moves
+}
+
+/**
+ * Standard castling: an unmoved royal piece and an unmoved friendly rook on the
+ * same rank, with every square between them open. The king travels two squares
+ * toward the rook and the rook lands on the square the king crossed.
+ */
+function castlingMoves(
+  state: GameState,
+  x: number,
+  y: number,
+  inst: GameState['pieces'][string],
+  piece: PieceType,
+  seen: Set<string>,
+): Move[] {
+  if (inst.hasMoved) return []
+  if (tileAt(state.variant, x, y)?.terrain !== 'normal') return []
+
+  const moves: Move[] = []
+  for (const dir of [-1, 1] as const) {
+    const finalX = x + dir * 2
+    if (!inBounds(state.variant.board, finalX, y)) continue
+
+    let rookId: string | null = null
+    let rookX = x
+    for (let scan = x + dir; inBounds(state.variant.board, scan, y); scan += dir) {
+      const tile = tileAt(state.variant, scan, y)
+      if (tile?.terrain !== 'normal') break
+      const occupant = state.board[y][scan]
+      if (!occupant) continue
+      const rook = state.pieces[occupant]
+      const rookPiece = rook ? state.pieceTypes[rook.typeId] : null
+      if (
+        rook &&
+        rook.team === inst.team &&
+        !rook.hasMoved &&
+        rookPiece?.icon === 'rook'
+      ) {
+        rookId = occupant
+        rookX = scan
+      }
+      break
+    }
+    if (!rookId) continue
+
+    const rookToX = x + dir
+    if (state.board[y][finalX] !== null || state.board[y][rookToX] !== null) continue
+    const key = `${finalX},${y}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    moves.push({
+      from: { x, y },
+      to: { x: finalX, y },
+      pieceId: inst.id,
+      effects: piece.effects.map((e) => ({ ...e })),
+      finalTo: { x: finalX, y },
+      castle: {
+        rookId,
+        rookFrom: { x: rookX, y },
+        rookTo: { x: rookToX, y },
+      },
+    })
+  }
   return moves
 }
 
@@ -304,9 +370,33 @@ export function getLegalMoves(state: GameState, x: number, y: number): Move[] {
   const inst = state.pieces[pieceId]
   if (!inst) return []
   return movesFor(state, x, y).filter((m) => {
+    if (m.castle) {
+      // You may not castle out of check, or through an attacked square.
+      if (isInCheck(state, inst.team)) return false
+      const dir = Math.sign(m.finalTo.x - m.from.x)
+      if (!isRoyalSafeOnSquare(state, m.pieceId, inst.team, m.from.x + dir, m.from.y)) {
+        return false
+      }
+    }
     const next = applyMove(state, m, { compute: false })
     return !isInCheck(next, inst.team)
   })
+}
+
+/** Put the royal piece on a square and see whether it is attacked there. */
+function isRoyalSafeOnSquare(
+  state: GameState,
+  royalId: string,
+  teamId: string,
+  x: number,
+  y: number,
+): boolean {
+  const probe = structuredClone(state)
+  const from = findPiece(probe, royalId)
+  if (!from) return false
+  probe.board[from.y][from.x] = null
+  probe.board[y][x] = royalId
+  return !isInCheck(probe, teamId)
 }
 
 export function hasAnyLegalMove(state: GameState, teamId: string): boolean {
@@ -386,6 +476,16 @@ export function applyMove(
   }
   next.board[fy][fx] = move.pieceId
   next.pieces[move.pieceId].hasMoved = true
+
+  // Castling moves the rook in the same turn.
+  if (move.castle) {
+    const { rookId, rookFrom, rookTo } = move.castle
+    if (next.board[rookFrom.y]?.[rookFrom.x] === rookId) {
+      next.board[rookFrom.y][rookFrom.x] = null
+      next.board[rookTo.y][rookTo.x] = rookId
+      if (next.pieces[rookId]) next.pieces[rookId].hasMoved = true
+    }
+  }
 
   if (hasSwap && move.capturedId) {
     next.board[move.from.y][move.from.x] = move.capturedId
@@ -482,6 +582,7 @@ function notationFor(
   piece: PieceType,
   capturedPiece?: PieceType,
 ) {
+  if (move.castle) return move.finalTo.x > move.from.x ? 'O-O' : 'O-O-O'
   const from = squareName(state.variant, move.from.x, move.from.y)
   const to = squareName(state.variant, move.finalTo.x, move.finalTo.y)
   const cap = move.capturedId ? 'x' : '-'

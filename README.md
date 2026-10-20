@@ -10,7 +10,7 @@ Deployable to Cloudflare Workers with GitHub Actions.
 ## Features
 
 - **Play view** — full rules engine with legal-move hints, hover previews, check
-  and checkmate detection, promotion, en passant, undo and move
+  and checkmate detection, castling, promotion, en passant, undo and move
   history.
 - **Rulebook** — `/rulebook` renders a human-readable guide from the current
   variant: starting board, terrain key, armies, win conditions, movement and

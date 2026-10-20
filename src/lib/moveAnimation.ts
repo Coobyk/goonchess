@@ -112,6 +112,26 @@ export function planMove(prev: GameState, game: GameState): MoveAnim | null {
     landing = travel
   }
 
+  // The rook glides alongside the king when castling.
+  if (move.castle) {
+    const rook = prev.pieces[move.castle.rookId]
+    if (rook) {
+      flights.push(
+        flight(
+          'castle-rook',
+          move.castle.rookId,
+          rook.typeId,
+          rook.team,
+          move.castle.rookFrom,
+          move.castle.rookTo,
+          'slide',
+          travel,
+          0,
+        ),
+      )
+    }
+  }
+
   // A captured piece either trades places with the mover or dissolves on arrival.
   const captured = move.capturedId ? prev.pieces[move.capturedId] : undefined
   if (captured && move.capturedId) {

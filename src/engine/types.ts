@@ -149,6 +149,13 @@ export interface Variant {
 
 /* ---------------------------------------------------------- game state */
 
+export interface CastleInfo {
+  /** The rook that moves with the king. */
+  rookId: string
+  rookFrom: Vec
+  rookTo: Vec
+}
+
 export interface Move {
   from: Vec
   to: Vec
@@ -160,6 +167,8 @@ export interface Move {
   /** Final square after portals. */
   finalTo: Vec
   promotionTypeId?: string
+  /** Set when this move is a king-side or queen-side castle. */
+  castle?: CastleInfo
 }
 
 /** Visual record of an explosion that happened during a move. */

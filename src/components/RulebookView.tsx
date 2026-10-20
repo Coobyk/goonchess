@@ -147,6 +147,9 @@ function ArmyBadge({ team, teamIndex }: { team: TeamConfig; teamIndex: number })
 
 export function RulebookView() {
   const variant = useAppStore((s) => s.variant)
+  const canCastle =
+    variant.pieceTypes.some((p) => p.flags.royal) &&
+    variant.pieceTypes.some((p) => p.icon === 'rook')
   const setView = useAppStore((s) => s.setView)
   const setMakerTab = useAppStore((s) => s.setMakerTab)
   const threats = useAppStore((s) => s.threats)
@@ -515,6 +518,14 @@ export function RulebookView() {
                 Portals and one-way portals move a piece to a linked square as part of the same
                 move. Walls and void squares stop movement entirely.
               </p>
+              {canCastle && (
+                <p>
+                  <span className="text-foreground font-medium">Castling</span> — a royal piece and a
+                  friendly rook that have not moved can castle if every square between them is open.
+                  The royal piece moves two squares toward the rook; the rook jumps to the square it
+                  crossed. You cannot castle out of check, through an attacked square, or onto one.
+                </p>
+              )}
               <p>
                 The turn panel shows whose move it is, whether the royal piece is in check, and any
                 active threat information. Undo steps back one move; restart resets the starting
