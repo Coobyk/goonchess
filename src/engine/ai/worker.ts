@@ -1,4 +1,5 @@
 import { searchBestMove, type BotLevel } from './search'
+import { applyMove } from '../rules'
 import type { GameState, Move } from '../types'
 
 /**
@@ -14,6 +15,8 @@ export interface BotRequest {
   seed: number
   /** Overrides the level's time budget, for playing against a clock. */
   timeBudgetMs?: number
+  /** Analyse the position instead of playing a move. */
+  analyze?: boolean
 }
 
 export interface BotReply {
@@ -23,6 +26,8 @@ export interface BotReply {
   depth: number
   nodes: number
   elapsedMs: number
+  /** The best line, in the notation of the variant. */
+  line: string[]
 }
 
 const scope = self as unknown as {
@@ -31,9 +36,9 @@ const scope = self as unknown as {
 }
 
 scope.onmessage = (event) => {
-  const { id, state, team, level, seed, timeBudgetMs } = event.data
+  const { id, state, team, level, seed, timeBudgetMs, analyze } = event.data
   try {
-    const result = searchBestMove(state, { team, level, seed, timeBudgetMs })
+    const result = searchBestMove(state, { team, level, seed, timeBudgetMs, analyze })
     scope.postMessage({
       id,
       move: result.move,
@@ -41,6 +46,7 @@ scope.onmessage = (event) => {
       depth: result.depth,
       nodes: result.nodes,
       elapsedMs: result.elapsedMs,
+      line: describeLine(state, result.line),
     })
   } catch (error) {
     scope.postMessage({
@@ -50,7 +56,21 @@ scope.onmessage = (event) => {
       depth: 0,
       nodes: 0,
       elapsedMs: 0,
+      line: [],
     })
     throw error
   }
+}
+
+/** Turns the best line into the notation the variant uses. */
+function describeLine(state: GameState, line: Move[]): string[] {
+  const out: string[] = []
+  let current = state
+  for (const move of line) {
+    const next = applyMove(current, move, { compute: false })
+    const record = next.moveHistory[next.moveHistory.length - 1]
+    out.push(record.notation)
+    current = next
+  }
+  return out
 }

@@ -13,6 +13,8 @@ export interface BotResult {
   depth: number
   nodes: number
   elapsedMs: number
+  /** The best line, in the notation of the variant. */
+  line: string[]
 }
 
 interface Pending {
@@ -40,12 +42,13 @@ export class BotWorker {
         depth: event.data.depth,
         nodes: event.data.nodes,
         elapsedMs: event.data.elapsedMs,
+        line: event.data.line ?? [],
       })
     }
     worker.onerror = () => {
       const pending = this.pending
       this.pending = null
-      pending?.resolve({ move: null, score: 0, depth: 0, nodes: 0, elapsedMs: 0 })
+      pending?.resolve({ move: null, score: 0, depth: 0, nodes: 0, elapsedMs: 0, line: [] })
     }
     this.worker = worker
     return worker
@@ -58,13 +61,14 @@ export class BotWorker {
     level: BotLevel,
     seed = Date.now(),
     timeBudgetMs?: number,
+    analyze = false,
   ): Promise<BotResult> {
     this.cancel()
     const worker = this.ensureWorker()
     const id = this.nextId++
     return new Promise<BotResult>((resolve) => {
       this.pending = { id, resolve }
-      const request: BotRequest = { id, state, team, level, seed, timeBudgetMs }
+      const request: BotRequest = { id, state, team, level, seed, timeBudgetMs, analyze }
       worker.postMessage(request)
     })
   }

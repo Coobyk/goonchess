@@ -75,12 +75,16 @@ export interface SearchOptions {
   seed?: number
   /** Overrides the level's time budget — used when a clock is running. */
   timeBudgetMs?: number
+  /** Analyse the position: always the best line, never a weaker move. */
+  analyze?: boolean
 }
 
 export interface SearchResult {
   move: Move | null
   /** Evaluation of the chosen move, in centipawns, from the bot's side. */
   score: number
+  /** The best line the search found. */
+  line: Move[]
   /** Deepest search that finished. */
   depth: number
   nodes: number
@@ -100,6 +104,8 @@ interface SearchContext {
   eliminationWins: boolean
   kingCaptureWins: boolean
   teams: string[]
+  /** The best line found, one array per ply. */
+  pv: Move[][]
 }
 
 /** Small deterministic random generator, so a seed gives a repeatable game. */
@@ -267,7 +273,14 @@ function negamax(
       score = -negamax(option.next, depth - 1, -beta, -alpha, ply + 1, ctx)
     }
     if (ctx.aborted) return best === -Infinity ? 0 : best
-    if (score > best) best = score
+    if (score > best) {
+      best = score
+      // Remember the line that leads here.
+      const line = [option.move]
+      const child = ctx.pv[ply + 1]
+      if (child) line.push(...child)
+      ctx.pv[ply] = line
+    }
     if (best > alpha) alpha = best
     if (alpha >= beta) break
   }
@@ -319,6 +332,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     eliminationWins: false,
     kingCaptureWins: false,
     teams: state.variant.teams.map((t) => t.id),
+    pv: [],
   }
   for (const condition of state.variant.winConditions) {
     if (condition.kind === 'points') ctx.pointTarget = condition.threshold ?? Infinity
@@ -345,6 +359,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     return {
       move: fallback.length ? fallback[0].move : null,
       score: 0,
+      line: fallback.length ? [fallback[0].move] : [],
       depth: 0,
       nodes: ctx.nodes,
       elapsedMs: performance.now() - started,
@@ -354,12 +369,13 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   const sorted = rootResults.slice().sort((a, b) => b.score - a.score)
 
   // A weaker bot plays a move that is nearly as good, or an outright random
-  // one now and then, so it does not feel like a machine.
+  // one now and then, so it does not feel like a machine. An analysis always
+  // reports the best line.
   let chosen = sorted[0]
-  if (profile.randomness > 0 && random() < profile.randomness) {
+  if (!options.analyze && profile.randomness > 0 && random() < profile.randomness) {
     const any = allLegalMoves(state)
     if (any.length) chosen = { option: any[Math.floor(random() * any.length)], score: 0 }
-  } else if (profile.slop > 0 && sorted.length > 1) {
+  } else if (!options.analyze && profile.slop > 0 && sorted.length > 1) {
     // The scores of the moves that were cut off are only upper bounds, so the
     // shortlist is scored properly before a near miss is picked.
     const shortlist = sorted.slice(0, 6)
@@ -377,6 +393,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   return {
     move: chosen.option.move,
     score: chosen.score,
+    line: ctx.pv[0] ?? [chosen.option.move],
     depth,
     nodes: ctx.nodes,
     elapsedMs: performance.now() - started,

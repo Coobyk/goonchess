@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 import { Bot, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
+import { AnalysisPanel } from './AnalysisPanel'
 import { BotPlayer } from './BotPlayer'
 import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
@@ -465,6 +466,7 @@ export function PlayView() {
       </div>
 
       <aside className="flex flex-col gap-4">
+        <AnalysisPanel />
         <Card className="py-4">
           <CardHeader className="px-4">
             <CardTitle className="flex items-center justify-between text-sm">
