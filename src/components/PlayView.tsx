@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { RotateCcw, Undo2, Trophy, ShieldAlert } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { PieceGlyph } from './PieceGlyph'
+import { WinConfetti } from './WinConfetti'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -66,6 +67,7 @@ export function PlayView() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <WinConfetti />
       <div className="flex flex-col items-center gap-4">
         {game.winner && (
           <Alert className="w-full max-w-xl">

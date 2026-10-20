@@ -16,6 +16,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
   explosions and game endings, with a mute toggle.
 - **Threat visualizer** — an optional overlay for attacked squares, hanging
   pieces and defended pieces, for the side to move or both armies at once.
+- **Win confetti** — a canvas volley in the winner's colours, skipped when the
+  visitor prefers reduced motion.
 - **Animated moves** — a piece glides to the square it landed on instead of
   teleporting. A capture fades out as the mover arrives, a swap sends both
   pieces on their way, a portal swallows the piece and spits it out at the
