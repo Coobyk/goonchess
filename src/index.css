@@ -217,6 +217,11 @@
     transform-origin: 50% 62%;
     will-change: transform;
   }
+  /* The piece carried under the cursor while dragging. */
+  .piece-dragging {
+    transform: scale(1.14) rotate(-3deg);
+    filter: drop-shadow(0 10px 14px rgb(0 0 0 / 0.45));
+  }
 }
 
 @keyframes blast-cell {

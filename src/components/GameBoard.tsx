@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { BoardShell, tileBackground } from './BoardShell'
 import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
@@ -89,6 +89,73 @@ export function GameBoard() {
   const { variant, board, pieceTypes, turn } = game
   const { width: cols, height: rows } = variant.board
   const cell = boardCellSize(width, cols, 64, 24)
+
+  const [drag, setDrag] = useState<{ pieceId: string; clientX: number; clientY: number } | null>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    grid: HTMLElement
+    startX: number
+    startY: number
+    pieceId: string
+    moved: boolean
+  } | null>(null)
+  const suppressClickUntil = useRef(0)
+
+  const startDrag = (e: ReactPointerEvent<HTMLButtonElement>, x: number, y: number) => {
+    if (e.button !== 0 || game.winner) return
+    const pieceId = board[y]?.[x]
+    const inst = pieceId ? game.pieces[pieceId] : undefined
+    if (!pieceId || !inst || inst.team !== turn) return
+    const grid = e.currentTarget.parentElement
+    if (!grid) return
+    selectSquare(x, y)
+    dragRef.current = {
+      pointerId: e.pointerId,
+      grid,
+      startX: e.clientX,
+      startY: e.clientY,
+      pieceId,
+      moved: false,
+    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* pointer capture is best-effort */
+    }
+  }
+
+  const moveDrag = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const dragState = dragRef.current
+    if (!dragState || dragState.pointerId !== e.pointerId) return
+    if (!dragState.moved) {
+      if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < 5) return
+      dragState.moved = true
+    }
+    setDrag({ pieceId: dragState.pieceId, clientX: e.clientX, clientY: e.clientY })
+  }
+
+  const endDrag = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const dragState = dragRef.current
+    if (!dragState || dragState.pointerId !== e.pointerId) return
+    dragRef.current = null
+    setDrag(null)
+    if (!dragState.moved) return
+
+    // The click that follows a drag must not be treated as a fresh square click.
+    suppressClickUntil.current = performance.now() + 150
+
+    const rect = dragState.grid.getBoundingClientRect()
+    const tx = Math.floor((e.clientX - rect.left) / cell)
+    const ty = Math.floor((e.clientY - rect.top) / cell)
+    if (tx >= 0 && ty >= 0 && tx < cols && ty < rows) selectSquare(tx, ty)
+  }
+
+  const cancelDrag = () => {
+    dragRef.current = null
+    setDrag(null)
+  }
+
+  const draggingId = drag?.pieceId
 
   const lastRecord = game.moveHistory[game.moveHistory.length - 1]
   const lastMove = lastRecord?.move
@@ -215,11 +282,22 @@ export function GameBoard() {
               <button
                 key={`${x}-${y}`}
                 type="button"
-                onClick={() => selectSquare(x, y)}
+                onClick={() => {
+                  if (suppressClickUntil.current) {
+                    const blocked = performance.now() < suppressClickUntil.current
+                    suppressClickUntil.current = 0
+                    if (blocked) return
+                  }
+                  selectSquare(x, y)
+                }}
+                onPointerDown={(e) => startDrag(e, x, y)}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onPointerCancel={cancelDrag}
                 onMouseEnter={() => setHover({ x, y })}
                 onMouseLeave={() => setHover(null)}
                 className={cn(
-                  'relative flex cursor-pointer items-center justify-center p-0 transition-[filter] outline-none',
+                  'relative flex cursor-pointer items-center justify-center p-0 transition-[filter] outline-none touch-none',
                   'hover:brightness-105 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',
                 )}
                 style={{ backgroundColor: tileBackground({ ...variant.board, x, y }) }}
@@ -239,7 +317,7 @@ export function GameBoard() {
                   />
                 )}
 
-                {piece && pieceType && !hiddenPieces.has(piece.id) && (
+                {piece && pieceType && !hiddenPieces.has(piece.id) && piece.id !== draggingId && (
                   <span
                     className={cn(
                       'relative z-10 inline-flex',
@@ -272,6 +350,26 @@ export function GameBoard() {
           }),
         )}
       </BoardShell>
+
+      {drag && (() => {
+        const inst = game.pieces[drag.pieceId]
+        const type = inst ? pieceTypes[inst.typeId] : null
+        if (!inst || !type) return null
+        return (
+          <div
+            className="pointer-events-none fixed z-[60] -translate-x-1/2 -translate-y-1/2"
+            style={{ left: drag.clientX, top: drag.clientY }}
+          >
+            <span className="piece-dragging inline-flex drop-shadow-2xl">
+              <PieceGlyph
+                piece={type}
+                teamIndex={teamIndex(inst.team)}
+                size={Math.round(cell * 0.86)}
+              />
+            </span>
+          </div>
+        )
+      })()}
     </div>
   )
 }
