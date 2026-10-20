@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { LayoutGrid, ListTree, Settings2, Swords } from 'lucide-react'
+import { LayoutGrid, ListTree, Redo2, Settings2, Swords, Undo2 } from 'lucide-react'
 import { useAppStore, type MakerTab } from '@/store/useAppStore'
 import { MakerBoard } from './MakerBoard'
 import { BoardTab } from './BoardTab'
@@ -23,6 +23,10 @@ export function MakerView() {
   const makerTab = useAppStore((s) => s.makerTab)
   const setMakerTab = useAppStore((s) => s.setMakerTab)
   const variant = useAppStore((s) => s.variant)
+  const undoVariant = useAppStore((s) => s.undoVariant)
+  const redoVariant = useAppStore((s) => s.redoVariant)
+  const canUndoVariant = useAppStore((s) => s.variantHistory.length > 0)
+  const canRedoVariant = useAppStore((s) => s.variantFuture.length > 0)
   const brush = useAppStore((s) => s.brush)
   const setBrush = useAppStore((s) => s.setBrush)
   const portalPending = useAppStore((s) => s.portalPending)
@@ -67,6 +71,26 @@ export function MakerView() {
               {t.label}
             </TabsTrigger>
           ))}
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Undo the last change"
+              disabled={!canUndoVariant}
+              onClick={undoVariant}
+            >
+              <Undo2 /> Undo
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Redo the last undone change"
+              disabled={!canRedoVariant}
+              onClick={redoVariant}
+            >
+              <Redo2 /> Redo
+            </Button>
+          </div>
         </TabsList>
         <TabsContent value="board" className="mt-4">
           <BoardTab />

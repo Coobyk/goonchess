@@ -62,6 +62,10 @@ interface AppState {
   botThinking: boolean
   clock: ClockSettings
   clockState: ClockState
+  /** Earlier versions of the variant, for undo. */
+  variantHistory: Variant[]
+  /** Versions that were undone, for redo. */
+  variantFuture: Variant[]
 
   selectedPieceTypeId: string | null
   brush: Brush
@@ -78,6 +82,8 @@ interface AppState {
 
   /* variant editing */
   updateVariant: (updater: (v: Variant) => Variant) => void
+  undoVariant: () => void
+  redoVariant: () => void
   loadVariantIntoMaker: (v: Variant) => void
   resizeBoard: (width: number, height: number) => void
   setBoardColors: (light: string, dark: string) => void
@@ -216,12 +222,31 @@ export const useAppStore = create<AppState>((set, get) => {
   const commit = (variant: Variant) => {
     saveVariant(variant)
     const bot = get().bot
+    const previous = get().variant
     set({
       variant,
       game: createInitialState(variant),
       selected: null,
       legalMoves: [],
       undoStack: [],
+      variantHistory: [...get().variantHistory, previous].slice(-60),
+      variantFuture: [],
+      botSide: sideFor(bot, variant, get().botSide),
+    })
+  }
+
+  /** Sets the variant without touching the undo history. */
+  const commitDirect = (variant: Variant, history: Variant[], future: Variant[]) => {
+    saveVariant(variant)
+    const bot = get().bot
+    set({
+      variant,
+      game: createInitialState(variant),
+      selected: null,
+      legalMoves: [],
+      undoStack: [],
+      variantHistory: history,
+      variantFuture: future,
       botSide: sideFor(bot, variant, get().botSide),
     })
   }
@@ -241,6 +266,8 @@ export const useAppStore = create<AppState>((set, get) => {
     botThinking: false,
     clock: initialClock,
     clockState: initialClockState(initialClock, initial.teams.map((t) => t.id)),
+    variantHistory: [],
+    variantFuture: [],
     selected: null,
     legalMoves: [],
     undoStack: [],
@@ -281,6 +308,22 @@ export const useAppStore = create<AppState>((set, get) => {
     updateVariant: (updater) => {
       const next = updater(get().variant)
       commit(next)
+    },
+
+    undoVariant: () => {
+      const history = get().variantHistory
+      if (!history.length) return
+      const previous = history[history.length - 1]
+      const current = get().variant
+      commitDirect(previous, history.slice(0, -1), [...get().variantFuture, current])
+    },
+
+    redoVariant: () => {
+      const future = get().variantFuture
+      if (!future.length) return
+      const next = future[future.length - 1]
+      const current = get().variant
+      commitDirect(next, [...get().variantHistory, current], future.slice(0, -1))
     },
 
     loadVariantIntoMaker: (v) => commit(structuredClone(v)),
