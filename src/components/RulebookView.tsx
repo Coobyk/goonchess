@@ -557,7 +557,7 @@ export function RulebookView() {
                   </div>
                   <p className="text-muted-foreground mt-1 text-sm">
                     {soundEnabled
-                      ? 'Move, capture, castle, check, explosion and win sounds are on.'
+                      ? 'Move, capture, check, promotion, explosion and game-ending sounds are on.'
                       : 'Muted. Use the speaker button in the header to turn sounds back on.'}
                   </p>
                 </div>
