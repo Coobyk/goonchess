@@ -6,7 +6,7 @@ import { ThreatArrows } from './ThreatArrows'
 import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
 import { computeThreats, mergeThreats } from '@/engine/threats'
-import type { Move } from '@/engine/types'
+import type { Move, Vec } from '@/engine/types'
 import { BLAST_STAGGER, useMoveAnimation } from '@/lib/moveAnimation'
 import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
@@ -104,6 +104,8 @@ export function GameBoard() {
     moved: boolean
   } | null>(null)
   const suppressClickUntil = useRef(0)
+  /** Board-space point where a dragged piece was released. */
+  const dragOrigin = useRef<Vec | null>(null)
 
   const startDrag = (e: ReactPointerEvent<HTMLButtonElement>, x: number, y: number) => {
     if (e.button !== 0 || game.winner) return
@@ -151,8 +153,22 @@ export function GameBoard() {
     const rect = dragState.grid.getBoundingClientRect()
     const rawX = Math.floor((e.clientX - rect.left) / cell)
     const rawY = Math.floor((e.clientY - rect.top) / cell)
+    // The drop point, in board units, so the slide starts under the cursor.
+    const dropX = (e.clientX - rect.left) / cell - 0.5
+    const dropY = (e.clientY - rect.top) / cell - 0.5
+    dragOrigin.current = flipBoard
+      ? { x: cols - 1 - dropX, y: rows - 1 - dropY }
+      : { x: dropX, y: dropY }
     if (rawX >= 0 && rawY >= 0 && rawX < cols && rawY < rows) {
+      const historyBefore = useAppStore.getState().game.moveHistory.length
       selectSquare(flipBoard ? cols - 1 - rawX : rawX, flipBoard ? rows - 1 - rawY : rawY)
+      // Dropping somewhere illegal leaves the game untouched; do not leak the
+      // drag origin into the next ordinary click-move.
+      if (useAppStore.getState().game.moveHistory.length === historyBefore) {
+        dragOrigin.current = null
+      }
+    } else {
+      dragOrigin.current = null
     }
   }
 
@@ -176,8 +192,12 @@ export function GameBoard() {
   const lastMove = lastRecord?.move
   const historyLen = game.moveHistory.length
 
-  // Pieces glide from where they were to where they landed.
-  const { anim, duration: moveDuration } = useMoveAnimation(game)
+  // Pieces glide from where they were to where they landed. A drag starts the
+  // glide from the release point instead of the old square.
+  const { anim, duration: moveDuration } = useMoveAnimation(game, dragOrigin.current)
+  useEffect(() => {
+    dragOrigin.current = null
+  }, [game])
   const hiddenPieces = useMemo(() => {
     const ids = new Set<string>()
     for (const f of anim?.flights ?? []) ids.add(f.pieceId)

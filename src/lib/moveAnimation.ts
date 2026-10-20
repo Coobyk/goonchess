@@ -71,7 +71,7 @@ function span(a: Vec, b: Vec) {
 }
 
 /** Builds the animation for the move that was just played. */
-export function planMove(prev: GameState, game: GameState): MoveAnim | null {
+export function planMove(prev: GameState, game: GameState, origin?: Vec | null): MoveAnim | null {
   if (game.moveHistory.length <= prev.moveHistory.length) return null
   const record = game.moveHistory[game.moveHistory.length - 1]
   const move = record.move
@@ -96,16 +96,19 @@ export function planMove(prev: GameState, game: GameState): MoveAnim | null {
 
   // A portal hop ends on a different square than the one that was stepped on.
   const throughPortal = move.to.x !== move.finalTo.x || move.to.y !== move.finalTo.y
-  const travel = Math.min(MAX_MS, BASE_MS + PER_SQUARE_MS * span(move.from, move.to))
+  // A dragged piece is already under the cursor, so its flight starts there
+  // instead of snapping back to the square it came from.
+  const start = origin ?? move.from
+  const travel = Math.min(MAX_MS, BASE_MS + PER_SQUARE_MS * span(start, move.to))
   let landing: number
 
   if (throughPortal) {
     // The piece sinks into the portal and grows back out of the exit.
-    flights.push(flight('mover-in', move.pieceId, mover.typeId, mover.team, move.from, move.to, 'vanish', travel, 0))
+    flights.push(flight('mover-in', move.pieceId, mover.typeId, mover.team, start, move.to, 'vanish', travel, 0))
     flights.push(flight('mover-out', move.pieceId, mover.typeId, mover.team, move.finalTo, move.finalTo, 'emerge', EMERGE_MS, travel))
     landing = travel + EMERGE_MS
   } else {
-    flights.push(flight('mover', move.pieceId, mover.typeId, mover.team, move.from, move.finalTo, 'slide', travel, 0))
+    flights.push(flight('mover', move.pieceId, mover.typeId, mover.team, start, move.finalTo, 'slide', travel, 0))
     landing = travel
   }
 
@@ -180,14 +183,14 @@ export function planMove(prev: GameState, game: GameState): MoveAnim | null {
  * Tracks the animation of the latest move. The plan is known during the very
  * first render after a move, so a piece is never drawn in two places at once.
  */
-export function useMoveAnimation(game: GameState) {
+export function useMoveAnimation(game: GameState, origin?: Vec | null) {
   const [anim, setAnim] = useState<MoveAnim | null>(null)
   const [duration, setDuration] = useState(0)
   const [prevGame, setPrevGame] = useState<GameState | null>(null)
 
   // Derive the animation of the move that was just played.
   if (prevGame !== game) {
-    const plan = prevGame ? planMove(prevGame, game) : null
+    const plan = prevGame ? planMove(prevGame, game, origin) : null
     setAnim(plan)
     setDuration(plan?.duration ?? 0)
     setPrevGame(game)
