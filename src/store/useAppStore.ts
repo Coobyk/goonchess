@@ -5,6 +5,7 @@ import { defaultVariant } from '@/engine/templates'
 import { variantFromHash } from '@/lib/encoding'
 import {
   loadLibrary,
+  loadSoundEnabled,
   loadTheme,
   loadVariant,
   saveLibrary,
@@ -12,6 +13,7 @@ import {
   saveVariant,
   type SavedVariant,
 } from '@/lib/persist'
+import { playSound, preloadSounds, setSoundEnabled as applySoundEnabled } from '@/lib/sound'
 
 export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
 export type View = 'play' | 'maker'
@@ -23,6 +25,7 @@ interface AppState {
   view: View
   makerTab: MakerTab
   theme: Theme
+  soundEnabled: boolean
   library: SavedVariant[]
 
   selected: Vec | null
@@ -37,6 +40,7 @@ interface AppState {
   setView: (view: View) => void
   setMakerTab: (tab: MakerTab) => void
   setTheme: (theme: Theme) => void
+  setSoundEnabled: (enabled: boolean) => void
 
   /* variant editing */
   updateVariant: (updater: (v: Variant) => Variant) => void
@@ -149,6 +153,7 @@ export const useAppStore = create<AppState>((set, get) => {
     view: 'play',
     makerTab: 'board',
     theme: loadTheme(),
+    soundEnabled: loadSoundEnabled(),
     library: loadLibrary(),
     selected: null,
     legalMoves: [],
@@ -163,6 +168,11 @@ export const useAppStore = create<AppState>((set, get) => {
       saveTheme(theme)
       applyThemeToDom(theme)
       set({ theme })
+    },
+    setSoundEnabled: (enabled) => {
+      applySoundEnabled(enabled)
+      if (enabled) preloadSounds()
+      set({ soundEnabled: enabled })
     },
 
     updateVariant: (updater) => {
@@ -381,6 +391,7 @@ export const useAppStore = create<AppState>((set, get) => {
           return
         }
       }
+      if (selected && pieceId === null) playSound('illegal')
       set({ selected: null, legalMoves: [] })
     },
 

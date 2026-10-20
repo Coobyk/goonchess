@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { RotateCcw, Undo2, Trophy, Swords } from 'lucide-react'
 import { GameBoard } from './GameBoard'
@@ -11,6 +11,7 @@ import { ScrollArea } from './ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from './ui/alert'
 import { useAppStore } from '@/store/useAppStore'
 import { isInCheck } from '@/engine/rules'
+import { playSound } from '@/lib/sound'
 
 const STATUS_TEXT: Record<string, string> = {
   checkmate: 'Checkmate',
@@ -28,6 +29,15 @@ export function PlayView() {
   const canUndo = useAppStore((s) => s.undoStack.length > 0)
   const setMakerTab = useAppStore((s) => s.setMakerTab)
   const setView = useAppStore((s) => s.setView)
+
+  const prevWinner = useRef(game.winner)
+
+  useEffect(() => {
+    if (game.winner && game.winner !== prevWinner.current) {
+      playSound(game.winner === 'draw' ? 'draw' : 'win')
+    }
+    prevWinner.current = game.winner
+  }, [game.winner])
 
   useEffect(() => {
     if (game.winner) {

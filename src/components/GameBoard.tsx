@@ -6,6 +6,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
 import type { Move } from '@/engine/types'
 import { BLAST_STAGGER, useMoveAnimation } from '@/lib/moveAnimation'
+import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 
 const BLAST_DURATION = 620
@@ -108,6 +109,19 @@ export function GameBoard() {
   const prevHistoryLen = useRef(historyLen)
   const blastSource = lastRecord?.blasts?.[0]
 
+  // Sound the latest move. A capture, check or promotion gets its own accent.
+  const prevSoundLen = useRef(historyLen)
+  useEffect(() => {
+    const grew = historyLen > prevSoundLen.current
+    prevSoundLen.current = historyLen
+    if (!grew || !lastRecord) return
+    const move = lastRecord.move
+    if (move.promotionTypeId) playSound('promote')
+    else if (!game.winner && isInCheck(game, game.turn)) playSound('check')
+    else if (move.capturedId) playSound('capture')
+    else playSound('move')
+  }, [historyLen, lastRecord, game])
+
   useEffect(() => {
     const grew = historyLen > prevHistoryLen.current
     prevHistoryLen.current = historyLen
@@ -123,11 +137,15 @@ export function GameBoard() {
       radius: blastSource.radius,
     })
     // The shockwave only fires once the moving piece has landed.
+    const soundTimer = window.setTimeout(() => playSound('explosion'), moveDuration)
     const timer = window.setTimeout(
       () => setBlast(null),
       BLAST_DURATION + blastSource.radius * BLAST_STAGGER + 120 + moveDuration,
     )
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      window.clearTimeout(soundTimer)
+    }
   }, [historyLen, blastSource, moveDuration])
 
 

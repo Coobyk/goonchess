@@ -7,6 +7,8 @@ import {
   Plus,
   Sparkles,
   Swords,
+  Volume2,
+  VolumeX,
   Wrench,
 } from 'lucide-react'
 import { TEMPLATES, blankVariant } from '@/engine/templates'
@@ -32,6 +34,8 @@ export function AppHeader() {
   const setMakerTab = useAppStore((s) => s.setMakerTab)
   const loadVariantIntoMaker = useAppStore((s) => s.loadVariantIntoMaker)
   const variant = useAppStore((s) => s.variant)
+  const soundEnabled = useAppStore((s) => s.soundEnabled)
+  const setSoundEnabled = useAppStore((s) => s.setSoundEnabled)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
 
@@ -121,6 +125,15 @@ export function AppHeader() {
             <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Share and import" onClick={() => setShareOpen(true)}>
               <FileJson />
               <span className="hidden md:inline">Share</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
+              title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
+              onClick={() => setSoundEnabled(!soundEnabled)}
+            >
+              {soundEnabled ? <Volume2 /> : <VolumeX />}
             </Button>
             <ThemeToggle />
           </div>

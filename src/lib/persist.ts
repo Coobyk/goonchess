@@ -3,6 +3,7 @@ import type { Variant } from '@/engine/types'
 const VARIANT_KEY = 'goonchess:variant'
 const LIBRARY_KEY = 'goonchess:library'
 const THEME_KEY = 'goonchess:theme'
+const SOUND_KEY = 'goonchess:sound'
 
 export interface SavedVariant {
   id: string
@@ -37,3 +38,6 @@ export const saveLibrary = (items: SavedVariant[]) => write(LIBRARY_KEY, items)
 
 export const loadTheme = () => read<'dark' | 'light'>(THEME_KEY, 'dark')
 export const saveTheme = (t: 'dark' | 'light') => write(THEME_KEY, t)
+
+export const loadSoundEnabled = () => read<boolean>(SOUND_KEY, true)
+export const saveSoundEnabled = (v: boolean) => write(SOUND_KEY, v)
