@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
+import { ReplayView } from './ReplayView'
 import { BotPlayer } from './BotPlayer'
 import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
@@ -81,6 +82,7 @@ export function PlayView() {
   const cancelPromotion = useAppStore((s) => s.cancelPromotion)
   const clock = useAppStore((s) => s.clock)
   const setClock = useAppStore((s) => s.setClock)
+  const [replayOpen, setReplayOpen] = useState(false)
   const botThinking = useAppStore((s) => s.botThinking)
 
   const threatReport = useMemo(() => {
@@ -117,6 +119,7 @@ export function PlayView() {
       <WinConfetti />
       <BotPlayer />
       <ClockTicker />
+      <ReplayView open={replayOpen} onOpenChange={setReplayOpen} />
       <div className="flex flex-col items-center gap-4">
         {pendingPromotion && (
           <div
@@ -290,6 +293,10 @@ export function PlayView() {
               </div>
             </PopoverContent>
           </Popover>
+
+          <Button variant="outline" size="sm" onClick={() => setReplayOpen(true)}>
+            <RotateCcw /> Replay
+          </Button>
 
           <Popover>
             <PopoverTrigger asChild>

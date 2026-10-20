@@ -73,7 +73,9 @@ export function createInitialState(variant: Variant): GameState {
     if (!variant.teams.some((t) => t.id === s.team)) continue
     if (!inBounds(variant.board, s.x, s.y)) continue
     if (board[s.y][s.x] !== null) continue
-    const id = uid()
+    // The id only depends on where the piece stands, so a game can be rebuilt
+    // from its start — that is what the replay and the exports need.
+    const id = `${s.typeId}|${s.team}|${s.x},${s.y}`
     pieces[id] = { id, typeId: s.typeId, team: s.team, hasMoved: false }
     board[s.y][s.x] = id
   }
@@ -785,7 +787,9 @@ export function applyMove(
         const sx = move.from.x + eff.offset.x
         const sy = move.from.y + eff.offset.y
         if (inBounds(next.variant.board, sx, sy) && next.board[sy][sx] === null) {
-          const sid = uid()
+          // Spawned pieces are named after the move that made them, so the
+          // game can be rebuilt later.
+          const sid = `spawn|${state.moveHistory.length}|${eff.pieceTypeId}|${eff.offset.x},${eff.offset.y}`
           next.pieces[sid] = {
             id: sid,
             typeId: eff.pieceTypeId,
