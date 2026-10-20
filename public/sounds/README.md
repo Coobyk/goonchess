@@ -5,17 +5,21 @@ These sounds are dedicated to the public domain under
 for anything, with no attribution required.
 
 `move.mp3` and `capture.mp3` are cut from **“Chess Pieces Move (Close)”** by
-[JJTaynos](https://freesound.org/people/JJTaynos/sounds/733927/), also CC0.
-The remaining sounds are synthesized. Everything is produced by
-[`scripts/generate-sounds.py`](../../scripts/generate-sounds.py):
+[JJTaynos](https://freesound.org/people/JJTaynos/sounds/733927/). `check.mp3`
+comes from **“Notification Correct”** by
+[TheBuilder15](https://freesound.org/people/TheBuilder15/sounds/415762/), and
+`win.mp3` from **“Game Success Fanfare”** by
+[el_boss](https://freesound.org/people/el_boss/sounds/677859/). All four
+recordings are CC0. The remaining sounds are synthesized. Everything is
+produced by [`scripts/generate-sounds.py`](../../scripts/generate-sounds.py):
 
 ```bash
 python3 scripts/generate-sounds.py
 ```
 
-The script needs numpy and ffmpeg. It downloads the CC0 recording (cached in
-your temp directory), cuts the two board taps, synthesizes the rest, and
-encodes 128 kbps mono MP3s. Keep the `.mp3` files in this directory;
+The script needs numpy and ffmpeg. It downloads the CC0 recordings (cached in
+your temp directory), cuts the samples, synthesizes the rest, and encodes
+128 kbps mono MP3s. Keep the `.mp3` files in this directory;
 `src/lib/sound.ts` loads `/sounds/<name>.mp3`.
 
 | File | Used for |

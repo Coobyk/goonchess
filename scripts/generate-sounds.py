@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Build goonchess' sound set.
 
-The move and capture sounds are cut from a CC0 recording of wooden chess pieces
-being moved on a wooden board by JJTaynos on Freesound:
+Three sounds are cut from CC0 recordings on Freesound:
 
+* move/capture — "Chess Pieces Move (Close)" by JJTaynos
     https://freesound.org/s/733927/
-    "Chess Pieces Move (Close)" — CC0 1.0
+* check — "Notification Correct" by TheBuilder15
+    https://freesound.org/s/415762/
+* win — "Game Success Fanfare" by el_boss
+    https://freesound.org/s/677859/
 
-Everything else is synthesised here. Both halves of the set are dedicated to
-the public domain under CC0 1.0.
+Everything else is synthesised here. The whole set is dedicated to the public
+domain under CC0 1.0.
 
 Run ``python3 scripts/generate-sounds.py`` after editing. It needs numpy and
-ffmpeg (for decoding the source and encoding the MP3s).
+ffmpeg (for decoding the sources and encoding the MP3s).
 """
 
 from __future__ import annotations
@@ -28,8 +31,12 @@ import numpy as np
 
 SR = 44100
 OUT = os.path.join(os.path.dirname(__file__), "..", "public", "sounds")
-SOURCE_URL = "https://cdn.freesound.org/previews/733/733927_15803939-hq.mp3"
-SOURCE_CACHE = os.path.join(tempfile.gettempdir(), "goonchess-chess-moves.mp3")
+MOVE_SOURCE_URL = "https://cdn.freesound.org/previews/733/733927_15803939-hq.mp3"
+MOVE_SOURCE_CACHE = os.path.join(tempfile.gettempdir(), "goonchess-chess-moves.mp3")
+CHECK_SOURCE_URL = "https://cdn.freesound.org/previews/415/415762_6090639-hq.mp3"
+CHECK_SOURCE_CACHE = os.path.join(tempfile.gettempdir(), "goonchess-check.mp3")
+WIN_SOURCE_URL = "https://cdn.freesound.org/previews/677/677859_9129912-hq.mp3"
+WIN_SOURCE_CACHE = os.path.join(tempfile.gettempdir(), "goonchess-win.mp3")
 
 # Timestamps in the CC0 source recording. The taps were chosen for a short,
 # clean wooden attack; move is lighter, capture lands harder.
@@ -82,19 +89,19 @@ def highpass(x: np.ndarray, cutoff: float = 90.0) -> np.ndarray:
     return y
 
 
-def fetch_source() -> str:
-    if not os.path.exists(SOURCE_CACHE):
-        print("downloading CC0 chess recording...")
-        urllib.request.urlretrieve(SOURCE_URL, SOURCE_CACHE)
-    return SOURCE_CACHE
+def fetch_cached(url: str, cache: str, label: str) -> str:
+    if not os.path.exists(cache):
+        print(f"downloading CC0 {label}...")
+        urllib.request.urlretrieve(url, cache)
+    return cache
 
 
-def load_source() -> np.ndarray:
+def load_audio(path: str) -> np.ndarray:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
-        raise SystemExit("ffmpeg is required to decode the CC0 sound source")
+        raise SystemExit("ffmpeg is required to decode the CC0 sound sources")
     raw = subprocess.run(
-        [ffmpeg, "-v", "error", "-i", fetch_source(), "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
+        [ffmpeg, "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
         check=True,
         stdout=subprocess.PIPE,
     ).stdout
@@ -125,34 +132,24 @@ def make_capture(source: np.ndarray) -> np.ndarray:
     return normalize(sound, 0.94)
 
 
-def make_check() -> np.ndarray:
-    dur = 0.36
-    out = np.zeros(int(SR * dur), dtype=np.float32)
-    for i, freq in enumerate([1318.5, 1760.0]):
-        tt = t(0.22)
-        tone = (
-            np.sin(2 * np.pi * freq * tt)
-            + 0.32 * np.sin(2 * np.pi * freq * 2 * tt)
-            + 0.12 * np.sin(2 * np.pi * freq * 3 * tt)
-        )
-        tone *= np.exp(-tt * 13) * (1 - np.exp(-tt * 350))
-        place(out, tone * 0.42, i * 0.075)
-    # A soft wooden tick anchors the alert to the board.
-    place(out, extract(make_source_for_tick(), 0.0, 0.03), 0.0, 0.5)
-    return normalize(out, 0.66)
+def make_check(source: np.ndarray) -> np.ndarray:
+    """A short, calm two-note alert — distinct, but not a shrill alarm."""
+    duration = 0.64
+    segment = source[: int(SR * duration)].copy()
+    segment = highpass(segment, 140)
+    fade = int(SR * 0.05)
+    segment[-fade:] *= np.linspace(1, 0, fade)
+    return normalize(segment, 0.7)
 
 
-_TICK_SOURCE: np.ndarray | None = None
-
-
-def make_source_for_tick() -> np.ndarray:
-    """A tiny synthetic click used inside the otherwise tonal check alert."""
-    global _TICK_SOURCE
-    if _TICK_SOURCE is None:
-        tt = t(0.03)
-        rng = np.random.default_rng(8)
-        _TICK_SOURCE = (rng.uniform(-1, 1, len(tt)) * np.exp(-tt * 180)).astype(np.float32)
-    return _TICK_SOURCE
+def make_win(source: np.ndarray) -> np.ndarray:
+    """The opening phrase of a quick CC0 major-chord victory fanfare."""
+    start = int(SR * 0.12)
+    segment = source[start : start + int(SR * 2.5)].copy()
+    segment = highpass(segment, 80)
+    fade = int(SR * 0.08)
+    segment[-fade:] *= np.linspace(1, 0, fade)
+    return normalize(segment, 0.8)
 
 
 def make_promote() -> np.ndarray:
@@ -160,6 +157,7 @@ def make_promote() -> np.ndarray:
     for i, f in enumerate([659.25, 880.0, 1174.7, 1568.0]):
         place(out, bell(f, 0.42, 0.3, 4.2), i * 0.06)
     return normalize(out, 0.68)
+
 
 
 def make_explosion() -> np.ndarray:
@@ -178,15 +176,6 @@ def make_explosion() -> np.ndarray:
     rumble = noise * np.exp(-tt * 2.5) * 0.4
     out = burst * 0.8 + crackle * 0.6 + sub + rumble
     return normalize(out, 0.95)
-
-
-def make_win() -> np.ndarray:
-    out = np.zeros(int(SR * 1.15), dtype=np.float32)
-    for i, f in enumerate([523.25, 659.25, 783.99, 1046.5]):
-        place(out, bell(f, 0.62, 0.3, 2.8), i * 0.1)
-    for f in [523.25, 659.25, 783.99, 1046.5]:
-        place(out, bell(f, 0.75, 0.15, 2.1), 0.42)
-    return normalize(out, 0.76)
 
 
 def make_draw() -> np.ndarray:
@@ -224,14 +213,16 @@ def encode_mp3s(names: list[str]) -> None:
 
 
 def main() -> None:
-    source = load_source()
+    move_source = load_audio(fetch_cached(MOVE_SOURCE_URL, MOVE_SOURCE_CACHE, "chess recording"))
+    check_source = load_audio(fetch_cached(CHECK_SOURCE_URL, CHECK_SOURCE_CACHE, "check alert"))
+    win_source = load_audio(fetch_cached(WIN_SOURCE_URL, WIN_SOURCE_CACHE, "victory fanfare"))
     sounds = {
-        "move": make_move(source),
-        "capture": make_capture(source),
-        "check": make_check(),
+        "move": make_move(move_source),
+        "capture": make_capture(move_source),
+        "check": make_check(check_source),
         "promote": make_promote(),
         "explosion": make_explosion(),
-        "win": make_win(),
+        "win": make_win(win_source),
         "draw": make_draw(),
     }
     for name, data in sounds.items():
