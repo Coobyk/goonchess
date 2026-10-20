@@ -23,7 +23,7 @@ import { playSound, preloadSounds, setSoundEnabled as applySoundEnabled } from '
 import { pushRoute, routeFromLocation } from '@/lib/router'
 
 export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
-export type View = 'play' | 'maker'
+export type View = 'play' | 'maker' | 'rulebook'
 export type Theme = 'dark' | 'light'
 
 interface AppState {

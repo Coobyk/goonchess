@@ -17,12 +17,14 @@ export function parseRoute(pathname: string): Route {
       makerTab: MAKER_TABS.includes(tab) ? tab : 'board',
     }
   }
+  if (parts[0] === 'rulebook') return { view: 'rulebook', makerTab: 'board' }
   return { view: 'play', makerTab: 'board' }
 }
 
 /** The canonical URL for a view. */
 export function pathFor(view: View, makerTab: MakerTab = 'board'): string {
   if (view === 'maker') return makerTab === 'board' ? '/maker' : `/maker/${makerTab}`
+  if (view === 'rulebook') return '/rulebook'
   return '/'
 }
 

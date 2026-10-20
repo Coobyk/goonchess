@@ -12,6 +12,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Play view** — full rules engine with legal-move hints, hover previews, check
   and checkmate detection, promotion, en passant, undo and move
   history.
+- **Rulebook** — `/rulebook` renders a human-readable guide from the current
+  variant: starting board, terrain key, armies, win conditions, movement and
+  capture patterns, flags, effects, promotions and the active display settings.
 - **Sound** — a bundled CC0 sound set for moves, captures, checks, promotions,
   explosions and game endings, with a mute toggle.
 - **Threat visualizer** — an optional overlay for attacked squares, hanging
@@ -41,9 +44,10 @@ Deployable to Cloudflare Workers with GitHub Actions.
   blast wipes out every enemy piece inside it, spares the mover's own team, and
   plays a shockwave animation on the board), and spawning another piece type.
 - **Built-in Shadcn UI** — Radix primitives, dark-first theme with a light mode.
-- **Real URLs** — `/` plays, `/maker` builds, and every maker tab has its own
-  address (`/maker/pieces`, `/maker/rules`, ...). Back/forward and direct links
-  work; Cloudflare serves the SPA fallback for deep links.
+- **Real URLs** — `/` plays, `/maker` builds, `/rulebook` explains the rules, and
+  every maker tab has its own address (`/maker/pieces`, `/maker/rules`, ...).
+  Back/forward and direct links work; Cloudflare serves the SPA fallback for
+  deep links.
 - **Library, links and JSON** — save named variants locally, share an encoded
   link, or import/export the raw JSON.
 - **Short share links** — a variant is packed into a compact array form

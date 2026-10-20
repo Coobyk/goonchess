@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
+  BookOpen,
   ChevronDown,
   FileJson,
   Library,
@@ -68,7 +69,7 @@ export function AppHeader() {
               type="single"
               value={view}
               onValueChange={(v) => {
-                if (v) setView(v as 'play' | 'maker')
+                if (v) setView(v as 'play' | 'maker' | 'rulebook')
               }}
             >
               <ToggleGroupItem value="play" aria-label="Play" className="gap-1.5 px-3">
@@ -76,6 +77,9 @@ export function AppHeader() {
               </ToggleGroupItem>
               <ToggleGroupItem value="maker" aria-label="Maker" className="gap-1.5 px-3">
                 <Wrench /> <span className="hidden sm:inline">Maker</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="rulebook" aria-label="Rulebook" className="gap-1.5 px-3">
+                <BookOpen /> <span className="hidden sm:inline">Rulebook</span>
               </ToggleGroupItem>
             </ToggleGroup>
           </div>

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { AppHeader } from './components/AppHeader'
 import { MakerView } from './components/MakerView'
 import { PlayView } from './components/PlayView'
+import { RulebookView } from './components/RulebookView'
 import { Toaster } from './components/ui/sonner'
 import { TooltipProvider } from './components/ui/tooltip'
 import { pathFor, replaceRoute, routeFromLocation } from './lib/router'
@@ -34,7 +35,7 @@ export default function App() {
       <div className="flex min-h-full flex-col">
         <AppHeader />
         <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-8">
-          {view === 'play' ? <PlayView /> : <MakerView />}
+          {view === 'play' ? <PlayView /> : view === 'maker' ? <MakerView /> : <RulebookView />}
         </main>
         <footer className="border-t">
           <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs lg:px-8">
