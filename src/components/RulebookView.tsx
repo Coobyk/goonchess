@@ -477,8 +477,11 @@ export function RulebookView() {
                                 <ArrowRight className="size-3" />
                               </span>
                               <span>
-                                <span className="text-foreground">Promotes</span> — becomes a{' '}
-                                {pieceName(piece.promotion.typeId)} when it reaches the far rank.
+                                <span className="text-foreground">Promotes</span> — becomes{' '}
+                                {piece.promotion.typeIds
+                                  .map((id) => pieceName(id))
+                                  .join(' or ')}{' '}
+                                when it reaches the far rank.
                               </span>
                             </li>
                           )}

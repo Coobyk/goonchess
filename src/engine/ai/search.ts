@@ -1,4 +1,4 @@
-import { isInCheck, legalOptionsForTeam, type MoveOption } from '../rules'
+import { applyMove, isInCheck, legalOptionsForTeam, type MoveOption } from '../rules'
 import { evaluate } from './evaluate'
 import type { GameState, Move } from '../types'
 
@@ -129,7 +129,20 @@ function hasRoyal(state: GameState, teamId: string) {
 
 /** Every legal move of the side to move, with the state it leads to. */
 function allLegalMoves(state: GameState): MoveOption[] {
-  return legalOptionsForTeam(state, state.turn)
+  const out: MoveOption[] = []
+  for (const option of legalOptionsForTeam(state, state.turn)) {
+    const choices = option.move.promotionOptions
+    if (!choices || choices.length < 2) {
+      out.push(option)
+      continue
+    }
+    // A piece that may promote into several things is tried as each of them.
+    for (const typeId of choices) {
+      const move = { ...option.move, promotionTypeId: typeId }
+      out.push({ move, next: applyMove(state, move, { compute: false }) })
+    }
+  }
+  return out
 }
 
 /**

@@ -105,7 +105,7 @@ export function classicChess(): Variant {
   const doubleStep = slider([{ x: 0, y: -1 }], 2)
   doubleStep.firstMoveOnly = true
   pawn.move = [...pawn.move, doubleStep]
-  pawn.promotion = { typeId: queen.id }
+  pawn.promotion = { typeIds: [queen.id] }
 
   const pieceTypes = [king, queen, rook, bishop, knight, pawn]
   const setup: SetupPiece[] = []
@@ -156,7 +156,7 @@ export function miniChess(): Variant {
   const miniDouble = slider([{ x: 0, y: -1 }], 2)
   miniDouble.firstMoveOnly = true
   pawn.move = [...pawn.move, miniDouble]
-  pawn.promotion = { typeId: queen.id }
+  pawn.promotion = { typeIds: [queen.id] }
 
   const pieceTypes = [king, queen, rook, knight, pawn]
   const setup: SetupPiece[] = []
@@ -269,9 +269,9 @@ export function bombQueen(): Variant {
     value: 9,
     move: [leaper(ALL8)],
     effects: [{ kind: 'explosion', radius: 1 }],
-    promotion: { typeId: pawn.id },
+    promotion: { typeIds: [pawn.id] },
   })
-  pawn.promotion = { typeId: queen.id }
+  pawn.promotion = { typeIds: [queen.id] }
   const doubleStep = slider([{ x: 0, y: -1 }], 2)
   doubleStep.firstMoveOnly = true
   pawn.move = [...pawn.move, doubleStep]

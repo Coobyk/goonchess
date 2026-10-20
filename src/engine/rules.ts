@@ -108,6 +108,11 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
   const moves: Move[] = []
   const seen = new Set<string>()
 
+  // A piece that reaches the far rank may turn into one of several pieces.
+  const promoOptions = (piece.promotion?.typeIds ?? []).filter((id) => !!state.pieceTypes[id])
+  const team = teamById(variant, inst.team)
+  const farRank = team?.forward === 'down' ? variant.board.height - 1 : 0
+
   const push = (
     tx: number,
     ty: number,
@@ -125,6 +130,7 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
     const occupant = state.board[final.y][final.x]
     const key = `${final.x},${final.y}`
     if (seen.has(key)) return
+    const promotion = promoOptions.length && final.y === farRank ? promoOptions : undefined
 
     if (occupant === null) {
       if (mode === 'capture') return
@@ -135,6 +141,7 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
         pieceId,
         effects: piece.effects.map((e) => ({ ...e })),
         finalTo: final,
+        promotionOptions: promotion,
       })
       return
     }
@@ -153,6 +160,7 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
       capturedId: occupant,
       effects: piece.effects.map((e) => ({ ...e })),
       finalTo: final,
+      promotionOptions: promotion,
     })
   }
 
@@ -794,7 +802,13 @@ export function applyMove(
     const team = teamById(next.variant, inst.team)
     const farRank = team?.forward === 'down' ? next.variant.board.height - 1 : 0
     if (fy === farRank) {
-      const target = next.pieceTypes[piece.promotion.typeId]
+      const options = piece.promotion.typeIds.filter((id) => !!next.pieceTypes[id])
+      // The player may have chosen; otherwise the first option is used.
+      const chosen =
+        move.promotionTypeId && options.includes(move.promotionTypeId)
+          ? move.promotionTypeId
+          : options[0]
+      const target = chosen ? next.pieceTypes[chosen] : undefined
       if (target) {
         promotionTypeId = target.id
         touch(move.pieceId)
@@ -806,7 +820,13 @@ export function applyMove(
   const record = {
     move: { ...move, promotionTypeId },
     team: state.turn,
-    notation: notationFor(state, move, piece, capturedPiece),
+    notation: notationFor(
+      state,
+      move,
+      piece,
+      capturedPiece,
+      promotionTypeId ? next.pieceTypes[promotionTypeId]?.name : undefined,
+    ),
     capturedName: capturedPiece?.name,
     blasts: blasts.length ? blasts : undefined,
     origin: options.origin,
@@ -829,6 +849,7 @@ function notationFor(
   move: Move,
   piece: PieceType,
   capturedPiece?: PieceType,
+  promotionName?: string,
 ) {
   if (move.castle) return move.finalTo.x > move.from.x ? 'O-O' : 'O-O-O'
   const from = squareName(state.variant, move.from.x, move.from.y)
@@ -836,7 +857,8 @@ function notationFor(
   const cap = move.capturedId ? 'x' : '-'
   const suffix = capturedPiece ? ` (${capturedPiece.name})` : ''
   const enPassant = move.capturedAt ? ' e.p.' : ''
-  return `${piece.name} ${from}${cap}${to}${enPassant}${suffix}`
+  const promotion = promotionName ? `=${promotionName}` : ''
+  return `${piece.name} ${from}${cap}${to}${promotion}${enPassant}${suffix}`
 }
 
 /* -------------------------------------------------------------- outcome */

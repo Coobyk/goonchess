@@ -91,7 +91,10 @@ interface AppState {
 
   /* game */
   selectSquare: (x: number, y: number, origin?: Vec) => void
-  playMove: (move: Move, origin?: Vec) => void
+  playMove: (move: Move, origin?: Vec, promotionTypeId?: string) => void
+  pendingPromotion: { move: Move; origin?: Vec } | null
+  choosePromotion: (typeId: string) => void
+  cancelPromotion: () => void
   resetGame: () => void
   undo: () => void
 
@@ -162,9 +165,23 @@ export function normalizeVariant(input: unknown): Variant | null {
       effects: p.effects ?? [],
       capture: p.capture ?? [],
       move: p.move ?? [],
-      promotion: p.promotion ?? null,
+      promotion: normalizePromotion(p.promotion),
     })),
   }
+}
+
+/** Older variants stored a single promotion target. */
+function normalizePromotion(promotion: unknown): { typeIds: string[] } | null {
+  if (!promotion) return null
+  if (Array.isArray(promotion)) {
+    const typeIds = promotion.filter((id): id is string => typeof id === 'string' && !!id)
+    return typeIds.length ? { typeIds } : null
+  }
+  if (typeof promotion === 'object' && 'typeId' in promotion) {
+    const typeId = (promotion as { typeId?: unknown }).typeId
+    return typeof typeId === 'string' && typeId ? { typeIds: [typeId] } : null
+  }
+  return null
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -210,6 +227,7 @@ export const useAppStore = create<AppState>((set, get) => {
     selected: null,
     legalMoves: [],
     undoStack: [],
+    pendingPromotion: null,
     selectedPieceTypeId: initial.pieceTypes[0]?.id ?? null,
     brush: { mode: 'terrain', terrain: 'wall', team: initial.teams[0]?.id ?? 'white', typeId: null },
     portalPending: null,
@@ -382,7 +400,7 @@ export const useAppStore = create<AppState>((set, get) => {
           .filter((p) => p.id !== id)
           .map((p) => ({
             ...p,
-            promotion: p.promotion?.typeId === id ? null : p.promotion,
+            promotion: p.promotion?.typeIds.includes(id) ? null : p.promotion,
             effects: p.effects.filter((e) => !(e.kind === 'spawn' && e.pieceTypeId === id)),
           })),
         setup: v.setup.filter((s) => s.typeId !== id),
@@ -443,7 +461,13 @@ export const useAppStore = create<AppState>((set, get) => {
       if (selected) {
         const move = legalMoves.find((m) => m.finalTo.x === x && m.finalTo.y === y)
         if (move) {
-          get().playMove(move, origin)
+          const options = move.promotionOptions ?? []
+          if (options.length > 1) {
+            // The player picks what the piece turns into.
+            set({ pendingPromotion: { move, origin } })
+            return
+          }
+          get().playMove(move, origin, options[0])
           return
         }
       }
@@ -458,10 +482,19 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ selected: null, legalMoves: [] })
     },
 
-    playMove: (move, origin) => {
+    choosePromotion: (typeId) => {
+      const pending = get().pendingPromotion
+      if (!pending) return
+      set({ pendingPromotion: null })
+      get().playMove(pending.move, pending.origin, typeId)
+    },
+
+    cancelPromotion: () => set({ pendingPromotion: null }),
+
+    playMove: (move, origin, promotionTypeId) => {
       const { game } = get()
       if (game.winner) return
-      const next = applyMove(game, move, { origin })
+      const next = applyMove(game, { ...move, promotionTypeId }, { origin })
       set({
         game: next,
         selected: null,

@@ -92,8 +92,8 @@ export type Effect =
   | { kind: 'spawn'; pieceTypeId: string; offset: Vec }
 
 export interface Promotion {
-  /** Piece type this becomes when it reaches the far rank. */
-  typeId: string
+  /** The piece types this piece may become on the far rank. */
+  typeIds: string[]
 }
 
 export interface PieceType {
@@ -167,6 +167,8 @@ export interface Move {
   /** Final square after portals. */
   finalTo: Vec
   promotionTypeId?: string
+  /** The pieces this move may promote into. The player picks one. */
+  promotionOptions?: string[]
   /** Set when this move is a king-side or queen-side castle. */
   castle?: CastleInfo
 }

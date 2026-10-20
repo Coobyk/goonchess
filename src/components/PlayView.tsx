@@ -68,6 +68,9 @@ export function PlayView() {
   const bot = useAppStore((s) => s.bot)
   const botSide = useAppStore((s) => s.botSide)
   const setBot = useAppStore((s) => s.setBot)
+  const pendingPromotion = useAppStore((s) => s.pendingPromotion)
+  const choosePromotion = useAppStore((s) => s.choosePromotion)
+  const cancelPromotion = useAppStore((s) => s.cancelPromotion)
   const botThinking = useAppStore((s) => s.botThinking)
 
   const threatReport = useMemo(() => {
@@ -104,6 +107,33 @@ export function PlayView() {
       <WinConfetti />
       <BotPlayer />
       <div className="flex flex-col items-center gap-4">
+        {pendingPromotion && (
+          <div
+            role="dialog"
+            aria-label="Choose a promotion"
+            className="flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-card p-3 shadow-lg"
+          >
+            <span className="text-muted-foreground mr-1 text-sm">Promote into</span>
+            {(pendingPromotion.move.promotionOptions ?? []).map((typeId) => {
+              const type = variant.pieceTypes.find((p) => p.id === typeId)
+              if (!type) return null
+              return (
+                <button
+                  key={typeId}
+                  type="button"
+                  onClick={() => choosePromotion(typeId)}
+                  className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors hover:bg-muted"
+                >
+                  <PieceGlyph piece={type} teamIndex={teamIndex(game.turn)} size={22} />
+                  {type.name}
+                </button>
+              )
+            })}
+            <Button variant="ghost" size="sm" onClick={cancelPromotion}>
+              Cancel
+            </Button>
+          </div>
+        )}
         {game.winner && (
           <Alert className="w-full max-w-xl">
             <Trophy className="size-4" />

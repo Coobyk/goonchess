@@ -75,7 +75,9 @@ export function packVariant(variant: Variant): unknown {
       p.move.map(packPattern),
       p.capture.map(packPattern),
       p.effects.map((e) => packEffect(e, pieceIndex)),
-      p.promotion ? (pieceIndex.get(p.promotion.typeId) ?? -1) : -1,
+      p.promotion
+        ? p.promotion.typeIds.map((id) => pieceIndex.get(id) ?? -1).filter((i) => i >= 0)
+        : [],
     ]),
     variant.setup.map((s) => [pieceIndex.get(s.typeId) ?? -1, teamIndex.get(s.team) ?? 0, s.x, s.y]),
     variant.winConditions.map((w) =>
@@ -194,8 +196,13 @@ export function unpackVariant(input: unknown): Variant {
       unknown,
       unknown,
       unknown,
-      number,
+      number | number[],
     ]
+    const promoList = Array.isArray(promo) ? promo : Number.isInteger(promo) ? [promo] : []
+    // Older links stored a single index; newer ones store a list.
+    const promoIds = promoList
+      .filter((i): i is number => Number.isInteger(i) && i >= 0 && !!ids[i])
+      .map((i) => ids[i])
     return {
       id: ids[i],
       name: typeof pieceName === 'string' && pieceName ? pieceName : 'Piece',
@@ -208,10 +215,7 @@ export function unpackVariant(input: unknown): Variant {
       effects: asArray(effects)
         .map((e) => unpackEffect(e, ids))
         .filter((e): e is Effect => e !== null),
-      promotion:
-        Number.isInteger(promo) && promo >= 0 && ids[promo]
-          ? { typeId: ids[promo] }
-          : null,
+      promotion: promoIds.length ? { typeIds: promoIds } : null,
     } satisfies PieceType
   })
 

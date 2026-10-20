@@ -500,28 +500,48 @@ export function PiecesTab() {
           <CardHeader>
             <CardTitle className="text-base">Promotion</CardTitle>
             <CardDescription>
-              When this piece reaches the enemy back rank it becomes another piece type.
+              When this piece reaches the enemy back rank it becomes another piece type. Pick one
+              option, or several — the player then chooses when the piece gets there.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-3">
-            <Select
-              value={piece.promotion?.typeId ?? 'none'}
-              onValueChange={(v) => set({ promotion: v === 'none' ? null : { typeId: v } })}
-            >
-              <SelectTrigger className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Does not promote</SelectItem>
-                {variant.pieceTypes
-                  .filter((p) => p.id !== piece.id)
-                  .map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {variant.pieceTypes
+                .filter((p) => p.id !== piece.id)
+                .map((p) => {
+                  const on = piece.promotion?.typeIds.includes(p.id) ?? false
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        const current = piece.promotion?.typeIds ?? []
+                        const typeIds = on
+                          ? current.filter((id) => id !== p.id)
+                          : [...current, p.id]
+                        set({ promotion: typeIds.length ? { typeIds } : null })
+                      }}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors',
+                        on
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'hover:bg-muted text-muted-foreground',
+                      )}
+                    >
+                      <PieceGlyph piece={p} teamIndex={0} size={20} />
                       {p.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+                    </button>
+                  )
+                })}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {piece.promotion?.typeIds.length
+                ? piece.promotion.typeIds.length > 1
+                  ? 'The player picks one of these when the piece promotes.'
+                  : 'This piece always promotes into the piece above.'
+                : 'This piece never changes.'}
+            </p>
             <Button
               size="sm"
               variant="secondary"
