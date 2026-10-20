@@ -8,17 +8,15 @@ export type SoundName =
   | 'explosion'
   | 'win'
   | 'draw'
-  | 'illegal'
 
 const VOLUME: Record<SoundName, number> = {
-  move: 0.45,
-  capture: 0.55,
-  check: 0.5,
+  move: 0.5,
+  capture: 0.6,
+  check: 0.55,
   promote: 0.55,
   explosion: 0.7,
   win: 0.6,
   draw: 0.45,
-  illegal: 0.25,
 }
 
 let enabled = loadSoundEnabled()

@@ -19,7 +19,7 @@ import {
   type SavedVariant,
   type TurnView,
 } from '@/lib/persist'
-import { playSound, preloadSounds, setSoundEnabled as applySoundEnabled } from '@/lib/sound'
+import { preloadSounds, setSoundEnabled as applySoundEnabled } from '@/lib/sound'
 import { pushRoute, routeFromLocation } from '@/lib/router'
 
 export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
@@ -422,7 +422,6 @@ export const useAppStore = create<AppState>((set, get) => {
           return
         }
       }
-      if (selected && pieceId === null) playSound('illegal')
       set({ selected: null, legalMoves: [] })
     },
 
