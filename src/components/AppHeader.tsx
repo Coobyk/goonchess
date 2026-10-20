@@ -5,6 +5,7 @@ import {
   ChevronDown,
   FileJson,
   Library,
+  Menu,
   Plus,
   Sparkles,
   Swords,
@@ -46,6 +47,27 @@ export function AppHeader() {
     toast.success(`${name} loaded`)
   }
 
+  const templateItems = (
+    <>
+      {TEMPLATES.map((t) => (
+        <DropdownMenuItem key={t.id} onClick={() => loadTemplate(t.build, t.name)}>
+          <Sparkles className="text-muted-foreground" />
+          <span className="flex-1">{t.name}</span>
+          <span className="text-muted-foreground text-[10px]">{t.description}</span>
+        </DropdownMenuItem>
+      ))}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}>
+        <Plus className="text-muted-foreground" />
+        Blank 8×8
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(12, 12), 'Blank 12×12')}>
+        <Plus className="text-muted-foreground" />
+        Blank 12×12
+      </DropdownMenuItem>
+    </>
+  )
+
   return (
     <>
       <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-xl">
@@ -64,7 +86,7 @@ export function AppHeader() {
             </div>
           </div>
 
-          <div className="mx-auto flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:mx-auto">
             <ToggleGroup
               type="single"
               value={view}
@@ -84,48 +106,32 @@ export function AppHeader() {
             </ToggleGroup>
           </div>
 
-          <div className="flex items-center gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5" aria-label="New variant">
-                  <Plus />
-                  <span className="hidden md:inline">New</span>
-                  <ChevronDown className="opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Templates</DropdownMenuLabel>
-                {TEMPLATES.map((t) => (
-                  <DropdownMenuItem key={t.id} onClick={() => loadTemplate(t.build, t.name)}>
-                    <Sparkles className="text-muted-foreground" />
-                    <span className="flex-1">{t.name}</span>
-                    <span className="text-muted-foreground text-[10px]">{t.description}</span>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}
-                >
-                  <Plus className="text-muted-foreground" />
-                  Blank 8×8
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => loadTemplate(() => blankVariant(12, 12), 'Blank 12×12')}
-                >
-                  <Plus className="text-muted-foreground" />
-                  Blank 12×12
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex shrink-0 items-center gap-1">
+            <div className="hidden items-center gap-1 md:flex">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1.5" aria-label="New variant">
+                    <Plus />
+                    <span className="hidden md:inline">New</span>
+                    <ChevronDown className="opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Templates</DropdownMenuLabel>
+                  {templateItems}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Library" onClick={() => setLibraryOpen(true)}>
-              <Library />
-              <span className="hidden md:inline">Library</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Share and import" onClick={() => setShareOpen(true)}>
-              <FileJson />
-              <span className="hidden md:inline">Share</span>
-            </Button>
+              <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Library" onClick={() => setLibraryOpen(true)}>
+                <Library />
+                <span className="hidden md:inline">Library</span>
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Share and import" onClick={() => setShareOpen(true)}>
+                <FileJson />
+                <span className="hidden md:inline">Share</span>
+              </Button>
+            </div>
+
             <Button
               variant="ghost"
               size="icon"
@@ -136,6 +142,27 @@ export function AppHeader() {
               {soundEnabled ? <Volume2 /> : <VolumeX />}
             </Button>
             <ThemeToggle />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden" aria-label="More actions">
+                  <Menu />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>New variant</DropdownMenuLabel>
+                {templateItems}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setLibraryOpen(true)}>
+                  <Library className="text-muted-foreground" />
+                  Library
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShareOpen(true)}>
+                  <FileJson className="text-muted-foreground" />
+                  Share &amp; import
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
