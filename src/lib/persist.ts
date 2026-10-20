@@ -1,5 +1,6 @@
 import type { Variant } from '@/engine/types'
 import { DEFAULT_THREAT_SETTINGS, type ThreatSettings } from '@/engine/threats'
+import { DEFAULT_BOT_SETTINGS, type BotSettings } from '@/engine/ai/botSettings'
 
 const VARIANT_KEY = 'goonchess:variant'
 const LIBRARY_KEY = 'goonchess:library'
@@ -7,6 +8,7 @@ const THEME_KEY = 'goonchess:theme'
 const SOUND_KEY = 'goonchess:sound'
 const THREAT_KEY = 'goonchess:threats'
 const TURN_VIEW_KEY = 'goonchess:turn-view'
+const BOT_KEY = 'goonchess:bot'
 
 export type TurnView = 'off' | 'board' | 'pieces'
 
@@ -58,3 +60,9 @@ export const loadTurnView = (): TurnView => {
   return value === 'board' || value === 'pieces' ? value : 'off'
 }
 export const saveTurnView = (v: TurnView) => write(TURN_VIEW_KEY, v)
+
+export const loadBotSettings = (): BotSettings => ({
+  ...DEFAULT_BOT_SETTINGS,
+  ...read<Partial<BotSettings>>(BOT_KEY, {}),
+})
+export const saveBotSettings = (v: BotSettings) => write(BOT_KEY, v)

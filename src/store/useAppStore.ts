@@ -3,14 +3,17 @@ import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine
 import { applyMove, createInitialState, getLegalMoves, uid } from '@/engine/rules'
 import { defaultVariant } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
+import { DEFAULT_BOT_SETTINGS, type BotSettings } from '@/engine/ai/botSettings'
 import { variantFromHash } from '@/lib/encoding'
 import {
+  loadBotSettings,
   loadLibrary,
   loadSoundEnabled,
   loadTheme,
   loadThreatSettings,
   loadTurnView,
   loadVariant,
+  saveBotSettings,
   saveLibrary,
   saveTheme,
   saveThreatSettings,
@@ -40,6 +43,8 @@ interface AppState {
   selected: Vec | null
   legalMoves: Move[]
   undoStack: GameState[]
+  bot: BotSettings
+  botThinking: boolean
 
   selectedPieceTypeId: string | null
   brush: Brush
@@ -79,8 +84,13 @@ interface AppState {
 
   /* game */
   selectSquare: (x: number, y: number, origin?: Vec) => void
+  playMove: (move: Move, origin?: Vec) => void
   resetGame: () => void
   undo: () => void
+
+  /* bot */
+  setBot: (patch: Partial<BotSettings>) => void
+  setBotThinking: (thinking: boolean) => void
 
   /* library */
   addCurrentToLibrary: (name?: string) => void
@@ -170,6 +180,8 @@ export const useAppStore = create<AppState>((set, get) => {
     threats: loadThreatSettings(),
     turnView: loadTurnView(),
     library: loadLibrary(),
+    bot: { ...DEFAULT_BOT_SETTINGS, ...loadBotSettings() },
+    botThinking: false,
     selected: null,
     legalMoves: [],
     undoStack: [],
@@ -399,18 +411,14 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     selectSquare: (x, y, origin) => {
-      const { game, selected, legalMoves } = get()
+      const { game, selected, legalMoves, bot } = get()
       if (game.winner) return
+      // The bot plays its own side — the human cannot touch it.
+      if (bot.team && game.turn === bot.team) return
       if (selected) {
         const move = legalMoves.find((m) => m.finalTo.x === x && m.finalTo.y === y)
         if (move) {
-          const next = applyMove(game, move, { origin })
-          set({
-            game: next,
-            selected: null,
-            legalMoves: [],
-            undoStack: [...get().undoStack, game],
-          })
+          get().playMove(move, origin)
           return
         }
       }
@@ -425,14 +433,43 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ selected: null, legalMoves: [] })
     },
 
+    playMove: (move, origin) => {
+      const { game } = get()
+      if (game.winner) return
+      const next = applyMove(game, move, { origin })
+      set({
+        game: next,
+        selected: null,
+        legalMoves: [],
+        undoStack: [...get().undoStack, game],
+      })
+    },
+
     resetGame: () => set({ game: createInitialState(get().variant), selected: null, legalMoves: [], undoStack: [] }),
 
     undo: () => {
       const stack = get().undoStack
       if (!stack.length) return
-      const prev = stack[stack.length - 1]
-      set({ game: prev, undoStack: stack.slice(0, -1), selected: null, legalMoves: [] })
+      const bot = get().bot
+      let rest = stack.slice(0, -1)
+      let prev = rest[rest.length - 1]
+      // When the bot is playing, take back its move and the human's with it,
+      // so it is the human's turn again.
+      if (bot.team && prev && prev.turn === bot.team && rest.length > 1) {
+        rest = rest.slice(0, -1)
+        prev = rest[rest.length - 1]
+      }
+      if (!prev) return
+      set({ game: prev, undoStack: rest, selected: null, legalMoves: [] })
     },
+
+    setBot: (patch) => {
+      const bot = { ...get().bot, ...patch }
+      saveBotSettings(bot)
+      set({ bot })
+    },
+
+    setBotThinking: (botThinking) => set({ botThinking }),
 
     addCurrentToLibrary: (name) => {
       const { variant, library } = get()

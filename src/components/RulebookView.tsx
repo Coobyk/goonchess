@@ -531,6 +531,10 @@ export function RulebookView() {
                 active threat information. Undo steps back one move; restart resets the starting
                 position.
               </p>
+              <p>
+                The <span className="text-foreground font-medium">Opponent</span> menu turns a
+                side over to a bot. It plays by the same rules as you do, in this very variant.
+              </p>
             </CardContent>
           </Card>
 

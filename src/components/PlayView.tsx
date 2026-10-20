@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
-import { RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2 } from 'lucide-react'
+import { Bot, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2 } from 'lucide-react'
 import { GameBoard } from './GameBoard'
+import { BotPlayer } from './BotPlayer'
 import { PieceGlyph } from './PieceGlyph'
 import { WinConfetti } from './WinConfetti'
 import { Badge } from './ui/badge'
@@ -17,6 +18,7 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { useAppStore } from '@/store/useAppStore'
 import { isInCheck } from '@/engine/rules'
 import { computeThreats, mergeThreats, threatSummary } from '@/engine/threats'
+import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
 import { playSound } from '@/lib/sound'
 
 const STATUS_TEXT: Record<string, string> = {
@@ -37,6 +39,9 @@ export function PlayView() {
   const setThreats = useAppStore((s) => s.setThreats)
   const turnView = useAppStore((s) => s.turnView)
   const setTurnView = useAppStore((s) => s.setTurnView)
+  const bot = useAppStore((s) => s.bot)
+  const setBot = useAppStore((s) => s.setBot)
+  const botThinking = useAppStore((s) => s.botThinking)
 
   const threatReport = useMemo(() => {
     if (!threatSettings.show) return null
@@ -70,6 +75,7 @@ export function PlayView() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <WinConfetti />
+      <BotPlayer />
       <div className="flex flex-col items-center gap-4">
         {game.winner && (
           <Alert className="w-full max-w-xl">
@@ -93,6 +99,71 @@ export function PlayView() {
           <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo}>
             <Undo2 /> Undo
           </Button>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant={bot.team ? 'secondary' : 'outline'} size="sm">
+                {botThinking ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Bot />
+                )}
+                {bot.team
+                  ? `Bot · ${variant.teams.find((t) => t.id === bot.team)?.name ?? ''}`
+                  : 'Opponent'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="center">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Opponent</Label>
+                  <ToggleGroup
+                    type="single"
+                    className="w-full"
+                    value={bot.team ?? 'none'}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      setBot({ team: value === 'none' ? null : value })
+                    }}
+                  >
+                    <ToggleGroupItem value="none" className="flex-1">
+                      Two players
+                    </ToggleGroupItem>
+                    {variant.teams.map((team) => (
+                      <ToggleGroupItem key={team.id} value={team.id} className="flex-1">
+                        Bot · {team.name}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </div>
+
+                {bot.team && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Strength</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(Object.keys(LEVEL_LABELS) as BotLevel[]).map((level) => (
+                        <Button
+                          key={level}
+                          size="sm"
+                          variant={bot.level === level ? 'secondary' : 'outline'}
+                          onClick={() => setBot({ level })}
+                        >
+                          {LEVEL_LABELS[level]}
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{LEVEL_HINTS[bot.level]}</p>
+                  </div>
+                )}
+
+                <Separator />
+                <p className="text-xs text-muted-foreground">
+                  The bot plays with goonchess&apos; own rules engine, so it works in every
+                  variant — custom pieces, portals, blasts and all.
+                </p>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <Popover>
             <PopoverTrigger asChild>
@@ -251,6 +322,11 @@ export function PlayView() {
           <CardContent className="px-4 text-sm text-muted-foreground">
             {game.winner ? (
               <span className="capitalize">{game.status.replace('-', ' ')}</span>
+            ) : botThinking ? (
+              <span className="flex items-center gap-2 text-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                The bot is thinking…
+              </span>
             ) : checked ? (
               <span className="text-rose-500">Check — the royal piece is under attack.</span>
             ) : (

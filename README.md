@@ -12,6 +12,10 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Play view** — full rules engine with legal-move hints, hover previews, check
   and checkmate detection, castling, promotion, en passant, undo and move
   history.
+- **Opponent bot** — play against a bot in any variant. It searches with the
+  same rules engine the game uses, so it understands custom pieces, portals and
+  blasts; three strengths, from a casual opponent to a deep search. The search
+  runs in a worker, so the board stays responsive while it thinks.
 - **Rulebook** — `/rulebook` renders a human-readable guide from the current
   variant: starting board, terrain key, armies, win conditions, movement and
   capture patterns, flags, effects, promotions and the active display settings.
