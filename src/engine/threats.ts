@@ -4,6 +4,8 @@ import type { GameState, Move, Vec } from './types'
 /** What the threat overlay should mark. Persisted with the user's settings. */
 export interface ThreatSettings {
   show: boolean
+  /** Arrows from every attacker to the piece it can capture. */
+  arrows: boolean
   /** Faint tint on every square the enemy can move to or capture on. */
   coverage: boolean
   /** Ring friendly pieces that are attacked and not defended. */
@@ -16,10 +18,23 @@ export interface ThreatSettings {
 
 export const DEFAULT_THREAT_SETTINGS: ThreatSettings = {
   show: false,
+  arrows: true,
   coverage: true,
   hanging: true,
   defended: true,
   scope: 'turn',
+}
+
+export interface ThreatEdge {
+  /** Attacking square. */
+  from: Vec
+  /** Square of the piece being threatened. */
+  to: Vec
+  attackerId: string
+  targetId: string
+  team: string
+  /** The target can be recaptured, so taking it is not free. */
+  defended: boolean
 }
 
 export interface PieceThreat {
@@ -36,6 +51,8 @@ export interface ThreatReport {
   coverage: Set<string>
   /** Friendly pieces that can be captured right now. */
   pieces: Map<string, PieceThreat>
+  /** One entry per attacking piece and threatened target. */
+  edges: ThreatEdge[]
 }
 
 export const threatKey = (x: number, y: number) => `${x},${y}`
@@ -48,6 +65,7 @@ export const threatKey = (x: number, y: number) => `${x},${y}`
 export function computeThreats(state: GameState, teamId: string): ThreatReport {
   const coverage = new Set<string>()
   const pieces = new Map<string, PieceThreat>()
+  const edges: ThreatEdge[] = []
   const captures = new Map<string, { move: Move; by: string }>()
 
   for (const id in state.pieces) {
@@ -60,6 +78,14 @@ export function computeThreats(state: GameState, teamId: string): ThreatReport {
       if (!move.capturedId) continue
       const target = state.pieces[move.capturedId]
       if (!target || target.team !== teamId) continue
+      edges.push({
+        from: { ...pos },
+        to: { ...move.finalTo },
+        attackerId: id,
+        targetId: move.capturedId,
+        team: inst.team,
+        defended: false,
+      })
       const existing = pieces.get(move.capturedId)
       if (existing) {
         if (!existing.by.includes(inst.team)) existing.by.push(inst.team)
@@ -80,9 +106,12 @@ export function computeThreats(state: GameState, teamId: string): ThreatReport {
     const attack = captures.get(pieceId)
     if (!attack) continue
     threat.defended = canRecapture(state, pieceId, attack.move)
+    for (const edge of edges) {
+      if (edge.targetId === pieceId) edge.defended = threat.defended
+    }
   }
 
-  return { coverage, pieces }
+  return { coverage, pieces, edges }
 }
 
 function canRecapture(state: GameState, defenderId: string, attack: Move): boolean {
@@ -120,6 +149,8 @@ function canRecapture(state: GameState, defenderId: string, attack: Move): boole
 export function mergeThreats(reports: ThreatReport[]): ThreatReport {
   const coverage = new Set<string>()
   const pieces = new Map<string, PieceThreat>()
+  const edges: ThreatEdge[] = []
+  const edgeKeys = new Set<string>()
   for (const report of reports) {
     for (const key of report.coverage) coverage.add(key)
     for (const [id, threat] of report.pieces) {
@@ -131,8 +162,14 @@ export function mergeThreats(reports: ThreatReport[]): ThreatReport {
         pieces.set(id, { ...threat, by: [...threat.by] })
       }
     }
+    for (const edge of report.edges) {
+      const key = `${edge.attackerId}:${edge.targetId}`
+      if (edgeKeys.has(key)) continue
+      edgeKeys.add(key)
+      edges.push({ ...edge })
+    }
   }
-  return { coverage, pieces }
+  return { coverage, pieces, edges }
 }
 
 /** Counts for the sidebar legend. */

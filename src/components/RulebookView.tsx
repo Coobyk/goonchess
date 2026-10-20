@@ -178,6 +178,7 @@ export function RulebookView() {
   const threatCopy = (settings: ThreatSettings) => {
     if (!settings.show) return 'Off'
     const layers = [
+      settings.arrows && 'threat arrows',
       settings.coverage && 'attacked squares',
       settings.hanging && 'hanging pieces',
       settings.defended && 'defended pieces',
@@ -545,6 +546,12 @@ export function RulebookView() {
                     <ShieldAlert className="text-muted-foreground size-4" /> Threat visualizer
                   </div>
                   <p className="text-muted-foreground mt-1 text-sm">{threatCopy(threats)}</p>
+                  {threats.show && (
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Arrows point from each attacker to the piece it can capture. Rose means the
+                      target is undefended; amber means a recapture is waiting.
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-lg border p-3">
                   <div className="flex items-center gap-2 text-sm font-medium">

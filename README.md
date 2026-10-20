@@ -17,8 +17,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
   capture patterns, flags, effects, promotions and the active display settings.
 - **Sound** — a bundled CC0 sound set for moves, captures, checks, promotions,
   explosions and game endings, with a mute toggle.
-- **Threat visualizer** — an optional overlay for attacked squares, hanging
-  pieces and defended pieces, for the side to move or both armies at once.
+- **Threat visualizer** — an optional overlay with arrows from each attacker to
+  the piece it can capture, plus attacked-square coverage and rings for hanging
+  or defended pieces, for the side to move or both armies at once.
 - **Win confetti** — a canvas volley in the winner's colours, skipped when the
   visitor prefers reduced motion.
 - **Turn view** — for two players sharing a screen: leave the board alone, flip

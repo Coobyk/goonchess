@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { BoardShell, tileBackground } from './BoardShell'
 import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
+import { ThreatArrows } from './ThreatArrows'
 import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
 import { computeThreats, mergeThreats } from '@/engine/threats'
@@ -276,16 +277,27 @@ export function GameBoard() {
         cellSize={cell}
         flip={flipBoard}
         overlay={
-          <MoveAnimationLayer
-            anim={anim}
-            cell={cell}
-            cols={cols}
-            rows={rows}
-            flip={flipBoard}
-            rotation={rotatePieces ? 180 : 0}
-            pieceTypes={pieceTypes}
-            teamIndex={teamIndex}
-          />
+          <>
+            {threatSettings.show && threatSettings.arrows && threats && (
+              <ThreatArrows
+                edges={threats.edges}
+                cell={cell}
+                cols={cols}
+                rows={rows}
+                flip={flipBoard}
+              />
+            )}
+            <MoveAnimationLayer
+              anim={anim}
+              cell={cell}
+              cols={cols}
+              rows={rows}
+              flip={flipBoard}
+              rotation={rotatePieces ? 180 : 0}
+              pieceTypes={pieceTypes}
+              teamIndex={teamIndex}
+            />
+          </>
         }
       >
         {Array.from({ length: rows }, (_, dy) =>

@@ -119,6 +119,20 @@ export function PlayView() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
+                      <Label className="text-sm">Threat arrows</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Arrows from each attacker to the piece it can take.
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label="Show threat arrows"
+                      disabled={!threatSettings.show}
+                      checked={threatSettings.arrows}
+                      onCheckedChange={(arrows) => setThreats({ arrows })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
                       <Label className="text-sm">Attacked squares</Label>
                       <p className="text-xs text-muted-foreground">Faint dots on every square in range.</p>
                     </div>
@@ -253,6 +267,15 @@ export function PlayView() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {threatSettings.arrows && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-0.5 text-rose-400">
+                        <span className="h-0.5 w-3 rounded-full bg-current" />
+                        <span className="-ml-1">›</span>
+                      </span>
+                      arrows
+                    </span>
+                  )}
                   {threatSettings.coverage && (
                     <span className="flex items-center gap-1.5">
                       <span className="threat-coverage inline-block size-3 rounded-full ring-1 ring-rose-400/30" />
