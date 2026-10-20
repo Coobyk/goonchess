@@ -39,6 +39,7 @@ const STATUS_TEXT: Record<string, string> = {
   points: 'Point target reached',
   stalemate: 'Stalemate — draw',
   timeout: 'Time ran out',
+  threefold: 'Draw by threefold repetition',
 }
 
 /** The three strengths, as a compact row of buttons. */
@@ -564,7 +565,7 @@ export function PlayView() {
           </CardHeader>
           <CardContent className="px-4 text-sm text-muted-foreground">
             {game.winner ? (
-              <span className="capitalize">{game.status.replace('-', ' ')}</span>
+              <span>{STATUS_TEXT[game.status] ?? game.status.replace('-', ' ')}</span>
             ) : botThinking ? (
               <span className="flex items-center gap-2 text-foreground">
                 <Loader2 className="size-3.5 animate-spin" />

@@ -4,12 +4,14 @@ import type {
   GameState,
   Move,
   MovePattern,
+  MoveRecord,
   PieceType,
   TeamConfig,
   Tile,
   Variant,
   Vec,
 } from './types'
+import { positionKey } from '@/lib/repetition'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -83,7 +85,7 @@ export function createInitialState(variant: Variant): GameState {
   const scores: Record<string, number> = {}
   for (const t of variant.teams) scores[t.id] = 0
 
-  return {
+  const state: GameState = {
     variant,
     board,
     pieces,
@@ -95,6 +97,9 @@ export function createInitialState(variant: Variant): GameState {
     scores,
     status: 'active',
   }
+  // The opening position counts towards a repetition.
+  state.startKey = positionKey(state)
+  return state
 }
 
 /** The pattern a die picked out of a piece's patterns. */
@@ -837,7 +842,7 @@ export function applyMove(
     }
   }
 
-  const record = {
+  const record: MoveRecord = {
     move: { ...move, promotionTypeId },
     team: state.turn,
     notation: notationFor(
@@ -852,12 +857,25 @@ export function applyMove(
     blasts: blasts.length ? blasts : undefined,
     origin: options.origin,
   }
-  next.moveHistory = [...next.moveHistory, record]
-
   // Turn switch
   const order = next.variant.teams.map((t) => t.id)
   const idx = order.indexOf(next.turn)
   next.turn = order[(idx + 1) % order.length]
+  next.moveHistory = [...next.moveHistory, record]
+
+  // A real move notes which position it left behind, so a repetition can be
+  // spotted later. It has to come after the turn has changed hands and after
+  // the move is in the history — the position depends on both.
+  if (options.san) {
+    const key = positionKey(next)
+    let repeats = 1
+    if (next.startKey === key) repeats += 1
+    for (const earlier of next.moveHistory) {
+      if (earlier.positionKey === key) repeats += 1
+    }
+    record.positionKey = key
+    record.repeats = repeats
+  }
 
   if (compute) {
     detectOutcome(next, inst.team, { capturedRoyal: !!capturedPiece?.flags.royal || blastRoyal })
@@ -1042,6 +1060,14 @@ export function detectOutcome(
       state.status = 'stalemate'
       return
     }
+  }
+
+  // The same position three times is a draw.
+  const last = state.moveHistory[state.moveHistory.length - 1]
+  if (last?.repeats && last.repeats >= 3) {
+    state.winner = 'draw'
+    state.status = 'threefold'
+    return
   }
 }
 

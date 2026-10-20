@@ -12,6 +12,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Play view** — full rules engine with legal-move hints, hover previews, check
   and checkmate detection, castling, promotion, en passant, undo and move
   history. A piece may promote into a choice of pieces, and the player picks.
+  The same position three times is a draw, counted with the same rule chess
+  uses: the pieces, the side to move, the castles still possible and the en
+  passant right all have to match.
 - **Opponent bot** — play against a bot in any variant. It searches with the
   same rules engine the game uses, so it understands custom pieces, portals and
   blasts; three strengths, from a casual opponent to a deep search. The search

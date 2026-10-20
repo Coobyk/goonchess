@@ -539,6 +539,11 @@ export function RulebookView() {
                 side over to a bot. It plays by the same rules as you do, in this very variant —
                 and two bots can play each other while you watch.
               </p>
+              <p>
+                The same position three times is a draw. Two positions count as the same when the
+                pieces stand in the same squares, the same side is to move, the same castles are
+                still possible and an en passant capture is available in both or in neither.
+              </p>
             </CardContent>
           </Card>
 

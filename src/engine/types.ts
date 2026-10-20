@@ -193,6 +193,10 @@ export interface MoveRecord {
   notation: string
   /** The move in algebraic notation, for PGN. */
   san?: string
+  /** What identifies the position after this move, for repetition. */
+  positionKey?: string
+  /** How often this position has now come up. */
+  repeats?: number
   capturedName?: string
   blasts?: Blast[]
   /** Release point of a dragged move, in board units, for the drop animation. */
@@ -219,6 +223,8 @@ export interface GameState {
   scores: Record<string, number>
   /** The die a piece rolled to pick its move, while it is being chosen. */
   roll?: { pieceId: string; value: number }
+  /** What identifies the position the game started from, for repetition. */
+  startKey?: string
   status:
     | 'active'
     | 'checkmate'
@@ -227,4 +233,5 @@ export interface GameState {
     | 'eliminated'
     | 'points'
     | 'timeout'
+    | 'threefold'
 }
