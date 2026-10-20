@@ -327,29 +327,30 @@ function enPassantMove(
 }
 
 export function isInCheck(state: GameState, teamId: string): boolean {
-  const royals: Vec[] = []
-  for (const id in state.pieces) {
-    const inst = state.pieces[id]
-    if (inst.team !== teamId) continue
-    if (state.pieceTypes[inst.typeId]?.flags.royal) {
-      const pos = findPiece(state, id)
-      if (pos) royals.push(pos)
+  // One walk over the board finds the royal pieces and the pieces that could
+  // attack them. Searching the board again for every piece is wasteful.
+  const royalIds = new Set<string>()
+  const enemies: { id: string; at: Vec }[] = []
+  for (let y = 0; y < state.board.length; y++) {
+    const row = state.board[y]
+    for (let x = 0; x < row.length; x++) {
+      const id = row[x]
+      if (!id) continue
+      const inst = state.pieces[id]
+      if (!inst) continue
+      if (inst.team === teamId) {
+        if (state.pieceTypes[inst.typeId]?.flags.royal) royalIds.add(id)
+        continue
+      }
+      enemies.push({ id, at: { x, y } })
     }
   }
-  if (royals.length === 0) return false
+  if (royalIds.size === 0) return false
 
-  for (const id in state.pieces) {
-    const inst = state.pieces[id]
-    if (inst.team === teamId) continue
-    const pos = findPiece(state, id)
-    if (!pos) continue
-    const caps = movesFor(state, pos.x, pos.y)
-    for (const m of caps) {
+  for (const enemy of enemies) {
+    for (const m of movesFor(state, enemy.at.x, enemy.at.y)) {
       if (!m.capturedId) continue
-      const target = state.pieces[m.capturedId]
-      if (target && target.team === teamId && state.pieceTypes[target.typeId]?.flags.royal) {
-        return true
-      }
+      if (royalIds.has(m.capturedId)) return true
     }
   }
   return false
@@ -364,23 +365,258 @@ export function findPiece(state: GameState, pieceId: string): Vec | null {
   return null
 }
 
+/**
+ * Copies the mutable parts of a game state.
+ *
+ * The variant and the piece type table are shared by reference: nothing in the
+ * engine ever mutates them, and deep-cloning the board terrain for every node
+ * of a search is pure waste. The board, the history and the score table are
+ * copied because those do change. The piece instances are shared until
+ * something changes one — then that single instance is copied first.
+ */
+export function cloneState(state: GameState): GameState {
+  return {
+    ...state,
+    board: state.board.map((row) => row.slice()),
+    pieces: { ...state.pieces },
+    moveHistory: state.moveHistory.slice(),
+    captured: state.captured.slice(),
+    scores: { ...state.scores },
+  }
+}
+
+/** A legal move together with the state that playing it produces. */
+export interface MoveOption {
+  move: Move
+  next: GameState
+}
+
 export function getLegalMoves(state: GameState, x: number, y: number): Move[] {
+  return legalOptions(state, x, y).map((option) => option.move)
+}
+
+/**
+ * The legal moves of one piece, each with the state it leads to. A search
+ * needs that child state anyway, so it is built once and handed over instead
+ * of being thrown away and rebuilt.
+ */
+export function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
   const pieceId = state.board[y]?.[x]
   if (!pieceId) return []
   const inst = state.pieces[pieceId]
   if (!inst) return []
-  return movesFor(state, x, y).filter((m) => {
-    if (m.castle) {
-      // You may not castle out of check, or through an attacked square.
-      if (isInCheck(state, inst.team)) return false
-      const dir = Math.sign(m.finalTo.x - m.from.x)
-      if (!isRoyalSafeOnSquare(state, m.pieceId, inst.team, m.from.x + dir, m.from.y)) {
-        return false
+  const options: MoveOption[] = []
+  for (const move of movesFor(state, x, y)) {
+    if (!castlingIsLegal(state, move, inst)) continue
+    const next = applyMove(state, move, { compute: false })
+    if (isInCheck(next, inst.team)) continue
+    options.push({ move, next })
+  }
+  return options
+}
+
+/** Castling has its own rules on top of the usual "do not stay in check". */
+function castlingIsLegal(state: GameState, move: Move, inst: GameState['pieces'][string]) {
+  if (!move.castle) return true
+  if (isInCheck(state, inst.team)) return false
+  const dir = Math.sign(move.finalTo.x - move.from.x)
+  return isRoyalSafeOnSquare(state, move.pieceId, inst.team, move.from.x + dir, move.from.y)
+}
+
+/* ------------------------------------------------- fast legality for a team */
+
+function squareKey(x: number, y: number) {
+  return `${x},${y}`
+}
+
+/** The squares the other armies can take right now. */
+function enemyAttackSquares(state: GameState, enemyTeams: Set<string>): Set<string> {
+  const squares = new Set<string>()
+  for (const id in state.pieces) {
+    const inst = state.pieces[id]
+    if (!enemyTeams.has(inst.team)) continue
+    const at = findPiece(state, id)
+    if (!at) continue
+    for (const move of movesFor(state, at.x, at.y)) {
+      if (!move.capturedId) continue
+      squares.add(squareKey(move.finalTo.x, move.finalTo.y))
+    }
+  }
+  return squares
+}
+
+/** Can this piece slide along the given line? */
+function slidesAlong(
+  state: GameState,
+  piece: PieceType,
+  teamId: string,
+  dx: number,
+  dy: number,
+): boolean {
+  // A piece with its own capture patterns attacks along a different set of
+  // lines, so do not guess — treat it as able to slide.
+  if (piece.capture.length > 0) return true
+  for (const pattern of piece.move) {
+    if (pattern.kind !== 'slider') continue
+    if (pattern.firstMoveOnly) {
+      const inst = Object.values(state.pieces).find((p) => p.typeId === piece.id)
+      if (inst?.hasMoved) continue
+    }
+    for (const raw of pattern.vectors) {
+      const v = orient(state.variant, piece, teamId, raw)
+      if ((v.x === dx && v.y === dy) || (v.x === -dx && v.y === -dy)) return true
+    }
+  }
+  return false
+}
+
+/**
+ * The squares of our own pieces that block a line from the royal piece to an
+ * enemy slider. Moving one of them away would expose the royal piece, so
+ * those moves have to be checked the slow way.
+ */
+function exposedSquares(
+  state: GameState,
+  royalAt: Vec,
+  teamId: string,
+  enemyTeams: Set<string>,
+): Set<string> {
+  const exposed = new Set<string>()
+  const directions = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+    { x: 1, y: 1 },
+    { x: 1, y: -1 },
+    { x: -1, y: 1 },
+    { x: -1, y: -1 },
+  ]
+  for (const dir of directions) {
+    let x = royalAt.x + dir.x
+    let y = royalAt.y + dir.y
+    let first: Vec | null = null
+    let firstId: string | null = null
+    let blocked = false
+    while (inBounds(state.variant.board, x, y)) {
+      const tile = tileAt(state.variant, x, y)
+      // A wall, a hole or a portal ends the line for good.
+      if (isBlocking(tile) || tile?.terrain === 'portal' || tile?.terrain === 'oneway') {
+        blocked = true
+        break
+      }
+      const occupant = state.board[y][x]
+      if (occupant) {
+        first = { x, y }
+        firstId = occupant
+        break
+      }
+      x += dir.x
+      y += dir.y
+    }
+    if (blocked || !first || !firstId) continue
+    const firstInst = state.pieces[firstId]
+    if (!firstInst || firstInst.team !== teamId) continue
+
+    // Look behind our blocker for the enemy slider that would come through.
+    let bx = first.x + dir.x
+    let by = first.y + dir.y
+    let second: Vec | null = null
+    let secondId: string | null = null
+    let blockedBehind = false
+    while (inBounds(state.variant.board, bx, by)) {
+      const tile = tileAt(state.variant, bx, by)
+      if (isBlocking(tile) || tile?.terrain === 'portal' || tile?.terrain === 'oneway') {
+        blockedBehind = true
+        break
+      }
+      const occupant = state.board[by][bx]
+      if (occupant) {
+        second = { x: bx, y: by }
+        secondId = occupant
+        break
+      }
+      bx += dir.x
+      by += dir.y
+    }
+    if (blockedBehind || !second || !secondId) continue
+    const enemyInst = state.pieces[secondId]
+    if (!enemyInst || !enemyTeams.has(enemyInst.team)) continue
+    const enemyPiece = state.pieceTypes[enemyInst.typeId]
+    if (!enemyPiece) continue
+    if (enemyPiece.flags.movesOnce && enemyInst.hasMoved) continue
+    if (!slidesAlong(state, enemyPiece, enemyInst.team, dir.x, dir.y)) continue
+    exposed.add(squareKey(first.x, first.y))
+  }
+  return exposed
+}
+
+/** Moves that change the board in ways the fast check cannot follow. */
+function needsSlowCheck(move: Move) {
+  if (move.castle) return true
+  if (move.capturedAt) return true
+  if (move.effects.length > 0) return true
+  return false
+}
+
+/**
+ * Every legal move of a whole team, with the state it leads to.
+ *
+ * Asking "is the royal piece still safe?" is the expensive part of a legal
+ * move, and a search asks it thousands of times. The squares the other armies
+ * attack are worked out once per team, and a move can only change that when
+ * the mover was standing in the way — which is found by looking along the
+ * eight lines from the royal piece. Anything unusual falls back to the slow
+ * but certain check.
+ */
+export function legalOptionsForTeam(state: GameState, teamId: string): MoveOption[] {
+  const options: MoveOption[] = []
+  const royals: { id: string; at: Vec }[] = []
+  for (const id in state.pieces) {
+    const inst = state.pieces[id]
+    if (inst.team !== teamId) continue
+    if (!state.pieceTypes[inst.typeId]?.flags.royal) continue
+    const at = findPiece(state, id)
+    if (at) royals.push({ id, at })
+  }
+  const enemyTeams = new Set(
+    state.variant.teams.filter((t) => t.id !== teamId).map((t) => t.id),
+  )
+  const attacked = enemyTeams.size ? enemyAttackSquares(state, enemyTeams) : new Set<string>()
+  const royalIds = new Set(royals.map((r) => r.id))
+  const inCheck = royals.some((r) => attacked.has(squareKey(r.at.x, r.at.y)))
+  // With several royal pieces it is not worth guessing — check every move.
+  const exposed =
+    inCheck || royals.length !== 1
+      ? null
+      : exposedSquares(state, royals[0].at, teamId, enemyTeams)
+
+  for (let y = 0; y < state.board.length; y++) {
+    const row = state.board[y]
+    for (let x = 0; x < row.length; x++) {
+      const pieceId = row[x]
+      if (!pieceId) continue
+      const inst = state.pieces[pieceId]
+      if (!inst || inst.team !== teamId) continue
+      for (const move of movesFor(state, x, y)) {
+        if (!castlingIsLegal(state, move, inst)) continue
+        const fast =
+          !inCheck &&
+          exposed !== null &&
+          !exposed.has(squareKey(move.from.x, move.from.y)) &&
+          !royalIds.has(move.pieceId) &&
+          !needsSlowCheck(move)
+        if (fast) {
+          options.push({ move, next: applyMove(state, move, { compute: false }) })
+          continue
+        }
+        const next = applyMove(state, move, { compute: false })
+        if (isInCheck(next, inst.team)) continue
+        options.push({ move, next })
       }
     }
-    const next = applyMove(state, m, { compute: false })
-    return !isInCheck(next, inst.team)
-  })
+  }
+  return options
 }
 
 /** Put the royal piece on a square and see whether it is attacked there. */
@@ -391,7 +627,7 @@ function isRoyalSafeOnSquare(
   x: number,
   y: number,
 ): boolean {
-  const probe = structuredClone(state)
+  const probe = cloneState(state)
   const from = findPiece(probe, royalId)
   if (!from) return false
   probe.board[from.y][from.x] = null
@@ -426,11 +662,17 @@ export function applyMove(
   options: ApplyOptions = {},
 ): GameState {
   const compute = options.compute ?? true
-  const next: GameState = structuredClone(state)
+  const next: GameState = cloneState(state)
   const inst = next.pieces[move.pieceId]
   if (!inst) return next
   const piece = next.pieceTypes[inst.typeId]
   if (!piece) return next
+
+  // Piece instances are shared between states until one of them changes.
+  const touch = (id: string) => {
+    const current = next.pieces[id]
+    if (current) next.pieces[id] = { ...current }
+  }
 
   const hasSwap = move.effects.some((e) => e.kind === 'swap')
   const capturedInst = move.capturedId ? next.pieces[move.capturedId] : undefined
@@ -443,6 +685,7 @@ export function applyMove(
     if (hasSwap) {
       // Swap positions instead of capturing.
       next.board[fy][fx] = null
+      touch(move.capturedId)
       next.pieces[move.capturedId].hasMoved = true
     } else {
       delete next.pieces[move.capturedId]
@@ -475,6 +718,7 @@ export function applyMove(
     }
   }
   next.board[fy][fx] = move.pieceId
+  touch(move.pieceId)
   next.pieces[move.pieceId].hasMoved = true
 
   // Castling moves the rook in the same turn.
@@ -483,7 +727,10 @@ export function applyMove(
     if (next.board[rookFrom.y]?.[rookFrom.x] === rookId) {
       next.board[rookFrom.y][rookFrom.x] = null
       next.board[rookTo.y][rookTo.x] = rookId
-      if (next.pieces[rookId]) next.pieces[rookId].hasMoved = true
+      if (next.pieces[rookId]) {
+        touch(rookId)
+        next.pieces[rookId].hasMoved = true
+      }
     }
   }
 
@@ -550,6 +797,7 @@ export function applyMove(
       const target = next.pieceTypes[piece.promotion.typeId]
       if (target) {
         promotionTypeId = target.id
+        touch(move.pieceId)
         next.pieces[move.pieceId].typeId = target.id
       }
     }
