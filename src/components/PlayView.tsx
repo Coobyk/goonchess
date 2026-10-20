@@ -4,6 +4,7 @@ import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, 
 import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
+import { PuzzlePanel } from './PuzzlePanel'
 import { ReplayView } from './ReplayView'
 import { BotPlayer } from './BotPlayer'
 import { ClockFor, ClockTicker } from './ClockTicker'
@@ -545,6 +546,7 @@ export function PlayView() {
       <aside className="flex flex-col gap-4">
         <LiveAnnouncer />
         <AnalysisPanel />
+        <PuzzlePanel />
         <Card className="py-4">
           <CardHeader className="px-4">
             <CardTitle className="flex items-center justify-between text-sm">

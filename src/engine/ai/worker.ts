@@ -1,6 +1,7 @@
 import { searchBestMove, type BotLevel } from './search'
+import { findPuzzle } from './puzzles'
 import { applyMove } from '../rules'
-import type { GameState, Move } from '../types'
+import type { GameState, Move, Variant } from '../types'
 
 /**
  * The bot runs in a worker so the board stays responsive while it thinks.
@@ -17,6 +18,8 @@ export interface BotRequest {
   timeBudgetMs?: number
   /** Analyse the position instead of playing a move. */
   analyze?: boolean
+  /** Look for a puzzle in the variant instead of playing. */
+  puzzle?: { variant: Variant; seed: number }
 }
 
 export interface BotReply {
@@ -28,6 +31,14 @@ export interface BotReply {
   elapsedMs: number
   /** The best line, in the notation of the variant. */
   line: string[]
+  /** A puzzle, when one was asked for. */
+  puzzle?: {
+    state: GameState
+    from: { x: number; y: number }
+    to: { x: number; y: number }
+    side: string
+    gain: number
+  } | null
 }
 
 const scope = self as unknown as {
@@ -36,8 +47,30 @@ const scope = self as unknown as {
 }
 
 scope.onmessage = (event) => {
-  const { id, state, team, level, seed, timeBudgetMs, analyze } = event.data
+  const { id, state, team, level, seed, timeBudgetMs, analyze, puzzle } = event.data
   try {
+    if (puzzle) {
+      const found = findPuzzle(puzzle.variant, puzzle.seed)
+      scope.postMessage({
+        id,
+        move: null,
+        score: 0,
+        depth: 0,
+        nodes: 0,
+        elapsedMs: 0,
+        line: [],
+        puzzle: found
+          ? {
+              state: found.state,
+              from: { x: found.solution.from.x, y: found.solution.from.y },
+              to: { x: found.solution.finalTo.x, y: found.solution.finalTo.y },
+              side: found.side,
+              gain: found.gain,
+            }
+          : null,
+      })
+      return
+    }
     const result = searchBestMove(state, { team, level, seed, timeBudgetMs, analyze })
     scope.postMessage({
       id,
@@ -47,6 +80,7 @@ scope.onmessage = (event) => {
       nodes: result.nodes,
       elapsedMs: result.elapsedMs,
       line: describeLine(state, result.line),
+      puzzle: null,
     })
   } catch (error) {
     scope.postMessage({
@@ -57,6 +91,7 @@ scope.onmessage = (event) => {
       nodes: 0,
       elapsedMs: 0,
       line: [],
+      puzzle: null,
     })
     throw error
   }

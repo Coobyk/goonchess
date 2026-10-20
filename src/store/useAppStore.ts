@@ -111,6 +111,7 @@ interface AppState {
   pendingPromotion: { move: Move; origin?: Vec } | null
   choosePromotion: (typeId: string) => void
   cancelPromotion: () => void
+  loadPosition: (state: GameState) => void
   resetGame: () => void
   undo: () => void
 
@@ -550,6 +551,16 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     cancelPromotion: () => set({ pendingPromotion: null }),
+
+    loadPosition: (state) => {
+      set({
+        game: state,
+        selected: null,
+        legalMoves: [],
+        undoStack: [],
+        pendingPromotion: null,
+      })
+    },
 
     playMove: (move, origin, promotionTypeId) => {
       const { game, clock, clockState } = get()

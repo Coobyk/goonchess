@@ -1,6 +1,12 @@
 import type { BotLevel } from '@/engine/ai/search'
 import type { BotReply, BotRequest } from '@/engine/ai/worker'
-import type { GameState, Move } from '@/engine/types'
+import { createInitialState } from '@/engine/rules'
+import type { GameState, Move, Variant } from '@/engine/types'
+
+/** A starting position, used when a request carries no board of its own. */
+function emptyState(variant: Variant): GameState {
+  return createInitialState(variant)
+}
 
 /**
  * Talks to the bot worker. One search at a time: a new request replaces the
@@ -15,6 +21,14 @@ export interface BotResult {
   elapsedMs: number
   /** The best line, in the notation of the variant. */
   line: string[]
+  /** A puzzle, when one was asked for. */
+  puzzle?: {
+    state: GameState
+    from: { x: number; y: number }
+    to: { x: number; y: number }
+    side: string
+    gain: number
+  } | null
 }
 
 interface Pending {
@@ -43,12 +57,21 @@ export class BotWorker {
         nodes: event.data.nodes,
         elapsedMs: event.data.elapsedMs,
         line: event.data.line ?? [],
+        puzzle: event.data.puzzle ?? null,
       })
     }
     worker.onerror = () => {
       const pending = this.pending
       this.pending = null
-      pending?.resolve({ move: null, score: 0, depth: 0, nodes: 0, elapsedMs: 0, line: [] })
+      pending?.resolve({
+        move: null,
+        score: 0,
+        depth: 0,
+        nodes: 0,
+        elapsedMs: 0,
+        line: [],
+        puzzle: null,
+      })
     }
     this.worker = worker
     return worker
@@ -69,6 +92,25 @@ export class BotWorker {
     return new Promise<BotResult>((resolve) => {
       this.pending = { id, resolve }
       const request: BotRequest = { id, state, team, level, seed, timeBudgetMs, analyze }
+      worker.postMessage(request)
+    })
+  }
+
+  /** Looks for a puzzle in a variant. */
+  findPuzzle(variant: Variant, seed = Date.now()): Promise<BotResult> {
+    this.cancel()
+    const worker = this.ensureWorker()
+    const id = this.nextId++
+    return new Promise<BotResult>((resolve) => {
+      this.pending = { id, resolve }
+      const request: BotRequest = {
+        id,
+        state: emptyState(variant),
+        team: variant.teams[0]?.id ?? 'white',
+        level: 'normal',
+        seed,
+        puzzle: { variant, seed },
+      }
       worker.postMessage(request)
     })
   }
