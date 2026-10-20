@@ -21,6 +21,11 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Rulebook** — `/rulebook` renders a human-readable guide from the current
   variant: starting board, terrain key, armies, win conditions, movement and
   capture patterns, flags, effects, promotions and the active display settings.
+- **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
+  piece is a horse and every horse jumps), **Bomb Queen** (a queen that steps
+  one square in any direction and detonates on every capture), Chaos Lab
+  (portals, walls, uncapturable gems and bombers) and blank boards to start
+  from.
 - **Sound** — a bundled CC0 sound set for moves, captures, checks, promotions,
   explosions and game endings, with a mute toggle.
 - **Threat visualizer** — an optional overlay with arrows from each attacker to

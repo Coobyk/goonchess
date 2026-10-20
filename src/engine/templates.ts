@@ -189,6 +189,124 @@ export function miniChess(): Variant {
   }
 }
 
+/* ---------------------------------------------------------- only horses */
+
+/**
+ * Every man is a horse, and every horse jumps. The usual chess army, with the
+ * royal horse as the only piece you have to keep alive.
+ */
+export function onlyHorses(): Variant {
+  const horse = makePiece({
+    name: 'Horse',
+    icon: 'knight',
+    value: 1,
+    move: [leaper(KNIGHT)],
+    flags: { jump: true },
+  })
+  const royalHorse = makePiece({
+    name: 'Royal Horse',
+    icon: 'king',
+    value: 0,
+    move: [leaper(KNIGHT)],
+    flags: { jump: true, royal: true },
+  })
+
+  const pieceTypes = [royalHorse, horse]
+  const setup: SetupPiece[] = []
+  // The usual back rank, but every square on it holds a horse.
+  const back = [horse, horse, horse, horse, royalHorse, horse, horse, horse]
+  for (const team of ['black', 'white']) {
+    const rank = team === 'black' ? 0 : 7
+    const pawnRank = team === 'black' ? 1 : 6
+    back.forEach((piece, x) => put(setup, piece.id, team, x, rank))
+    for (let x = 0; x < 8; x++) put(setup, horse.id, team, x, pawnRank)
+  }
+
+  return {
+    schema: 1,
+    id: 'horses',
+    name: 'Only Horses',
+    description:
+      'Every piece is a horse and every horse jumps. The royal horse is the one to watch.',
+    board: emptyBoard(8, 8),
+    teams: [
+      { id: 'white', name: 'White', color: '#f4f1ea', forward: 'up' },
+      { id: 'black', name: 'Black', color: '#3f3f46', forward: 'down' },
+    ],
+    pieceTypes,
+    setup,
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+      { id: uid(), kind: 'elimination' },
+    ],
+  }
+}
+
+/* ------------------------------------------------------------ bomb queen */
+
+/**
+ * Classic chess with a bomb for a queen: it steps one square in any
+ * direction, and every capture sets off a blast that takes the enemy pieces
+ * around it with it.
+ */
+export function bombQueen(): Variant {
+  const king = makePiece({ name: 'King', icon: 'king', value: 0, move: [leaper(ALL8)], flags: { royal: true } })
+  const rook = makePiece({ name: 'Rook', icon: 'rook', value: 5, move: [slider(ORTH)] })
+  const bishop = makePiece({ name: 'Bishop', icon: 'bishop', value: 3, move: [slider(DIAG)] })
+  const knight = makePiece({ name: 'Knight', icon: 'knight', value: 3, move: [leaper(KNIGHT)], flags: { jump: true } })
+  const pawn = makePiece({
+    name: 'Pawn',
+    icon: 'pawn',
+    value: 1,
+    move: [leaper([{ x: 0, y: -1 }])],
+    capture: [leaper([{ x: -1, y: -1 }, { x: 1, y: -1 }])],
+    flags: { enPassant: true },
+  })
+  const queen = makePiece({
+    name: 'Bomb Queen',
+    icon: 'queen',
+    value: 9,
+    move: [leaper(ALL8)],
+    effects: [{ kind: 'explosion', radius: 1 }],
+    promotion: { typeId: pawn.id },
+  })
+  pawn.promotion = { typeId: queen.id }
+  const doubleStep = slider([{ x: 0, y: -1 }], 2)
+  doubleStep.firstMoveOnly = true
+  pawn.move = [...pawn.move, doubleStep]
+
+  const pieceTypes = [king, queen, rook, bishop, knight, pawn]
+  const setup: SetupPiece[] = []
+  const back = [rook, knight, bishop, queen, king, bishop, knight, rook]
+
+  for (const team of ['black', 'white']) {
+    const rank = team === 'black' ? 0 : 7
+    const pawnRank = team === 'black' ? 1 : 6
+    back.forEach((piece, x) => put(setup, piece.id, team, x, rank))
+    for (let x = 0; x < 8; x++) put(setup, pawn.id, team, x, pawnRank)
+  }
+
+  return {
+    schema: 1,
+    id: 'bomb-queen',
+    name: 'Bomb Queen',
+    description:
+      'Classic chess with a bomb for a queen: it steps one square in any direction and detonates on every capture.',
+    board: emptyBoard(8, 8),
+    teams: [
+      { id: 'white', name: 'White', color: '#f4f1ea', forward: 'up' },
+      { id: 'black', name: 'Black', color: '#3f3f46', forward: 'down' },
+    ],
+    pieceTypes,
+    setup,
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+    ],
+  }
+}
+
 /* ------------------------------------------------------------ chaos lab */
 
 export function chaosLab(): Variant {
@@ -341,6 +459,8 @@ export function blankVariant(width = 8, height = 8): Variant {
 export const TEMPLATES: { id: string; name: string; description: string; build: () => Variant }[] = [
   { id: 'classic', name: 'Classic Chess', description: 'Standard 8×8', build: classicChess },
   { id: 'mini', name: 'Mini Chess', description: 'Fast 6×6', build: miniChess },
+  { id: 'horses', name: 'Only Horses', description: 'Every piece jumps', build: onlyHorses },
+  { id: 'bomb-queen', name: 'Bomb Queen', description: 'A queen that detonates', build: bombQueen },
   { id: 'chaos', name: 'Chaos Lab', description: 'Portals and bombers', build: chaosLab },
 ]
 
