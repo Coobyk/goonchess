@@ -240,7 +240,12 @@ export function GameBoard() {
                 )}
 
                 {piece && pieceType && !hiddenPieces.has(piece.id) && (
-                  <span className="relative z-10">
+                  <span
+                    className={cn(
+                      'relative z-10 inline-flex',
+                      isSelected && 'piece-selected z-20',
+                    )}
+                  >
                     <PieceGlyph piece={pieceType} teamIndex={teamIndex(piece.team)} size={Math.round(cell * 0.78)} />
                   </span>
                 )}
@@ -260,9 +265,6 @@ export function GameBoard() {
                 )}
                 {hasDest && captures && (
                   <span className="absolute inset-[8%] z-20 rounded-sm ring-[3px] ring-inset ring-rose-500/70" />
-                )}
-                {isSelected && (
-                  <span className="absolute inset-0 z-20 ring-2 ring-inset ring-amber-400" />
                 )}
                 {inCheck && <span className="absolute inset-0 z-20 ring-2 ring-inset ring-rose-500" />}
               </button>
