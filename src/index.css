@@ -222,6 +222,19 @@
     transform: scale(1.14) rotate(-3deg);
     filter: drop-shadow(0 10px 14px rgb(0 0 0 / 0.45));
   }
+  /* A square the opposing side can move to or capture on. */
+  .threat-coverage {
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgb(244 63 94 / 0.42) 0 5%,
+      rgb(244 63 94 / 0.14) 6% 20%,
+      transparent 58%
+    );
+  }
+  /* An attacked piece with no defender. */
+  .threat-hanging {
+    animation: threat-pulse 1500ms ease-in-out infinite;
+  }
 }
 
 @keyframes blast-cell {
@@ -368,6 +381,16 @@
   }
 }
 
+@keyframes threat-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .blast-cell,
   .blast-core,
@@ -379,7 +402,8 @@
   .piece-emerge,
   .piece-dissolve,
   .piece-pop,
-  .piece-selected {
+  .piece-selected,
+  .threat-hanging {
     animation-duration: 1ms;
     animation-delay: 0ms;
   }

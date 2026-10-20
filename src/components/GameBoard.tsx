@@ -4,6 +4,7 @@ import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
 import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
+import { computeThreats, mergeThreats } from '@/engine/threats'
 import type { Move } from '@/engine/types'
 import { BLAST_STAGGER, useMoveAnimation } from '@/lib/moveAnimation'
 import { playSound } from '@/lib/sound'
@@ -83,6 +84,7 @@ export function GameBoard() {
   const selected = useAppStore((s) => s.selected)
   const legalMoves = useAppStore((s) => s.legalMoves)
   const selectSquare = useAppStore((s) => s.selectSquare)
+  const threatSettings = useAppStore((s) => s.threats)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [container, width] = useElementWidth<HTMLDivElement>()
 
@@ -156,6 +158,15 @@ export function GameBoard() {
   }
 
   const draggingId = drag?.pieceId
+
+  const threats = useMemo(() => {
+    if (!threatSettings.show) return null
+    const teams =
+      threatSettings.scope === 'both'
+        ? variant.teams.map((team) => team.id)
+        : [turn]
+    return mergeThreats(teams.map((team) => computeThreats(game, team)))
+  }, [game, turn, variant.teams, threatSettings.show, threatSettings.scope])
 
   const lastRecord = game.moveHistory[game.moveHistory.length - 1]
   const lastMove = lastRecord?.move
@@ -277,6 +288,9 @@ export function GameBoard() {
               ? Math.max(Math.abs(x - blast.x), Math.abs(y - blast.y))
               : -1
             const inBlast = !!blast && blastDistance <= blast.radius
+            const pieceThreat = pieceId && threats ? threats.pieces.get(pieceId) : undefined
+            const covered =
+              !!threats && threatSettings.coverage && threats.coverage.has(`${x},${y}`)
 
             return (
               <button
@@ -317,6 +331,10 @@ export function GameBoard() {
                   />
                 )}
 
+                {covered && (
+                  <span className="threat-coverage pointer-events-none absolute inset-0 z-[5]" />
+                )}
+
                 {piece && pieceType && !hiddenPieces.has(piece.id) && piece.id !== draggingId && (
                   <span
                     className={cn(
@@ -343,6 +361,12 @@ export function GameBoard() {
                 )}
                 {hasDest && captures && (
                   <span className="absolute inset-[8%] z-20 rounded-sm ring-[3px] ring-inset ring-rose-500/70" />
+                )}
+                {pieceThreat && !pieceThreat.defended && threatSettings.hanging && (
+                  <span className="threat-hanging pointer-events-none absolute inset-[7%] z-20 rounded-sm border-2 border-dashed border-rose-400/90" />
+                )}
+                {pieceThreat?.defended && threatSettings.defended && (
+                  <span className="pointer-events-none absolute inset-[10%] z-20 rounded-sm border-2 border-amber-300/75" />
                 )}
                 {inCheck && <span className="absolute inset-0 z-20 ring-2 ring-inset ring-rose-500" />}
               </button>

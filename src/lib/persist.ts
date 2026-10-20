@@ -1,9 +1,11 @@
 import type { Variant } from '@/engine/types'
+import { DEFAULT_THREAT_SETTINGS, type ThreatSettings } from '@/engine/threats'
 
 const VARIANT_KEY = 'goonchess:variant'
 const LIBRARY_KEY = 'goonchess:library'
 const THEME_KEY = 'goonchess:theme'
 const SOUND_KEY = 'goonchess:sound'
+const THREAT_KEY = 'goonchess:threats'
 
 export interface SavedVariant {
   id: string
@@ -41,3 +43,9 @@ export const saveTheme = (t: 'dark' | 'light') => write(THEME_KEY, t)
 
 export const loadSoundEnabled = () => read<boolean>(SOUND_KEY, true)
 export const saveSoundEnabled = (v: boolean) => write(SOUND_KEY, v)
+
+export const loadThreatSettings = (): ThreatSettings => ({
+  ...DEFAULT_THREAT_SETTINGS,
+  ...read<Partial<ThreatSettings>>(THREAT_KEY, {}),
+})
+export const saveThreatSettings = (v: ThreatSettings) => write(THREAT_KEY, v)

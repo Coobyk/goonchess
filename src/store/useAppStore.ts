@@ -2,14 +2,17 @@ import { create } from 'zustand'
 import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine/types'
 import { applyMove, createInitialState, getLegalMoves, uid } from '@/engine/rules'
 import { defaultVariant } from '@/engine/templates'
+import type { ThreatSettings } from '@/engine/threats'
 import { variantFromHash } from '@/lib/encoding'
 import {
   loadLibrary,
   loadSoundEnabled,
   loadTheme,
+  loadThreatSettings,
   loadVariant,
   saveLibrary,
   saveTheme,
+  saveThreatSettings,
   saveVariant,
   type SavedVariant,
 } from '@/lib/persist'
@@ -26,6 +29,7 @@ interface AppState {
   makerTab: MakerTab
   theme: Theme
   soundEnabled: boolean
+  threats: ThreatSettings
   library: SavedVariant[]
 
   selected: Vec | null
@@ -41,6 +45,7 @@ interface AppState {
   setMakerTab: (tab: MakerTab) => void
   setTheme: (theme: Theme) => void
   setSoundEnabled: (enabled: boolean) => void
+  setThreats: (patch: Partial<ThreatSettings>) => void
 
   /* variant editing */
   updateVariant: (updater: (v: Variant) => Variant) => void
@@ -154,6 +159,7 @@ export const useAppStore = create<AppState>((set, get) => {
     makerTab: 'board',
     theme: loadTheme(),
     soundEnabled: loadSoundEnabled(),
+    threats: loadThreatSettings(),
     library: loadLibrary(),
     selected: null,
     legalMoves: [],
@@ -173,6 +179,11 @@ export const useAppStore = create<AppState>((set, get) => {
       applySoundEnabled(enabled)
       if (enabled) preloadSounds()
       set({ soundEnabled: enabled })
+    },
+    setThreats: (patch) => {
+      const threats = { ...get().threats, ...patch }
+      saveThreatSettings(threats)
+      set({ threats })
     },
 
     updateVariant: (updater) => {
