@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { BoardShell, tileBackground } from './BoardShell'
 import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
@@ -89,10 +89,17 @@ export function GameBoard() {
   const turnView = useAppStore((s) => s.turnView)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [container, width] = useElementWidth<HTMLDivElement>()
+  // The square the keyboard cursor is on. Arrow keys move it, Enter plays.
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
 
   const { variant, board, pieceTypes, turn } = game
   const { width: cols, height: rows } = variant.board
   const cell = boardCellSize(width, cols, 64, 24)
+
+  // Put the cursor on the board as soon as it exists.
+  useEffect(() => {
+    setCursor((current) => current ?? { x: 0, y: Math.max(0, rows - 1) })
+  }, [rows])
 
   const [drag, setDrag] = useState<{ pieceId: string; clientX: number; clientY: number } | null>(null)
   const dragRef = useRef<{
@@ -276,6 +283,47 @@ export function GameBoard() {
 
   const teamIndex = (id: string) => variant.teams.findIndex((t) => t.id === id)
 
+  // Keyboard: the arrow keys move a cursor over the board, Enter plays a move.
+  const moveCursor = (x: number, y: number) => {
+    const nx = Math.max(0, Math.min(cols - 1, x))
+    const ny = Math.max(0, Math.min(rows - 1, y))
+    setCursor({ x: nx, y: ny })
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-square="${nx},${ny}"]`)
+        ?.focus({ preventScroll: true })
+    })
+  }
+
+  const handleKey = (e: ReactKeyboardEvent<HTMLButtonElement>, x: number, y: number) => {
+    const steps: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    }
+    // The cursor is the origin, so quick key presses keep moving from where
+    // the cursor is now rather than from the square that had focus.
+    const origin = cursor ?? { x, y }
+    const step = steps[e.key]
+    if (step) {
+      e.preventDefault()
+      moveCursor(origin.x + step[0], origin.y + step[1])
+      return true
+    }
+    if (e.key === 'Home') {
+      e.preventDefault()
+      moveCursor(0, origin.y)
+      return true
+    }
+    if (e.key === 'End') {
+      e.preventDefault()
+      moveCursor(cols - 1, origin.y)
+      return true
+    }
+    return false
+  }
+
   return (
     <div ref={container} className="flex w-full justify-center">
       <BoardShell
@@ -337,6 +385,14 @@ export function GameBoard() {
               <button
                 key={`${x}-${y}`}
                 type="button"
+                role="gridcell"
+                tabIndex={cursor?.x === x && cursor?.y === y ? 0 : -1}
+                aria-label={describeSquare(x, y, piece, pieceType, variant)}                aria-selected={isSelected}
+                data-square={`${x},${y}`}
+                onFocus={() => setCursor({ x, y })}
+                onKeyDown={(e) => {
+                  if (!handleKey(e, x, y)) return
+                }}
                 onClick={() => {
                   if (suppressClickUntil.current) {
                     const blocked = performance.now() < suppressClickUntil.current
@@ -450,4 +506,20 @@ export function GameBoard() {
       })()}
     </div>
   )
+}
+
+/** "e4, white pawn" — what a screen reader reads for a square. */
+function describeSquare(
+  x: number,
+  y: number,
+  piece: { team: string } | null,
+  pieceType: { name: string } | null,
+  variant: { board: { width: number; height: number }; teams: { id: string; name: string }[] },
+) {
+  const file = String.fromCharCode(97 + x)
+  const rank = variant.board.height - y
+  const name = `${file}${rank}`
+  if (!piece || !pieceType) return `${name}, empty`
+  const team = variant.teams.find((t) => t.id === piece.team)
+  return `${name}, ${team?.name ?? ''} ${pieceType.name}`.replace(/\s+/g, ' ')
 }

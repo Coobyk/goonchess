@@ -10,6 +10,7 @@ export function BoardShell({
   showLabels = true,
   flip = false,
   overlay,
+  ariaLabel = 'Board',
 }: {
   width: number
   height: number
@@ -21,6 +22,8 @@ export function BoardShell({
   flip?: boolean
   /** Drawn on top of the squares, aligned to the grid. */
   overlay?: ReactNode
+  /** What a screen reader hears when it reaches the board. */
+  ariaLabel?: string
 }) {
   const ranks = Array.from({ length: height }, (_, i) => (flip ? i + 1 : height - i))
   const files = Array.from({ length: width }, (_, i) =>
@@ -44,6 +47,8 @@ export function BoardShell({
         )}
         <div
           className="board-grid-shadow grid relative overflow-hidden rounded-lg"
+          role="grid"
+          aria-label={ariaLabel}
           style={{
             gridTemplateColumns: `repeat(${width}, ${cellSize}px)`,
             gridTemplateRows: `repeat(${height}, ${cellSize}px)`,
