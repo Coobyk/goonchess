@@ -22,12 +22,14 @@ Freesound:
     https://freesound.org/s/515738/
 * capture — "Rimshot 1" by Sorinius_Genious
     https://freesound.org/s/573259/
-* check — "wah wah sad trombone" by kirbydx
-    https://freesound.org/s/175409/
+* check — "Public Domain Exclamation Point" by SmeckoGeck, the Metal Gear
+  Solid "!" sting
+    https://freesound.org/s/717009/
 * promote — "Industrial Air Horn" by mcpable
     https://freesound.org/s/131930/
-* explosion — "Drama Boom 02" by modusmogulus
-    https://freesound.org/s/802074/
+* explosion — "Drama Boom" by modusmogulus, made in the spirit of the vine
+  boom
+    https://freesound.org/s/785925/
 * win — "Crowd Cheer 5" by Krizin
     https://freesound.org/s/651646/
 * draw — "Fail Jingle (layer 1)" by unfa
@@ -77,16 +79,16 @@ MEME_SOURCES = {
         0.9,
     ),
     "check": (
-        "https://cdn.freesound.org/previews/175/175409_1326576-hq.mp3",
-        1.6,
+        "https://cdn.freesound.org/previews/717/717009_12398530-hq.mp3",
+        0.55,
     ),
     "promote": (
         "https://cdn.freesound.org/previews/131/131930_1542102-hq.mp3",
         1.0,
     ),
     "explosion": (
-        "https://cdn.freesound.org/previews/802/802074_15956618-hq.mp3",
-        0.9,
+        "https://cdn.freesound.org/previews/785/785925_15956618-hq.mp3",
+        1.4,
     ),
     "win": (
         "https://cdn.freesound.org/previews/651/651646_5315864-hq.mp3",

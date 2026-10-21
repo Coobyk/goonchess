@@ -35,9 +35,9 @@ The good stuff. CC0 recordings from Freesound, trimmed to their best moment:
 | --- | --- |
 | move | **“Retro, Coin 07”** by [LilMati](https://freesound.org/people/LilMati/sounds/515738/) |
 | capture | **“Rimshot 1”** by [Sorinious_Genious](https://freesound.org/people/Sorinious_Genious/sounds/573259/) |
-| check | **“wah wah sad trombone”** by [kirbydx](https://freesound.org/people/kirbydx/sounds/175409/) |
+| check | **“Public Domain Exclamation Point”** by [SmeckoGeck](https://freesound.org/people/SmeckoGeck/sounds/717009/) — the Metal Gear Solid “!” sting |
 | promote | **“Industrial Air Horn”** by [mcpable](https://freesound.org/people/mcpable/sounds/131930/) |
-| explosion | **“Drama Boom 02”** by [modusmogulus](https://freesound.org/people/modusmogulus/sounds/802074/) |
+| explosion | **“Drama Boom”** by [modusmogulus](https://freesound.org/people/modusmogulus/sounds/785925/) — made in the spirit of the vine boom |
 | win | **“Crowd Cheer 5”** by [Krizin](https://freesound.org/people/Krizin/sounds/651646/) |
 | draw | **“Fail Jingle (layer 1)”** by [unfa](https://freesound.org/people/unfa/sounds/181354/) |
 

@@ -34,9 +34,9 @@ export const SOUND_PACKS: SoundPack[] = [
   {
     id: 'memes',
     name: 'Memes',
-    description: 'Vine booms, sad trombones and a lot of drama.',
+    description: 'Vine booms, exclamation stings and a lot of drama.',
     dir: '/sounds/memes',
-    credit: 'CC0 recordings — LilMati, Sorinius_Genious, kirbydx, mcpable, modusmogulus, Krizin, unfa',
+    credit: 'CC0 recordings — LilMati, Sorinius_Genious, SmeckoGeck, mcpable, modusmogulus, Krizin, unfa',
   },
 ]
 
