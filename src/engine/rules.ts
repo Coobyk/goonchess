@@ -21,9 +21,73 @@ export function inBounds(board: { width: number; height: number }, x: number, y:
   return x >= 0 && y >= 0 && x < board.width && y < board.height
 }
 
+/**
+ * The board of a variant never changes, so the things a search keeps asking
+ * about it — what terrain a square has, whether it blocks, where a portal
+ * leads — are worked out once per variant and kept.
+ */
+interface Geometry {
+  width: number
+  height: number
+  /** tiles[index] — the terrain of a square, null when it has none. */
+  tiles: (Tile | null)[]
+  /** 1 when the square blocks movement. */
+  blocking: Uint8Array
+  /** Where a portal leads: the index of the square, -1 when there is none. */
+  portal: Int32Array
+  /** Which way each team advances. */
+  forward: Record<string, 'up' | 'down'>
+}
+
+const geometryCache = new WeakMap<Variant, Geometry>()
+
+function geometryFor(variant: Variant): Geometry {
+  const cached = geometryCache.get(variant)
+  if (cached) return cached
+  const { width, height } = variant.board
+  const tiles: (Tile | null)[] = new Array(width * height).fill(null)
+  const blocking = new Uint8Array(width * height)
+  const portal = new Int32Array(width * height)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const index = y * width + x
+      const tile = variant.board.tiles[y]?.[x] ?? null
+      tiles[index] = tile
+      if (!tile) {
+        // A square without terrain blocks everything, and leads nowhere.
+        blocking[index] = 1
+        portal[index] = -1
+        continue
+      }
+      blocking[index] = tile.terrain === 'void' || tile.terrain === 'wall' ? 1 : 0
+      if (tile.terrain === 'portal' || tile.terrain === 'oneway') {
+        // Portals never chain, so one hop is the whole story.
+        const dest = tile.target ?? { x: width - 1 - x, y: height - 1 - y }
+        portal[index] =
+          dest.x >= 0 && dest.y >= 0 && dest.x < width && dest.y < height
+            ? dest.y * width + dest.x
+            : -1
+        continue
+      }
+      portal[index] = index
+    }
+  }
+  const geometry = { width, height, tiles, blocking, portal, forward: forwardOf(variant) }
+  geometryCache.set(variant, geometry)
+  return geometry
+}
+
+/** Which way each team advances. */
+function forwardOf(variant: Variant): Record<string, 'up' | 'down'> {
+  const forward: Record<string, 'up' | 'down'> = {}
+  for (const team of variant.teams) forward[team.id] = team.forward
+  return forward
+}
+
 export function tileAt(variant: Variant, x: number, y: number): Tile | null {
-  if (!inBounds(variant.board, x, y)) return null
-  return variant.board.tiles[y]?.[x] ?? null
+  const geo = geometryFor(variant)
+  if (x < 0 || y < 0 || x >= geo.width || y >= geo.height) return null
+  return geo.tiles[y * geo.width + x]
 }
 
 export function teamById(variant: Variant, id: string): TeamConfig | undefined {
@@ -39,23 +103,25 @@ export function squareName(variant: Variant, x: number, y: number) {
 
 /** Resolves a portal / one-way tile in a single hop. Portals never chain. */
 export function resolvePortals(variant: Variant, x: number, y: number): Vec | null {
-  const tile = tileAt(variant, x, y)
-  if (!tile) return null
-  if (tile.terrain !== 'portal' && tile.terrain !== 'oneway') return { x, y }
-  const dest = tile.target
-    ? tile.target
-    : { x: variant.board.width - 1 - x, y: variant.board.height - 1 - y }
-  if (!inBounds(variant.board, dest.x, dest.y)) return null
-  return { x: dest.x, y: dest.y }
+  const geo = geometryFor(variant)
+  if (x < 0 || y < 0 || x >= geo.width || y >= geo.height) return null
+  const index = geo.portal[y * geo.width + x]
+  if (index < 0) return null
+  return { x: index % geo.width, y: (index / geo.width) | 0 }
 }
 
 function isBlocking(tile: Tile | null) {
   return !tile || tile.terrain === 'void' || tile.terrain === 'wall'
 }
 
-function orient(variant: Variant, piece: PieceType, teamId: string, v: Vec): Vec {
-  const team = teamById(variant, teamId)
-  if (!piece.flags.mirror || !team || team.forward === 'up') return v
+/**
+ * Turns a pattern the way a team sees it.
+ *
+ * A team that advances downwards sees the board mirrored, so a step that goes
+ * "forward" in the pattern goes the other way on the board.
+ */
+function orient(piece: PieceType, forward: 'up' | 'down', v: Vec): Vec {
+  if (!piece.flags.mirror || forward !== 'down') return v
   return { x: v.x, y: -v.y }
 }
 
@@ -110,8 +176,44 @@ function dicePattern(patterns: MovePattern[], roll: number): MovePattern[] {
   return [list[index]]
 }
 
+/* ------------------------------------------------------ scratch for moves */
+
+/**
+ * Move generation marks the squares it has already reached, so that two
+ * patterns leading to the same square do not produce the same move twice. A
+ * search does this thousands of times a second, so the marks live in a small
+ * buffer that is borrowed and handed back instead of being allocated every
+ * time.
+ */
+const scratchBuffers: Uint8Array[] = []
+let scratchDepth = 0
+
+function takeScratch(size: number): Uint8Array {
+  const depth = scratchDepth++
+  let buf = scratchBuffers[depth]
+  if (!buf || buf.length < size) {
+    buf = new Uint8Array(size)
+    scratchBuffers[depth] = buf
+  }
+  buf.fill(0, 0, size)
+  return buf
+}
+
+function giveScratch() {
+  scratchDepth -= 1
+}
+
 export function movesFor(state: GameState, x: number, y: number): Move[] {
+  const { width, height } = state.variant.board
+  const seen = takeScratch(width * height)
+  const moves = generateMoves(state, x, y, seen)
+  giveScratch()
+  return moves
+}
+
+function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array): Move[] {
   const { variant } = state
+  const geo = geometryFor(variant)
   const pieceId = state.board[y]?.[x]
   if (!pieceId) return []
   const inst = state.pieces[pieceId]
@@ -121,12 +223,13 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
   if (piece.flags.movesOnce && inst.hasMoved) return []
 
   const moves: Move[] = []
-  const seen = new Set<string>()
+  // Every move of this piece starts on the same square, so they all share it.
+  const from = { x, y }
 
   // A piece that reaches the far rank may turn into one of several pieces.
   const promoOptions = (piece.promotion?.typeIds ?? []).filter((id) => !!state.pieceTypes[id])
-  const team = teamById(variant, inst.team)
-  const farRank = team?.forward === 'down' ? variant.board.height - 1 : 0
+  const forward = geo.forward[inst.team] ?? 'up'
+  const farRank = forward === 'down' ? geo.height - 1 : 0
 
   const push = (
     tx: number,
@@ -134,28 +237,29 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
     mode: 'move' | 'capture',
     allowCapture: boolean,
   ) => {
-    if (!inBounds(variant.board, tx, ty)) return
-    const tile = tileAt(variant, tx, ty)
-    if (isBlocking(tile)) return
-    const final = resolvePortals(variant, tx, ty)
-    if (!final || !inBounds(variant.board, final.x, final.y)) return
-    const finalTile = tileAt(variant, final.x, final.y)
-    if (isBlocking(finalTile)) return
+    if (tx < 0 || ty < 0 || tx >= geo.width || ty >= geo.height) return
+    const index = ty * geo.width + tx
+    if (geo.blocking[index]) return
+    const finalIndex = geo.portal[index]
+    if (finalIndex < 0) return
+    const fx = finalIndex % geo.width
+    const fy = (finalIndex / geo.width) | 0
+    if (geo.blocking[finalIndex]) return
 
-    const occupant = state.board[final.y][final.x]
-    const key = `${final.x},${final.y}`
-    if (seen.has(key)) return
-    const promotion = promoOptions.length && final.y === farRank ? promoOptions : undefined
+    const occupant = state.board[fy][fx]
+    if (seen[finalIndex]) return
+    const promotion = promoOptions.length && fy === farRank ? promoOptions : undefined
 
     if (occupant === null) {
       if (mode === 'capture') return
-      seen.add(key)
+      seen[finalIndex] = 1
+      const finalTo = { x: fx, y: fy }
       moves.push({
-        from: { x, y },
-        to: { x: tx, y: ty },
+        from,
+        to: fx === tx && fy === ty ? finalTo : { x: tx, y: ty },
         pieceId,
-        effects: piece.effects.map((e) => ({ ...e })),
-        finalTo: final,
+        effects: piece.effects,
+        finalTo,
         promotionOptions: promotion,
         roll: piece.flags.dice ? roll : undefined,
       })
@@ -168,14 +272,15 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
     if (!allowCapture && mode === 'move') return
     const occPiece = state.pieceTypes[occInst.typeId]
     if (occPiece?.flags.uncapturable) return
-    seen.add(key)
+    seen[finalIndex] = 1
+    const finalTo = { x: fx, y: fy }
     moves.push({
-      from: { x, y },
-      to: { x: tx, y: ty },
+      from,
+      to: fx === tx && fy === ty ? finalTo : { x: tx, y: ty },
       pieceId,
       capturedId: occupant,
-      effects: piece.effects.map((e) => ({ ...e })),
-      finalTo: final,
+      effects: piece.effects,
+      finalTo,
       promotionOptions: promotion,
       roll: piece.flags.dice ? roll : undefined,
     })
@@ -194,7 +299,7 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
     for (const pattern of list) {
       if (pattern.firstMoveOnly && inst.hasMoved) continue
       for (const raw of pattern.vectors) {
-        const v = orient(variant, piece, inst.team, raw)
+        const v = orient(piece, forward, raw)
         if (pattern.kind === 'leaper') {
           push(x + v.x, y + v.y, mode, allowCapture)
           continue
@@ -205,16 +310,17 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
         for (let step = 1; step <= max; step++) {
           const tx = x + v.x * step
           const ty = y + v.y * step
-          if (!inBounds(variant.board, tx, ty)) break
-          const tile = tileAt(variant, tx, ty)
-          if (isBlocking(tile)) break
+          if (tx < 0 || ty < 0 || tx >= geo.width || ty >= geo.height) break
+          const index = ty * geo.width + tx
+          if (geo.blocking[index]) break
+          const tile = geo.tiles[index]
           const isPortal = tile?.terrain === 'portal' || tile?.terrain === 'oneway'
-          const final = resolvePortals(variant, tx, ty)
-          if (!final || !inBounds(variant.board, final.x, final.y)) {
+          const finalIndex = geo.portal[index]
+          if (finalIndex < 0) {
             if (!piece.flags.jump) break
             continue
           }
-          const occupant = state.board[final.y][final.x]
+          const occupant = state.board[(finalIndex / geo.width) | 0][finalIndex % geo.width]
           push(tx, ty, mode, allowCapture)
           // Portals swallow the rest of the line unless the piece leaps.
           if ((isPortal || occupant !== null) && !piece.flags.jump) break
@@ -227,7 +333,7 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
   run(piece.move, 'move', !hasCapturePattern)
   if (hasCapturePattern) run(piece.capture, 'capture', true)
   if (piece.flags.enPassant) {
-    const enPassant = enPassantMove(state, x, y, inst, piece, seen)
+    const enPassant = enPassantMove(state, x, y, inst, piece, seen, forward)
     if (enPassant) moves.push(enPassant)
   }
 
@@ -248,20 +354,21 @@ function castlingMoves(
   y: number,
   inst: GameState['pieces'][string],
   piece: PieceType,
-  seen: Set<string>,
+  seen: Uint8Array,
 ): Move[] {
   if (inst.hasMoved) return []
-  if (tileAt(state.variant, x, y)?.terrain !== 'normal') return []
+  const geo = geometryFor(state.variant)
+  if (geo.tiles[y * geo.width + x]?.terrain !== 'normal') return []
 
   const moves: Move[] = []
   for (const dir of [-1, 1] as const) {
     const finalX = x + dir * 2
-    if (!inBounds(state.variant.board, finalX, y)) continue
+    if (finalX < 0 || finalX >= geo.width) continue
 
     let rookId: string | null = null
     let rookX = x
-    for (let scan = x + dir; inBounds(state.variant.board, scan, y); scan += dir) {
-      const tile = tileAt(state.variant, scan, y)
+    for (let scan = x + dir; scan >= 0 && scan < geo.width; scan += dir) {
+      const tile = geo.tiles[y * geo.width + scan]
       if (tile?.terrain !== 'normal') break
       const occupant = state.board[y][scan]
       if (!occupant) continue
@@ -282,15 +389,16 @@ function castlingMoves(
 
     const rookToX = x + dir
     if (state.board[y][finalX] !== null || state.board[y][rookToX] !== null) continue
-    const key = `${finalX},${y}`
-    if (seen.has(key)) continue
-    seen.add(key)
+    const index = y * geo.width + finalX
+    if (seen[index]) continue
+    seen[index] = 1
+    const finalTo = { x: finalX, y }
     moves.push({
       from: { x, y },
-      to: { x: finalX, y },
+      to: finalTo,
       pieceId: inst.id,
-      effects: piece.effects.map((e) => ({ ...e })),
-      finalTo: { x: finalX, y },
+      effects: piece.effects,
+      finalTo,
       castle: {
         rookId,
         rookFrom: { x: rookX, y },
@@ -312,7 +420,8 @@ function enPassantMove(
   y: number,
   inst: GameState['pieces'][string],
   piece: PieceType,
-  seen: Set<string>,
+  seen: Uint8Array,
+  forward: 'up' | 'down',
 ): Move | null {
   const last = state.moveHistory[state.moveHistory.length - 1]
   if (!last) return null
@@ -330,13 +439,13 @@ function enPassantMove(
   // The jumper must be standing right beside us after landing.
   if (Math.abs(previous.finalTo.x - x) + Math.abs(previous.finalTo.y - y) !== 1) return null
   if (state.board[skipped.y]?.[skipped.x] !== null) return null
-  if (seen.has(`${skipped.x},${skipped.y}`)) return null
+  if (seen[skipped.y * state.variant.board.width + skipped.x]) return null
 
   // The skipped square must be one of our capture steps.
   const patterns = piece.capture.length > 0 ? piece.capture : piece.move
   const attacksIt = patterns.some((pattern) =>
     pattern.vectors.some((raw) => {
-      const v = orient(state.variant, piece, inst.team, raw)
+      const v = orient(piece, forward, raw)
       return x + v.x === skipped.x && y + v.y === skipped.y
     }),
   )
@@ -348,7 +457,7 @@ function enPassantMove(
     pieceId: inst.id,
     capturedId: previous.pieceId,
     capturedAt: { ...previous.finalTo },
-    effects: piece.effects.map((e) => ({ ...e })),
+    effects: piece.effects,
     finalTo: skipped,
   }
 }
@@ -402,10 +511,14 @@ export function findPiece(state: GameState, pieceId: string): Vec | null {
  * something changes one — then that single instance is copied first.
  */
 export function cloneState(state: GameState): GameState {
+  // Copying the piece table by hand is measurably faster than the spread
+  // operator, and the search copies it once for every move it tries.
+  const pieces: GameState['pieces'] = {}
+  for (const id in state.pieces) pieces[id] = state.pieces[id]
   return {
     ...state,
     board: state.board.map((row) => row.slice()),
-    pieces: { ...state.pieces },
+    pieces,
     moveHistory: state.moveHistory.slice(),
     captured: state.captured.slice(),
     scores: { ...state.scores },
@@ -452,24 +565,26 @@ function castlingIsLegal(state: GameState, move: Move, inst: GameState['pieces']
 
 /* ------------------------------------------------- fast legality for a team */
 
-function squareKey(x: number, y: number) {
-  return `${x},${y}`
-}
-
 /** The squares the other armies can take right now. */
-function enemyAttackSquares(state: GameState, enemyTeams: Set<string>): Set<string> {
-  const squares = new Set<string>()
-  for (const id in state.pieces) {
-    const inst = state.pieces[id]
-    if (!enemyTeams.has(inst.team)) continue
-    const at = findPiece(state, id)
-    if (!at) continue
-    for (const move of movesFor(state, at.x, at.y)) {
-      if (!move.capturedId) continue
-      squares.add(squareKey(move.finalTo.x, move.finalTo.y))
+function fillAttackedSquares(
+  state: GameState,
+  enemyTeams: Set<string>,
+  out: Uint8Array,
+): void {
+  const width = state.variant.board.width
+  for (let y = 0; y < state.board.length; y++) {
+    const row = state.board[y]
+    for (let x = 0; x < row.length; x++) {
+      const id = row[x]
+      if (!id) continue
+      const inst = state.pieces[id]
+      if (!inst || !enemyTeams.has(inst.team)) continue
+      for (const move of movesFor(state, x, y)) {
+        if (!move.capturedId) continue
+        out[move.finalTo.y * width + move.finalTo.x] = 1
+      }
     }
   }
-  return squares
 }
 
 /** Can this piece slide along the given line? */
@@ -489,8 +604,9 @@ function slidesAlong(
       const inst = Object.values(state.pieces).find((p) => p.typeId === piece.id)
       if (inst?.hasMoved) continue
     }
+    const forward = geometryFor(state.variant).forward[teamId] ?? 'up'
     for (const raw of pattern.vectors) {
-      const v = orient(state.variant, piece, teamId, raw)
+      const v = orient(piece, forward, raw)
       if ((v.x === dx && v.y === dy) || (v.x === -dx && v.y === -dy)) return true
     }
   }
@@ -507,8 +623,9 @@ function exposedSquares(
   royalAt: Vec,
   teamId: string,
   enemyTeams: Set<string>,
-): Set<string> {
-  const exposed = new Set<string>()
+  exposed: Uint8Array,
+): void {
+  const width = state.variant.board.width
   const directions = [
     { x: 1, y: 0 },
     { x: -1, y: 0 },
@@ -573,9 +690,8 @@ function exposedSquares(
     if (!enemyPiece) continue
     if (enemyPiece.flags.movesOnce && enemyInst.hasMoved) continue
     if (!slidesAlong(state, enemyPiece, enemyInst.team, dir.x, dir.y)) continue
-    exposed.add(squareKey(first.x, first.y))
+    exposed[first.y * width + first.x] = 1
   }
-  return exposed
 }
 
 /** Moves that change the board in ways the fast check cannot follow. */
@@ -596,27 +712,70 @@ function needsSlowCheck(move: Move) {
  * eight lines from the royal piece. Anything unusual falls back to the slow
  * but certain check.
  */
-export function legalOptionsForTeam(state: GameState, teamId: string): MoveOption[] {
+export function legalOptionsForTeam(
+  state: GameState,
+  teamId: string,
+  settings: { search?: boolean } = {},
+): MoveOption[] {
+  const { moves, states } = collectTeamMoves(state, teamId, true, settings.search ?? false)
   const options: MoveOption[] = []
-  const royals: { id: string; at: Vec }[] = []
-  for (const id in state.pieces) {
-    const inst = state.pieces[id]
-    if (inst.team !== teamId) continue
-    if (!state.pieceTypes[inst.typeId]?.flags.royal) continue
-    const at = findPiece(state, id)
-    if (at) royals.push({ id, at })
+  for (let i = 0; i < moves.length; i++) {
+    options.push({ move: moves[i], next: states[i] as GameState })
   }
+  return options
+}
+
+/**
+ * The legal moves of a whole team, without the states they lead to.
+ *
+ * A search throws away most of the moves it generates: it prunes them before
+ * it ever looks at them. Building the state behind a move costs a copy of the
+ * board and of the piece table, so a search asks for the moves alone and only
+ * builds the state of the move it really wants to look at.
+ */
+export function legalMovesForTeam(
+  state: GameState,
+  teamId: string,
+  settings: { search?: boolean } = {},
+): Move[] {
+  return collectTeamMoves(state, teamId, false, settings.search ?? false).moves
+}
+
+/**
+ * The legal moves of a whole team. When the states are wanted, they are built
+ * as the moves are found; when they are not, the moves come on their own.
+ */
+function collectTeamMoves(
+  state: GameState,
+  teamId: string,
+  wantStates: boolean,
+  search: boolean,
+): { moves: Move[]; states: (GameState | null)[] } {
+  const moves: Move[] = []
+  const states: (GameState | null)[] = []
+  const royals: { id: string; at: Vec }[] = []
   const enemyTeams = new Set(
     state.variant.teams.filter((t) => t.id !== teamId).map((t) => t.id),
   )
-  const attacked = enemyTeams.size ? enemyAttackSquares(state, enemyTeams) : new Set<string>()
+  for (let y = 0; y < state.board.length; y++) {
+    const row = state.board[y]
+    for (let x = 0; x < row.length; x++) {
+      const id = row[x]
+      if (!id) continue
+      const inst = state.pieces[id]
+      if (!inst || inst.team !== teamId) continue
+      if (state.pieceTypes[inst.typeId]?.flags.royal) royals.push({ id, at: { x, y } })
+    }
+  }
+  const size = state.variant.board.width * state.variant.board.height
+  const attacked = takeScratch(size)
+  if (enemyTeams.size) fillAttackedSquares(state, enemyTeams, attacked)
   const royalIds = new Set(royals.map((r) => r.id))
-  const inCheck = royals.some((r) => attacked.has(squareKey(r.at.x, r.at.y)))
+  const inCheck = royals.some((r) => attacked[r.at.y * state.variant.board.width + r.at.x] > 0)
+  giveScratch()
   // With several royal pieces it is not worth guessing — check every move.
-  const exposed =
-    inCheck || royals.length !== 1
-      ? null
-      : exposedSquares(state, royals[0].at, teamId, enemyTeams)
+  const exposed = inCheck || royals.length !== 1 ? null : takeScratch(size)
+  if (exposed) exposedSquares(state, royals[0].at, teamId, enemyTeams, exposed)
 
   for (let y = 0; y < state.board.length; y++) {
     const row = state.board[y]
@@ -630,20 +789,27 @@ export function legalOptionsForTeam(state: GameState, teamId: string): MoveOptio
         const fast =
           !inCheck &&
           exposed !== null &&
-          !exposed.has(squareKey(move.from.x, move.from.y)) &&
+          !exposed[move.from.y * state.variant.board.width + move.from.x] &&
           !royalIds.has(move.pieceId) &&
           !needsSlowCheck(move)
         if (fast) {
-          options.push({ move, next: applyMove(state, move, { compute: false }) })
+          moves.push(move)
+          // The state is only built when somebody asks for it.
+          states.push(
+            wantStates ? applyMove(state, move, { compute: false, search }) : null,
+          )
           continue
         }
-        const next = applyMove(state, move, { compute: false })
+        // This move has to be looked at properly, so the state is built now.
+        const next = applyMove(state, move, { compute: false, search })
         if (isInCheck(next, inst.team)) continue
-        options.push({ move, next })
+        moves.push(move)
+        states.push(next)
       }
     }
   }
-  return options
+  if (exposed) giveScratch()
+  return { moves, states }
 }
 
 /** Put the royal piece on a square and see whether it is attacked there. */
@@ -683,6 +849,12 @@ interface ApplyOptions {
   origin?: Vec
   /** Work out the algebraic notation too. It costs time, so searches skip it. */
   san?: boolean
+  /**
+   * A search tries millions of moves that never reach the board. The wording
+   * of such a move and the list of captured pieces are of no use there, so
+   * they are left out.
+   */
+  search?: boolean
 }
 
 export function applyMove(
@@ -725,7 +897,9 @@ export function applyMove(
       if (next.board[capturedAt.y]?.[capturedAt.x] === move.capturedId) {
         next.board[capturedAt.y][capturedAt.x] = null
       }
-      next.captured.push({ team: capturedInst.team, typeId: capturedInst.typeId, by: inst.team })
+      if (!options.search) {
+        next.captured.push({ team: capturedInst.team, typeId: capturedInst.typeId, by: inst.team })
+      }
       if (capturedPiece) {
         next.scores[inst.team] = (next.scores[inst.team] ?? 0) + capturedPiece.value
       }
@@ -741,7 +915,9 @@ export function applyMove(
     const leftoverInst = next.pieces[leftover]
     if (leftoverInst) {
       const leftoverPiece = next.pieceTypes[leftoverInst.typeId]
-      next.captured.push({ team: leftoverInst.team, typeId: leftoverInst.typeId, by: inst.team })
+      if (!options.search) {
+        next.captured.push({ team: leftoverInst.team, typeId: leftoverInst.typeId, by: inst.team })
+      }
       if (leftoverPiece) {
         next.scores[inst.team] = (next.scores[inst.team] ?? 0) + leftoverPiece.value
       }
@@ -789,7 +965,9 @@ export function applyMove(
           // Friendly fire is off: a blast never harms the moving team.
           if (oInst.team === inst.team) continue
           const oPiece = next.pieceTypes[oInst.typeId]
-          next.captured.push({ team: oInst.team, typeId: oInst.typeId, by: inst.team })
+          if (!options.search) {
+            next.captured.push({ team: oInst.team, typeId: oInst.typeId, by: inst.team })
+          }
           if (oPiece) {
             next.scores[inst.team] = (next.scores[inst.team] ?? 0) + oPiece.value
             if (oPiece.flags.royal) blastRoyal = true
@@ -845,15 +1023,17 @@ export function applyMove(
   const record: MoveRecord = {
     move: { ...move, promotionTypeId },
     team: state.turn,
-    notation: notationFor(
-      state,
-      move,
-      piece,
-      capturedPiece,
-      promotionTypeId ? next.pieceTypes[promotionTypeId]?.name : undefined,
-    ),
+    notation: options.search
+      ? ''
+      : notationFor(
+          state,
+          move,
+          piece,
+          capturedPiece,
+          promotionTypeId ? next.pieceTypes[promotionTypeId]?.name : undefined,
+        ),
     san: options.san ? sanFor(state, move, next) : undefined,
-    capturedName: capturedPiece?.name,
+    capturedName: options.search ? undefined : capturedPiece?.name,
     blasts: blasts.length ? blasts : undefined,
     origin: options.origin,
   }

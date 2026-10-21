@@ -1,6 +1,7 @@
-import { applyMove, isInCheck, legalOptionsForTeam, type MoveOption } from '../rules'
+import { applyMove, isInCheck, legalMovesForTeam } from '../rules'
 import { evaluate } from './evaluate'
-import type { GameState, Move } from '../types'
+import { enPassantSensitive, hashPosition, TABLE_SIZE, type Fingerprint } from './hash'
+import type { GameState, Move, Variant } from '../types'
 
 /**
  * A small but real chess engine: negamax with alpha-beta pruning, iterative
@@ -98,6 +99,118 @@ export interface SearchResult {
 
 const MATE = 1_000_000
 
+/** How the score in the table was found. */
+const EXACT = 1
+/** The score is a lower bound: the position is at least this good. */
+const LOWER = 2
+/** The score is an upper bound: the position is at most this good. */
+const UPPER = 3
+
+/* ------------------------------------------------------ transposition table */
+
+/**
+ * What the search remembers about a position it has already looked at.
+ *
+ * The table is shared by every search the worker makes: the position a bot
+ * looks at now is often one it looked at a moment ago, and the score it
+ * worked out then still holds.
+ */
+class TranspositionTable {
+  /** Whether the slot holds the position it is asked about. */
+  private readonly check = new Int32Array(TABLE_SIZE)
+  /** How deep the position was searched. */
+  private readonly depth = new Int16Array(TABLE_SIZE)
+  /** What the search found. */
+  private readonly score = new Int32Array(TABLE_SIZE)
+  /** Whether the score is exact, a lower bound or an upper bound. */
+  private readonly flag = new Int8Array(TABLE_SIZE)
+  /** The move the search liked best, as the square it starts and ends on. */
+  private readonly from = new Int16Array(TABLE_SIZE)
+  private readonly to = new Int16Array(TABLE_SIZE)
+  /** Which round of the search wrote the entry. */
+  private readonly age = new Int32Array(TABLE_SIZE)
+
+  private round = 0
+
+  /** Starts a new round. Entries from older rounds may be replaced. */
+  beginRound() {
+    this.round += 1
+  }
+
+  /** Empties the table. */
+  clear() {
+    this.check.fill(0)
+    this.depth.fill(0)
+    this.score.fill(0)
+    this.flag.fill(0)
+    this.from.fill(0)
+    this.to.fill(0)
+    this.age.fill(0)
+    this.round = 0
+  }
+
+  /**
+   * What is known about a position, or null when it is not in the table.
+   */
+  probe(
+    slot: number,
+    check: number,
+    depth: number,
+  ): { score: number; flag: number; from: number; to: number } | null {
+    if (this.check[slot] !== check) return null
+    if (this.depth[slot] < depth) {
+      // The entry is too shallow to cut the search short, but the move it
+      // remembers is still the best guess at what to try first.
+      return { score: this.score[slot], flag: 0, from: this.from[slot], to: this.to[slot] }
+    }
+    return {
+      score: this.score[slot],
+      flag: this.flag[slot],
+      from: this.from[slot],
+      to: this.to[slot],
+    }
+  }
+
+  store(
+    slot: number,
+    check: number,
+    depth: number,
+    score: number,
+    flag: number,
+    from: number,
+    to: number,
+  ) {
+    // A deeper result about the same position is worth more than a shallow
+    // one, so it is kept.
+    if (this.check[slot] === check && this.depth[slot] > depth && this.age[slot] === this.round) {
+      return
+    }
+    this.check[slot] = check
+    this.depth[slot] = depth
+    this.score[slot] = score
+    this.flag[slot] = flag
+    this.from[slot] = from
+    this.to[slot] = to
+    this.age[slot] = this.round
+  }
+}
+
+/** The table the worker shares. */
+const table = new TranspositionTable()
+
+/**
+ * Empties the table of positions the search has looked at.
+ *
+ * The table is safe to keep between games — a position of one game says
+ * nothing about another — but a fresh table keeps the memory small and the
+ * search honest.
+ */
+export function clearSearchTable() {
+  table.clear()
+}
+
+/* ------------------------------------------------------------- the search */
+
 interface SearchContext {
   team: string
   deadline: number
@@ -113,6 +226,16 @@ interface SearchContext {
   pv: Move[][]
   /** Moves the search must not play. */
   exclude?: Set<string>
+  /** Positions the search has already looked at. */
+  tt: TranspositionTable
+  /** The fingerprint of the position being looked at. */
+  fingerprint: Fingerprint
+  /** The move the table remembers for the position being looked at. */
+  ttMove: { from: number; to: number } | null
+  /** Moves that caused a cut-off, one pair per ply of the search. */
+  killers: ({ from: number; to: number } | null)[][]
+  /** How often a quiet move caused a cut-off. */
+  history: Map<number, number>
 }
 
 /** Small deterministic random generator, so a seed gives a repeatable game. */
@@ -142,12 +265,38 @@ function hasRoyal(state: GameState, teamId: string) {
   return false
 }
 
-/** Every legal move of the side to move, with the state it leads to. */
-function allLegalMoves(state: GameState): MoveOption[] {
-  const out: MoveOption[] = []
-  const dicePieces = Object.values(state.pieces).filter(
-    (p) => p.team === state.turn && state.pieceTypes[p.typeId]?.flags.dice,
-  )
+/**
+ * Whether a variant has a piece that rolls a die.
+ *
+ * Most variants do not, and looking for such a piece in every position costs
+ * a walk over all the pieces — for nothing.
+ */
+const diceVariants = new WeakMap<Variant, boolean>()
+
+function variantHasDice(variant: Variant): boolean {
+  let flag = diceVariants.get(variant)
+  if (flag === undefined) {
+    flag = variant.pieceTypes.some((piece) => piece.flags.dice)
+    diceVariants.set(variant, flag)
+  }
+  return flag
+}
+
+/**
+ * Every legal move of the side to move.
+ *
+ * The states behind the moves are not built here: a search prunes most of the
+ * moves it generates before it looks at them, and a state costs a copy of the
+ * board and of the piece table. The state of a move is built when the search
+ * decides to look at that move.
+ */
+function allLegalMoves(state: GameState): Move[] {
+  const out: Move[] = []
+  const dicePieces = variantHasDice(state.variant)
+    ? Object.values(state.pieces).filter(
+        (p) => p.team === state.turn && state.pieceTypes[p.typeId]?.flags.dice,
+      )
+    : []
   // A piece that rolls a die is tried with every roll.
   const rolledStates: GameState[] = dicePieces.length
     ? dicePieces.flatMap((piece) =>
@@ -160,20 +309,20 @@ function allLegalMoves(state: GameState): MoveOption[] {
 
   const seen = new Set<string>()
   for (const rolled of rolledStates) {
-    for (const option of legalOptionsForTeam(rolled, state.turn)) {
-      const choices = option.move.promotionOptions
+    for (const option of legalMovesForTeam(rolled, state.turn, { search: true })) {
+      const choices = option.promotionOptions
       if (choices && choices.length > 1) {
         // A piece that may promote into several things is tried as each.
         for (const typeId of choices) {
-          const move = { ...option.move, promotionTypeId: typeId }
+          const move = { ...option, promotionTypeId: typeId }
           const key = `${move.pieceId}|${move.finalTo.x},${move.finalTo.y}|${typeId}`
           if (seen.has(key)) continue
           seen.add(key)
-          out.push({ move, next: applyMove(state, move, { compute: false }) })
+          out.push(move)
         }
         continue
       }
-      const key = `${option.move.pieceId}|${option.move.finalTo.x},${option.move.finalTo.y}|${option.move.roll ?? 0}`
+      const key = `${option.pieceId}|${option.finalTo.x},${option.finalTo.y}|${option.roll ?? 0}`
       if (seen.has(key)) continue
       seen.add(key)
       out.push(option)
@@ -186,29 +335,72 @@ function allLegalMoves(state: GameState): MoveOption[] {
  * Captures and promotions only — the moves a quiet horizon should not miss.
  * Only those moves are followed, which keeps the quiescence search cheap.
  */
-function captureMoves(state: GameState): MoveOption[] {
-  return allLegalMoves(state).filter(
-    (option) => !!option.move.capturedId || !!option.move.promotionTypeId,
-  )
+function captureMoves(state: GameState): Move[] {
+  return allLegalMoves(state).filter((move) => !!move.capturedId || !!move.promotionTypeId)
+}
+
+/* ------------------------------------------------------- ordering the moves */
+
+/** The square a move starts on and the square it ends on, as one number. */
+function squaresOf(move: Move, width: number) {
+  const from = move.from.y * width + move.from.x
+  const to = move.finalTo.y * width + move.finalTo.x
+  return { from, to }
 }
 
 /** Most valuable victim first, cheapest attacker second. */
-function orderMoves(options: MoveOption[], state: GameState): MoveOption[] {
-  const weight = (option: MoveOption) => {
-    const move = option.move
-    let score = 0
-    if (move.capturedId) {
-      const victim = state.pieces[move.capturedId]
-      const victimPiece = victim ? state.pieceTypes[victim.typeId] : undefined
-      const attacker = state.pieces[move.pieceId]
-      const attackerPiece = attacker ? state.pieceTypes[attacker.typeId] : undefined
-      score += 1000 + (victimPiece?.value ?? 0) * 10 - (attackerPiece?.value ?? 0)
-    }
-    if (move.promotionTypeId) score += 900
-    if (move.castle) score += 25
-    return score
+function moveWeight(move: Move, state: GameState): number {
+  let score = 0
+  if (move.capturedId) {
+    const victim = state.pieces[move.capturedId]
+    const victimPiece = victim ? state.pieceTypes[victim.typeId] : undefined
+    const attacker = state.pieces[move.pieceId]
+    const attackerPiece = attacker ? state.pieceTypes[attacker.typeId] : undefined
+    score += 100_000 + (victimPiece?.value ?? 0) * 100 - (attackerPiece?.value ?? 0)
   }
-  return options.slice().sort((a, b) => weight(b) - weight(a))
+  if (move.promotionTypeId) score += 900_000
+  if (move.castle) score += 2_500
+  return score
+}
+
+/**
+ * The order the moves of a position are tried in.
+ *
+ * The move the table remembers comes first, then the moves that take
+ * something, then the moves that caused a cut-off deeper down, and finally
+ * the quiet moves that have served the search well.
+ */
+function orderMoves(moves: Move[], state: GameState, ctx: SearchContext, ply: number): Move[] {
+  if (moves.length < 2) return moves
+  const width = state.variant.board.width
+  const killers = ctx.killers[ply]
+  const weights = new Array<number>(moves.length)
+  for (let i = 0; i < moves.length; i++) {
+    const move = moves[i]
+    const { from, to } = squaresOf(move, width)
+    let score = moveWeight(move, state)
+    if (ctx.ttMove && ctx.ttMove.from === from && ctx.ttMove.to === to) {
+      // The move that worked last time.
+      weights[i] = 10_000_000
+      continue
+    }
+    if (!move.capturedId && !move.promotionTypeId) {
+      if (killers) {
+        for (const killer of killers) {
+          if (killer && killer.from === from && killer.to === to) {
+            score += 800_000
+            break
+          }
+        }
+      }
+      const history = ctx.history.get(from * 65536 + to)
+      if (history) score += Math.min(history, 700_000)
+    }
+    weights[i] = score
+  }
+  const order = moves.map((_, i) => i)
+  order.sort((a, b) => weights[b] - weights[a])
+  return order.map((i) => moves[i])
 }
 
 /** The score of the position for the side that is to move. */
@@ -241,6 +433,25 @@ function outOfTime(ctx: SearchContext) {
   return false
 }
 
+/* ------------------------------------------------------------- mate scores */
+
+/**
+ * A mate score says how many moves the mate still needs. That number depends
+ * on how deep the search was, so it is put in the table in a form that can be
+ * read back at any depth.
+ */
+function toStored(score: number, ply: number) {
+  if (score >= MATE - 1000 || score <= -MATE + 1000) return score + ply
+  return score
+}
+
+function fromStored(stored: number, ply: number) {
+  if (stored >= MATE - 1000 || stored <= -MATE + 1000) return stored - ply
+  return stored
+}
+
+/* ---------------------------------------------------------- the search itself */
+
 function quiesce(
   state: GameState,
   alpha: number,
@@ -260,8 +471,9 @@ function quiesce(
   if (stand > alpha) alpha = stand
   if (depth <= 0) return alpha
 
-  for (const option of orderMoves(captureMoves(state), state)) {
-    const score = -quiesce(option.next, -beta, -alpha, ply + 1, depth - 1, ctx)
+  for (const move of orderMoves(captureMoves(state), state, ctx, ply)) {
+    const next = applyMove(state, move, { compute: false, search: true })
+    const score = -quiesce(next, -beta, -alpha, ply + 1, depth - 1, ctx)
     if (ctx.aborted) return alpha
     if (score >= beta) return beta
     if (score > alpha) alpha = score
@@ -283,6 +495,27 @@ function negamax(
   const terminal = terminalScore(state, ply, ctx)
   if (terminal !== null) return terminal
 
+  // Has this position been looked at before? A position where a capture en
+  // passant is open is left out: the rules depend on the last move there, and
+  // two positions that look the same can still be different.
+  const sensitive = enPassantSensitive(state)
+  hashPosition(state, ctx.fingerprint)
+  const slot = ctx.fingerprint.slot
+  const check = ctx.fingerprint.check
+  const hit = sensitive ? null : ctx.tt.probe(slot, check, depth)
+  const width = state.variant.board.width
+  let bestMove = -1
+  let bestTo = -1
+  if (hit) {
+    const known = fromStored(hit.score, ply)
+    if (hit.flag === EXACT) return known
+    if (hit.flag === LOWER && known >= beta) return known
+    if (hit.flag === UPPER && known <= alpha) return known
+    bestMove = hit.from
+    bestTo = hit.to
+  }
+  ctx.ttMove = bestMove >= 0 ? { from: bestMove, to: bestTo } : null
+
   const moves = allLegalMoves(state)
   if (moves.length === 0) {
     // No move left: checkmate if the royal piece is attacked, else a draw.
@@ -292,38 +525,83 @@ function negamax(
 
   if (depth <= 0) return quiesce(state, alpha, beta, ply, ctx.quiescence, ctx)
 
+  const originalAlpha = alpha
   let best = -Infinity
-  for (const option of orderMoves(moves, state)) {
+  let bestMoveUsed = -1
+  let bestToUsed = -1
+  const ordered = orderMoves(moves, state, ctx, ply)
+  for (let i = 0; i < ordered.length; i++) {
+    const move = ordered[i]
+    // The state behind the move is built now, not when the moves were listed.
+    const next = applyMove(state, move, { compute: false, search: true })
     let score: number
-    if (reachedPointTarget(state, option, ctx)) {
+    if (reachedPointTarget(state, next, ctx)) {
       // The mover hits the point target and wins.
       score = MATE - ply
+    } else if (i === 0) {
+      score = -negamax(next, depth - 1, -beta, -alpha, ply + 1, ctx)
     } else {
-      score = -negamax(option.next, depth - 1, -beta, -alpha, ply + 1, ctx)
+      // A quiet move that comes late in the order is looked at with less
+      // depth first: it is unlikely to be the best move, and there are many
+      // of them.
+      const quiet = !move.capturedId && !move.promotionTypeId
+      const reduced = quiet && i >= 3 && depth >= 3 ? 1 : 0
+      // A narrow window first: most moves are worse than the best one, and
+      // this says so without looking at them properly.
+      score = -negamax(next, depth - 1 - reduced, -alpha - 1, -alpha, ply + 1, ctx)
+      if (score > alpha && score < beta) {
+        if (reduced) {
+          // It might be better than the shorter look suggested.
+          score = -negamax(next, depth - 1, -alpha - 1, -alpha, ply + 1, ctx)
+        }
+        if (score > alpha && score < beta) {
+          // It might be the best move after all — look at it properly.
+          score = -negamax(next, depth - 1, -beta, -alpha, ply + 1, ctx)
+        }
+      }
     }
     if (ctx.aborted) return best === -Infinity ? 0 : best
     if (score > best) {
       best = score
       // Remember the line that leads here.
-      const line = [option.move]
+      const line = [move]
       const child = ctx.pv[ply + 1]
       if (child) line.push(...child)
       ctx.pv[ply] = line
+      const squares = squaresOf(move, width)
+      bestMoveUsed = squares.from
+      bestToUsed = squares.to
     }
     if (best > alpha) alpha = best
-    if (alpha >= beta) break
+    if (alpha >= beta) {
+      // A cut-off: this move is worth trying first next time.
+      if (!move.capturedId && !move.promotionTypeId) {
+        const killers = ctx.killers[ply] ?? (ctx.killers[ply] = [null, null])
+        killers[1] = killers[0]
+        killers[0] = { from: bestMoveUsed, to: bestToUsed }
+        const key = bestMoveUsed * 65536 + bestToUsed
+        ctx.history.set(key, (ctx.history.get(key) ?? 0) + depth * depth)
+      }
+      break
+    }
+  }
+
+  // Remember what was found.
+  if (!sensitive) {
+    const flag = best <= originalAlpha ? UPPER : best >= beta ? LOWER : EXACT
+    ctx.tt.store(slot, check, depth, toStored(best, ply), flag, bestMoveUsed, bestToUsed)
   }
   return best
 }
 
-function reachedPointTarget(state: GameState, option: MoveOption, ctx: SearchContext) {
+function reachedPointTarget(state: GameState, next: GameState, ctx: SearchContext) {
   if (ctx.pointTarget === null) return false
   const mover = state.turn
-  return (option.next.scores[mover] ?? 0) >= ctx.pointTarget
+  return (next.scores[mover] ?? 0) >= ctx.pointTarget
 }
 
 interface RootMove {
-  option: MoveOption
+  move: Move
   score: number
 }
 
@@ -332,16 +610,25 @@ function searchRoot(state: GameState, depth: number, ctx: SearchContext): RootMo
   // The best score so far narrows the window for the moves that follow, so
   // the root does not search every line from scratch.
   let alpha = -Infinity
-  for (const option of orderMoves(allLegalMoves(state), state)) {
+  const ordered = orderMoves(allLegalMoves(state), state, ctx, 0)
+  for (let i = 0; i < ordered.length; i++) {
+    const move = ordered[i]
     // Some moves are off the table — repeating a position is a draw.
-    if (ctx.exclude?.has(moveName(option.move))) continue
+    if (ctx.exclude?.has(moveName(move))) continue
+    const next = applyMove(state, move, { compute: false, search: true })
     let score: number
-    if (reachedPointTarget(state, option, ctx)) {
+    if (reachedPointTarget(state, next, ctx)) {
       score = MATE - 1
+    } else if (i === 0) {
+      score = -negamax(next, depth - 1, -Infinity, Infinity, 1, ctx)
     } else {
-      score = -negamax(option.next, depth - 1, -Infinity, -alpha, 1, ctx)
+      score = -negamax(next, depth - 1, -Infinity, -alpha, 1, ctx)
+      if (score > alpha) {
+        // It might be the best move — look at it with the whole window.
+        score = -negamax(next, depth - 1, -Infinity, Infinity, 1, ctx)
+      }
     }
-    results.push({ option, score })
+    results.push({ move, score })
     if (score > alpha) alpha = score
     if (ctx.aborted) break
   }
@@ -370,6 +657,11 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     teams: state.variant.teams.map((t) => t.id),
     pv: [],
     exclude: options.exclude?.length ? new Set(options.exclude) : undefined,
+    tt: table,
+    fingerprint: { slot: 0, check: 0 },
+    ttMove: null,
+    killers: [],
+    history: new Map(),
   }
   for (const condition of state.variant.winConditions) {
     if (condition.kind === 'points') ctx.pointTarget = condition.threshold ?? Infinity
@@ -382,6 +674,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   let rootResults: RootMove[] = []
   let depth = 0
 
+  ctx.tt.beginRound()
   for (let d = 1; d <= profile.maxDepth; d++) {
     const results = searchRoot(state, d, ctx)
     if (ctx.aborted || !results.length) break
@@ -393,12 +686,12 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   if (!rootResults.length) {
     // Nothing was searched — fall back to any legal move.
     const all = allLegalMoves(state)
-    const fallback = all.filter((o) => !ctx.exclude?.has(moveName(o.move)))
+    const fallback = all.filter((m) => !ctx.exclude?.has(moveName(m)))
     const pool = fallback.length ? fallback : all
     return {
-      move: pool.length ? pool[0].move : null,
+      move: pool.length ? pool[0] : null,
       score: 0,
-      line: pool.length ? [pool[0].move] : [],
+      line: pool.length ? [pool[0]] : [],
       depth: 0,
       nodes: ctx.nodes,
       elapsedMs: performance.now() - started,
@@ -412,8 +705,8 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   // reports the best line.
   let chosen = sorted[0]
   if (!options.analyze && profile.randomness > 0 && random() < profile.randomness) {
-    const any = allLegalMoves(state).filter((o) => !ctx.exclude?.has(moveName(o.move)))
-    if (any.length) chosen = { option: any[Math.floor(random() * any.length)], score: 0 }
+    const any = allLegalMoves(state).filter((m) => !ctx.exclude?.has(moveName(m)))
+    if (any.length) chosen = { move: any[Math.floor(random() * any.length)], score: 0 }
   } else if (!options.analyze && profile.slop > 0 && sorted.length > 1) {
     // The scores of the moves that were cut off are only upper bounds, so the
     // shortlist is scored properly before a near miss is picked.
@@ -421,8 +714,8 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     ctx.aborted = false
     ctx.deadline = performance.now() + 600
     const exact = shortlist.map((entry) => ({
-      option: entry.option,
-      score: scoreMove(state, entry.option, depth, ctx),
+      move: entry.move,
+      score: scoreMove(state, entry.move, depth, ctx),
     }))
     const best = exact.reduce((a, b) => (b.score > a.score ? b : a))
     const pool = exact.filter((entry) => entry.score >= best.score - profile.slop)
@@ -430,9 +723,9 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   }
 
   return {
-    move: chosen.option.move,
+    move: chosen.move,
     score: chosen.score,
-    line: ctx.pv[0] ?? [chosen.option.move],
+    line: ctx.pv[0] ?? [chosen.move],
     depth,
     nodes: ctx.nodes,
     elapsedMs: performance.now() - started,
@@ -442,11 +735,12 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
 /** The exact score of one move, searched with a full window. */
 function scoreMove(
   state: GameState,
-  option: MoveOption,
+  move: Move,
   depth: number,
   ctx: SearchContext,
 ): number {
-  if (reachedPointTarget(state, option, ctx)) return MATE - 1
-  if (depth <= 0) return sideScore(option.next, ctx)
-  return -negamax(option.next, depth - 1, -Infinity, Infinity, 1, ctx)
+  const next = applyMove(state, move, { compute: false, search: true })
+  if (reachedPointTarget(state, next, ctx)) return MATE - 1
+  if (depth <= 0) return sideScore(next, ctx)
+  return -negamax(next, depth - 1, -Infinity, Infinity, 1, ctx)
 }

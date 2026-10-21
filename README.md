@@ -21,6 +21,11 @@ Deployable to Cloudflare Workers with GitHub Actions.
   runs in a worker, so the board stays responsive while it thinks. The bot can
   take a fixed side or a random one that is rolled for every new game, and two
   bots can play each other, each with its own strength, while you watch.
+  Under the hood it is a real engine: negamax with alpha-beta, a table of the
+  positions it has already looked at, a narrow-window re-search, killer and
+  history move ordering, a capture-only horizon and a late-move reduction —
+  about twice the speed and a full ply deeper than before, at the same
+  thinking time.
 - **Analysis** — the bot looks at the position on the board and says what it
   thinks: a score for the first army. The line it would play is hidden by
   default and can be switched on.

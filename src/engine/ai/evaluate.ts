@@ -1,5 +1,5 @@
 import { cloneState, findPiece, isInCheck, movesFor } from '../rules'
-import type { GameState, Vec } from '../types'
+import type { GameState, Variant, Vec } from '../types'
 
 /**
  * A generic evaluation for any variant.
@@ -28,6 +28,28 @@ interface SideScan {
 function squareKey(x: number, y: number) {
   return `${x},${y}`
 }
+
+/** Which way each team advances. */
+const forwardCache = new WeakMap<Variant, Record<string, 'up' | 'down'>>()
+
+function forwardOf(variant: Variant): Record<string, 'up' | 'down'> {
+  const cached = forwardCache.get(variant)
+  if (cached) return cached
+  const forward: Record<string, 'up' | 'down'> = {}
+  for (const team of variant.teams) forward[team.id] = team.forward
+  forwardCache.set(variant, forward)
+  return forward
+}
+
+/**
+ * The royal pieces on the board.
+ *
+ * The evaluation is called at every leaf of a search, so it does not want to
+ * make a new list every time — it uses the same one again and again.
+ */
+const royalX: number[] = []
+const royalY: number[] = []
+const royalTeam: string[] = []
 
 /** One pass over a side: its mobility and the squares it attacks. */
 function scanSide(state: GameState, teamId: string): SideScan {
@@ -126,6 +148,28 @@ function threatScore(
 }
 
 /**
+ * How close the nearest enemy piece is to a royal piece.
+ *
+ * A king that stands next to the enemy is asking to be taken. The distance is
+ * counted in squares, the way a king moves.
+ */
+function nearestEnemy(state: GameState, x: number, y: number, team: string): number {
+  let nearest = 99
+  for (let ry = 0; ry < state.board.length; ry++) {
+    const row = state.board[ry]
+    for (let rx = 0; rx < row.length; rx++) {
+      const id = row[rx]
+      if (!id) continue
+      const inst = state.pieces[id]
+      if (inst.team === team) continue
+      const distance = Math.max(Math.abs(rx - x), Math.abs(ry - y))
+      if (distance < nearest) nearest = distance
+    }
+  }
+  return nearest
+}
+
+/**
  * Scores the position from `teamId`'s point of view. A positive number means
  * the position is good for that team.
  */
@@ -137,8 +181,10 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
   const centerY = (boardH - 1) / 2
   const maxDist = Math.max(1, Math.hypot(centerX, centerY))
   const span = Math.max(1, boardH - 1)
+  const forward = forwardOf(variant)
 
   let score = 0
+  let royalCount = 0
   for (let y = 0; y < state.board.length; y++) {
     const row = state.board[y]
     for (let x = 0; x < row.length; x++) {
@@ -153,16 +199,36 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
       // Material.
       score += sign * piece.value * MATERIAL_SCALE
 
+      if (piece.flags.royal) {
+        // The royal piece is not measured by how far it has travelled or by
+        // the square it holds — a king in the middle of the board is in
+        // danger, not in a good place. It is measured by its safety instead.
+        royalX[royalCount] = x
+        royalY[royalCount] = y
+        royalTeam[royalCount] = inst.team
+        royalCount += 1
+        continue
+      }
+
       // How far the piece has pushed towards the far side. Cheap, and it stops
       // the bot from shuffling pieces back and forth.
-      const team = variant.teams.find((t) => t.id === inst.team)
-      const progress = team?.forward === 'down' ? y / span : (span - y) / span
+      const progress = forward[inst.team] === 'down' ? y / span : (span - y) / span
       score += sign * progress * progress * Math.min(piece.value, 3) * 30
 
       // Holding the middle is worth something in most variants.
       const dist = Math.hypot(x - centerX, y - centerY) / maxDist
       score += sign * (1 - dist) * Math.min(piece.value, 3) * 12
+
+      // A piece that has left its home square is one step closer to the fight.
+      if (inst.hasMoved) score += sign * 10
     }
+  }
+
+  // Royal safety.
+  for (let i = 0; i < royalCount; i++) {
+    const nearest = Math.min(4, nearestEnemy(state, royalX[i], royalY[i], royalTeam[i]))
+    const sign = royalTeam[i] === teamId ? -1 : 1
+    score += sign * (4 - nearest) * 30
   }
 
   if (options.fast) {
