@@ -72,12 +72,23 @@ export function MakerBoard({ interactive = true }: { interactive?: boolean }) {
                   e.preventDefault()
                   if (interactive) eraseSquare(x, y)
                 }}
+                onDragEnter={(e) => {
+                  if (!interactive) return
+                  e.preventDefault()
+                  setDropTarget(`${x},${y}`)
+                }}
                 onDragOver={(e) => {
                   if (!interactive) return
                   e.preventDefault()
                   setDropTarget(`${x},${y}`)
                 }}
-                onDragLeave={() => setDropTarget(null)}
+                onDragLeave={(e) => {
+                  // Moving from a square onto one of its children — the piece
+                  // standing on it, say — is still being over the square. The
+                  // drop mark used to blink off and on because of it.
+                  if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+                  setDropTarget(null)
+                }}
                 onDrop={(e) => {
                   if (!interactive) return
                   e.preventDefault()
