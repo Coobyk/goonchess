@@ -622,6 +622,19 @@ export function RulebookView() {
               </div>
             </CardContent>
           </Card>
+
+          <p className="text-muted-foreground px-1 text-xs">
+            Piece drawings: chess pieces by Colin M. L. Burnett, shared under CC BY-SA 3.0.{' '}
+            <a
+              href="/pieces/cburnett/ATTRIBUTION.txt"
+              className="underline underline-offset-2"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Attribution
+            </a>
+            .
+          </p>
         </div>
       </div>
     </div>

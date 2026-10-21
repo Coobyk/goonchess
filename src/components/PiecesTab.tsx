@@ -1,11 +1,13 @@
-import { Copy, Plus, Trash2, Wand2 } from 'lucide-react'
+import { Copy, Layers, Plus, Trash2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Effect, MovePattern, PieceIcon, PieceType, Vec } from '@/engine/types'
+import { useState } from 'react'
+import type { Effect, MovePattern, PieceArt, PieceIcon, PieceType, Vec } from '@/engine/types'
 import { PIECE_ICONS } from '@/engine/types'
 import { leaper, slider } from '@/engine/templates'
 import { uid } from '@/engine/rules'
 import { useAppStore } from '@/store/useAppStore'
 import { PatternGrid } from './PatternGrid'
+import { PieceComposer } from './PieceComposer'
 import { PieceGlyph } from './PieceGlyph'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -69,6 +71,7 @@ export function PiecesTab() {
 
   const piece = variant.pieceTypes.find((p) => p.id === selectedId) ?? variant.pieceTypes[0]
   const teamIndex = 0
+  const [composing, setComposing] = useState(false)
 
   if (!piece) {
     return (
@@ -222,6 +225,29 @@ export function PiecesTab() {
                   ))}
                 </SelectContent>
               </Select>
+              {piece.art && piece.art.length > 0 && (
+                <p className="text-muted-foreground text-xs">
+                  This piece has a drawing of its own. The icon is only used when the drawing is
+                  removed.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Drawing</Label>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setComposing(true)}
+                >
+                  <Layers /> Compose
+                </Button>
+                {piece.art && piece.art.length > 0 && (
+                  <Button variant="ghost" onClick={() => set({ art: undefined })}>
+                    Remove
+                  </Button>
+                )}
+              </div>
             </div>
             {piece.icon === 'custom' && (
               <div className="space-y-1.5">
@@ -557,6 +583,13 @@ export function PiecesTab() {
           </CardContent>
         </Card>
       </div>
+
+      <PieceComposer
+        open={composing}
+        onOpenChange={setComposing}
+        art={piece.art ?? []}
+        onChange={(art: PieceArt) => set({ art })}
+      />
     </div>
   )
 }

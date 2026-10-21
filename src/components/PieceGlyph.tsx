@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PieceType } from '@/engine/types'
+import { artToUri } from '@/lib/pieceArt'
 
 const CODES: Record<string, string> = {
   king: 'K',
@@ -24,7 +25,17 @@ export function PieceGlyph({
   if (!piece) return null
   const code = CODES[piece.icon]
   const glyph =
-    piece.icon !== 'custom' && code ? (
+    piece.art && piece.art.length ? (
+      // A piece that was drawn in the composer.
+      <img
+        src={artToUri(piece.art, teamIndex === 0)}
+        alt={piece.name}
+        width={size}
+        height={size}
+        draggable={false}
+        style={{ display: 'block', width: size, height: size }}
+      />
+    ) : piece.icon !== 'custom' && code ? (
       <img
         src={`/pieces/cburnett/${teamIndex === 0 ? 'w' : 'b'}${code}.svg`}
         alt={piece.name}

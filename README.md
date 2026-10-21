@@ -15,6 +15,13 @@ Deployable to Cloudflare Workers with GitHub Actions.
   The same position three times is a draw, counted with the same rule chess
   uses: the pieces, the side to move, the castles still possible and the en
   passant right all have to match.
+- **Piece composer** — draw a piece instead of settling for a letter. The six
+  chess pieces are stacked on top of each other: a knight with a bishop's
+  crown on its head, a queen wearing a king's crown, an amazon with a knight's
+  head. A collection of premade pieces — the plain shapes and the classic
+  combinations — is there to start from, and every one of them can be pulled
+  apart, moved, resized and restacked. The drawing travels with the piece:
+  it is on the board, in the rulebook and in the share link.
 - **Opponent bot** — play against a bot in any variant. It searches with the
   same rules engine the game uses, so it understands custom pieces, portals and
   blasts; three strengths, from a casual opponent to a deep search. The search

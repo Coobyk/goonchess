@@ -54,6 +54,30 @@ export const PIECE_ICONS: { id: PieceIcon; label: string }[] = [
   { id: 'custom', label: 'Letter / Symbol' },
 ]
 
+/** The shapes a piece can be drawn from. */
+export type ArtShape = 'king' | 'queen' | 'rook' | 'bishop' | 'knight' | 'pawn'
+
+/**
+ * One shape in the drawing of a piece.
+ *
+ * The shapes are the chess pieces as they are normally drawn. A piece that is
+ * made of several of them is drawn by stacking them: the last shape is the
+ * one on top.
+ */
+export interface PieceArtLayer {
+  shape: ArtShape
+  /** Where the shape sits, in the 45 by 45 space the pieces are drawn in. */
+  x: number
+  y: number
+  /** How large the shape is. 1 is its normal size. */
+  scale: number
+  /** Show only the crown of the shape — everything above its pedestal. */
+  crown?: boolean
+}
+
+/** The drawing of a piece, shape by shape. */
+export type PieceArt = PieceArtLayer[]
+
 export type PatternKind = 'leaper' | 'slider'
 
 export interface MovePattern {
@@ -109,6 +133,8 @@ export interface PieceType {
   flags: PieceFlags
   effects: Effect[]
   promotion: Promotion | null
+  /** A drawing of the piece, made of the shapes below. Wins over the icon. */
+  art?: PieceArt
 }
 
 /* ---------------------------------------------------------------- setup */

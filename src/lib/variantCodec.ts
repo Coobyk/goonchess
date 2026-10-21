@@ -2,9 +2,11 @@ import { uid } from '@/engine/rules'
 import { BOARD_DARK, BOARD_LIGHT } from './palette'
 import {
   PIECE_ICONS,
+  type ArtShape,
   type BoardConfig,
   type Effect,
   type MovePattern,
+  type PieceArtLayer,
   type PieceFlags,
   type PieceIcon,
   type PieceType,
@@ -28,11 +30,12 @@ import {
  *
  * Bump FORMAT_VERSION whenever the packed shape changes.
  */
-export const FORMAT_VERSION = 2
+export const FORMAT_VERSION = 3
 
 const TERRAINS: Terrain[] = ['normal', 'void', 'wall', 'portal', 'oneway']
 const WIN_KINDS: WinConditionKind[] = ['checkmate', 'kingCapture', 'elimination', 'points']
 const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
+const SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']
 
 const FLAGS: [keyof PieceFlags, number][] = [
   ['jump', 1],
@@ -82,6 +85,7 @@ export function packVariant(variant: Variant): unknown {
       p.promotion
         ? p.promotion.typeIds.map((id) => pieceIndex.get(id) ?? -1).filter((i) => i >= 0)
         : [],
+      (p.art ?? []).map(packArtLayer),
     ]),
     variant.setup.map((s) => [pieceIndex.get(s.typeId) ?? -1, teamIndex.get(s.team) ?? 0, s.x, s.y]),
     variant.winConditions.map((w) =>
@@ -124,6 +128,13 @@ function packPattern(pattern: MovePattern): unknown[] {
   return row
 }
 
+/** One shape in the drawing of a piece. */
+function packArtLayer(layer: PieceArtLayer): unknown[] {
+  const row: unknown[] = [SHAPES.indexOf(layer.shape), layer.x, layer.y, layer.scale]
+  if (layer.crown) row.push(1)
+  return row
+}
+
 function packEffect(effect: Effect, pieceIndex: Map<string, number>): unknown[] {
   if (effect.kind === 'swap') return [0]
   if (effect.kind === 'explosion') return [1, effect.radius]
@@ -135,7 +146,10 @@ function packEffect(effect: Effect, pieceIndex: Map<string, number>): unknown[] 
 /** Throws on anything that is not a well-formed packed variant. */
 export function unpackVariant(input: unknown): Variant {
   if (!Array.isArray(input)) throw new Error('packed variant must be an array')
-  if (input[0] !== FORMAT_VERSION) throw new Error(`unsupported packed variant version: ${String(input[0])}`)
+  // Version 2 is the same format without the drawings of composed pieces.
+  if (input[0] !== FORMAT_VERSION && input[0] !== 2) {
+    throw new Error(`unsupported packed variant version: ${String(input[0])}`)
+  }
 
   const [, name, description, board, teams, pieces, setup, wins] = input
   if (!Array.isArray(board) || !Array.isArray(pieces)) {
@@ -192,7 +206,7 @@ export function unpackVariant(input: unknown): Variant {
 
   const pieceTypes = pieces.map((raw, i) => {
     if (!Array.isArray(raw)) throw new Error('packed piece is malformed')
-    const [pieceName, icon, symbol, value, flags, move, capture, effects, promo] = raw as [
+    const [pieceName, icon, symbol, value, flags, move, capture, effects, promo, art] = raw as [
       string,
       number,
       string,
@@ -202,6 +216,7 @@ export function unpackVariant(input: unknown): Variant {
       unknown,
       unknown,
       number | number[],
+      unknown,
     ]
     const promoList = Array.isArray(promo) ? promo : Number.isInteger(promo) ? [promo] : []
     // Older links stored a single index; newer ones store a list.
@@ -221,6 +236,7 @@ export function unpackVariant(input: unknown): Variant {
         .map((e) => unpackEffect(e, ids))
         .filter((e): e is Effect => e !== null),
       promotion: promoIds.length ? { typeIds: promoIds } : null,
+      art: asArray(art).map(unpackArtLayer).filter((l): l is PieceArtLayer => l !== null),
     } satisfies PieceType
   })
 
@@ -295,6 +311,20 @@ function unpackPattern(raw: unknown): MovePattern {
     vectors,
     maxRange: Number(maxRange) || 0,
     firstMoveOnly: firstMoveOnly === 1,
+  }
+}
+
+/** One shape in the drawing of a piece. */
+function unpackArtLayer(raw: unknown): PieceArtLayer | null {
+  if (!Array.isArray(raw)) return null
+  const [shape, x, y, scale, crown] = raw as [number, number, number, number, number]
+  if (!Number.isInteger(shape) || shape < 0 || shape >= SHAPES.length) return null
+  return {
+    shape: SHAPES[shape],
+    x: Number.isFinite(x) ? x : 0,
+    y: Number.isFinite(y) ? y : 0,
+    scale: Number.isFinite(scale) ? scale : 1,
+    crown: crown === 1,
   }
 }
 
