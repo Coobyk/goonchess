@@ -13,6 +13,12 @@ import { cn } from '@/lib/utils'
 
 const BLAST_DURATION = 620
 const SPARK_ANGLES = [0, 60, 120, 180, 240, 300]
+/**
+ * How far a pointer has to travel before it counts as a drag. A pencil never
+ * lands perfectly still, so a small threshold turns every tap into a drag — and
+ * a drag swallows the click that should have played the move.
+ */
+const DRAG_THRESHOLD = 12
 
 function BlastOverlay({
   distance,
@@ -113,7 +119,7 @@ export function GameBoard() {
   const suppressClickUntil = useRef(0)
 
   const startDrag = (e: ReactPointerEvent<HTMLButtonElement>, x: number, y: number) => {
-    if (e.button !== 0 || game.winner) return
+    if (e.button !== 0 || !e.isPrimary || game.winner) return
     const pieceId = board[y]?.[x]
     const inst = pieceId ? game.pieces[pieceId] : undefined
     if (!pieceId || !inst || inst.team !== turn) return
@@ -139,7 +145,8 @@ export function GameBoard() {
     const dragState = dragRef.current
     if (!dragState || dragState.pointerId !== e.pointerId) return
     if (!dragState.moved) {
-      if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < 5) return
+      // A pencil never lands perfectly still, so only a real move counts.
+      if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < DRAG_THRESHOLD) return
       dragState.moved = true
     }
     setDrag({ pieceId: dragState.pieceId, clientX: e.clientX, clientY: e.clientY })
@@ -418,6 +425,7 @@ export function GameBoard() {
                 onPointerCancel={cancelDrag}
                 onMouseEnter={() => setHover({ x, y })}
                 onMouseLeave={() => setHover(null)}
+                onPointerLeave={() => setHover(null)}
                 className={cn(
                   'relative flex cursor-pointer items-center justify-center p-0 transition-[filter] outline-none touch-none',
                   'hover:brightness-105 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',

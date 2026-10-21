@@ -126,6 +126,25 @@
   ::selection {
     background: oklch(0.85 0.08 85 / 0.35);
   }
+
+  /*
+   * A pencil or a finger should act the moment it touches down. Without this
+   * the browser waits to see whether the tap is a double tap or the start of a
+   * scroll, and the click is often swallowed on the way.
+   */
+  button,
+  a,
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='switch'],
+  [role='radio'],
+  input,
+  select,
+  textarea,
+  label {
+    touch-action: manipulation;
+  }
 }
 
 @layer utilities {
