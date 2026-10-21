@@ -14,7 +14,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
   history. A piece may promote into a choice of pieces, and the player picks.
   The same position three times is a draw, counted with the same rule chess
   uses: the pieces, the side to move, the castles still possible and the en
-  passant right all have to match.
+  passant right all have to match. The board wears the brown of Lichess,
+  `#f0d9b5` and `#b58863`, in light and in dark mode alike.
 - **Piece composer** — draw a piece instead of settling for a letter. The six
   chess pieces are stacked on top of each other: a knight with a bishop's
   crown on its head, a queen wearing a king's crown, an amazon with a knight's

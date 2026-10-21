@@ -74,8 +74,10 @@
   --sidebar-accent-foreground: oklch(0.25 0.006 285);
   --sidebar-border: oklch(0.9 0.004 90);
   --sidebar-ring: oklch(0.7 0.01 90);
-  --board-light: #e9dfcd;
-  --board-dark: #9b7b5c;
+  /* The board of Lichess: the brown one. It is the same in light and dark
+     mode, the way it is there. */
+  --board-light: #f0d9b5;
+  --board-dark: #b58863;
 }
 
 .dark {
@@ -106,8 +108,6 @@
   --sidebar-accent-foreground: oklch(0.96 0.002 90);
   --sidebar-border: oklch(0.28 0.004 285);
   --sidebar-ring: oklch(0.6 0.008 90);
-  --board-light: #b9b1a2;
-  --board-dark: #70604f;
 }
 
 @layer base {

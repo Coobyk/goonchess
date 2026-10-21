@@ -64,34 +64,36 @@ export function MakerView() {
         onValueChange={(v) => setMakerTab(v as MakerTab)}
         className="min-w-0"
       >
-        <TabsList className="w-full justify-start">
+        <TabsList className="w-full justify-start overflow-x-auto">
           {TABS.map((t) => (
             <TabsTrigger key={t.id} value={t.id} className="flex-none px-3">
               <t.icon />
               {t.label}
             </TabsTrigger>
           ))}
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Undo the last change"
-              disabled={!canUndoVariant}
-              onClick={undoVariant}
-            >
-              <Undo2 /> Undo
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Redo the last undone change"
-              disabled={!canRedoVariant}
-              onClick={redoVariant}
-            >
-              <Redo2 /> Redo
-            </Button>
-          </div>
         </TabsList>
+        {/* The undo and redo sit on their own row: in the tab strip they
+            pushed the whole page sideways on a narrow screen. */}
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Undo the last change"
+            disabled={!canUndoVariant}
+            onClick={undoVariant}
+          >
+            <Undo2 /> Undo
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Redo the last undone change"
+            disabled={!canRedoVariant}
+            onClick={redoVariant}
+          >
+            <Redo2 /> Redo
+          </Button>
+        </div>
         <TabsContent value="board" className="mt-4">
           <BoardTab />
         </TabsContent>
