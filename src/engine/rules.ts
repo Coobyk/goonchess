@@ -11,7 +11,7 @@ import type {
   Variant,
   Vec,
 } from './types'
-import { positionKey } from '@/lib/repetition'
+import { positionKey } from './repetition'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
