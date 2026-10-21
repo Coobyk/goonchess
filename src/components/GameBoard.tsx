@@ -257,6 +257,17 @@ export function GameBoard() {
   }, [historyLen, blastSource, moveDuration])
 
 
+  // Pieces glide across the board. While that is happening, a new move waits
+  // its turn so the animation is never cut in half.
+  const setBoardAnimating = useAppStore((s) => s.setBoardAnimating)
+  useEffect(() => {
+    setBoardAnimating(!!anim)
+  }, [anim, setBoardAnimating])
+  useEffect(() => {
+    // Leaving the view should not leave a move waiting forever.
+    return () => setBoardAnimating(false)
+  }, [setBoardAnimating])
+
   const hoverMoves: Move[] = useMemo(() => {
     if (selected || !hover || game.winner) return []
     const id = board[hover.y]?.[hover.x]

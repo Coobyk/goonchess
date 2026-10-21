@@ -67,6 +67,10 @@ interface AppState {
   /** The side the bot plays in the current game, when it plays one side. */
   botSide: string | null
   botThinking: boolean
+  /** True while a piece is still gliding across the board. */
+  boardAnimating: boolean
+  /** A move that is waiting for the current animation to finish. */
+  queuedMove: { move: Move; origin?: Vec; promotionTypeId?: string } | null
   clock: ClockSettings
   clockState: ClockState
   /** Earlier versions of the variant, for undo. */
@@ -126,6 +130,7 @@ interface AppState {
   /* bot */
   setBot: (patch: Partial<BotSettings>) => void
   setBotThinking: (thinking: boolean) => void
+  setBoardAnimating: (busy: boolean) => void
 
   /* clock */
   setClock: (settings: ClockSettings) => void
@@ -286,6 +291,8 @@ export const useAppStore = create<AppState>((set, get) => {
     legalMoves: [],
     undoStack: [],
     pendingPromotion: null,
+    boardAnimating: false,
+    queuedMove: null,
     selectedPieceTypeId: initial.pieceTypes[0]?.id ?? null,
     brush: { mode: 'terrain', terrain: 'wall', team: initial.teams[0]?.id ?? 'white', typeId: null },
     portalPending: null,
@@ -591,9 +598,14 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     playMove: (move, origin, promotionTypeId) => {
-      const { game, clock, clockState } = get()
+      const { game, clock, clockState, boardAnimating } = get()
       if (game.winner) return
-
+      if (boardAnimating) {
+        // A piece is still gliding across the board. The move waits its turn,
+        // so an animation is never cut in half.
+        set({ queuedMove: { move, origin, promotionTypeId } })
+        return
+      }
       // The clock runs while the player thinks, so the time is settled first.
       const now = Date.now()
       let clockNext = clockState
@@ -650,6 +662,7 @@ export const useAppStore = create<AppState>((set, get) => {
         selected: null,
         legalMoves: [],
         undoStack: [],
+        queuedMove: null,
         clockState: initialClockState(get().clock, variant.teams.map((t) => t.id)),
         // A new game means a new side for a bot that plays at random.
         botSide: sideFor(get().bot, variant, get().botSide),
@@ -670,7 +683,7 @@ export const useAppStore = create<AppState>((set, get) => {
         prev = rest[rest.length - 1]
       }
       if (!prev) return
-      set({ game: prev, undoStack: rest, selected: null, legalMoves: [] })
+      set({ game: prev, undoStack: rest, selected: null, legalMoves: [], queuedMove: null })
     },
 
     setBot: (patch) => {
@@ -680,6 +693,21 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setBotThinking: (botThinking) => set({ botThinking }),
+
+    setBoardAnimating: (busy) => {
+      if (busy) {
+        set({ boardAnimating: true })
+        return
+      }
+      const queued = get().queuedMove
+      if (!queued) {
+        set({ boardAnimating: false })
+        return
+      }
+      // The board is free again, so the waiting move can be played.
+      set({ boardAnimating: false, queuedMove: null })
+      get().playMove(queued.move, queued.origin, queued.promotionTypeId)
+    },
 
     setClock: (settings) => {
       saveClockSettings(settings)
