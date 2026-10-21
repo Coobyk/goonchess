@@ -100,11 +100,11 @@ export function AppHeader() {
         <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <div className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm">
-              <img src="/logo.svg" alt="goonchess" className="size-7" />
+              <img src="/logo.svg" alt="Goonchess" className="size-7" />
             </div>
             <div className="hidden min-w-0 sm:block">
               <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-semibold tracking-tight">goonchess</span>
+                <span className="truncate text-sm font-semibold tracking-tight">Goonchess</span>
               </div>
               <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
                 {variant.name}

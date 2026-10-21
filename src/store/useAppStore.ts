@@ -49,6 +49,9 @@ import { pushRoute, routeFromLocation } from '@/lib/router'
 
 export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
 export type View = 'play' | 'maker' | 'rulebook'
+
+/** How the position is analysed. */
+export type AnalysisMode = 'off' | 'engine' | 'computer'
 export type Theme = 'dark' | 'light'
 
 interface AppState {
@@ -134,9 +137,9 @@ interface AppState {
   /** The position a puzzle started from, so the puzzle can be set up again. */
   puzzleStart: GameState | null
   setPuzzleStart: (state: GameState | null) => void
-  /** Whether the analysis panel is switched on. */
-  analysisOn: boolean
-  setAnalysisOn: (on: boolean) => void
+  /** How the position is analysed: not at all, live, or the whole game. */
+  analysisMode: AnalysisMode
+  setAnalysisMode: (mode: AnalysisMode) => void
   /** What the last analysis found, for the bar beside the board. */
   analysisResult: { score: number; depth: number } | null
   setAnalysisResult: (result: { score: number; depth: number } | null) => void
@@ -311,7 +314,7 @@ export const useAppStore = create<AppState>((set, get) => {
     boardAnimating: false,
     queuedMove: null,
     puzzleStart: null,
-    analysisOn: false,
+    analysisMode: 'off',
     analysisResult: null,
     selectedPieceTypeId: initial.pieceTypes[0]?.id ?? null,
     brush: { mode: 'terrain', terrain: 'wall', team: initial.teams[0]?.id ?? 'white', typeId: null },
@@ -706,7 +709,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     setPuzzleStart: (state) => set({ puzzleStart: state }),
 
-    setAnalysisOn: (on) => set({ analysisOn: on }),
+    setAnalysisMode: (mode) => set({ analysisMode: mode }),
     setAnalysisResult: (result) => set({ analysisResult: result }),
 
     undo: () => {

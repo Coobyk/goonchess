@@ -24,6 +24,8 @@ export interface BotRequest {
   exclude?: string[]
   /** Send the best line back as well. */
   wantLine?: boolean
+  /** Analyse a whole game, position by position. */
+  analyse?: { states: GameState[]; team: string }
 }
 
 export interface BotReply {
@@ -35,6 +37,8 @@ export interface BotReply {
   elapsedMs: number
   /** The best line, in the notation of the variant. */
   line: string[]
+  /** The score of every position, when a whole game was analysed. */
+  scores?: number[] | null
   /** A puzzle, when one was asked for. */
   puzzle?: {
     state: GameState
@@ -51,9 +55,46 @@ const scope = self as unknown as {
 }
 
 scope.onmessage = (event) => {
-  const { id, state, team, level, seed, timeBudgetMs, analyze, puzzle, exclude, wantLine } =
-    event.data
+  const {
+    id,
+    state,
+    team,
+    level,
+    seed,
+    timeBudgetMs,
+    analyze,
+    puzzle,
+    exclude,
+    wantLine,
+    analyse,
+  } = event.data
   try {
+    if (analyse) {
+      // Every position of the game is looked at in turn, and the scores are
+      // sent back for the graph.
+      const scores = analyse.states.map((position) => {
+        const result = searchBestMove(position, {
+          team: analyse.team,
+          level: 'casual',
+          seed: 1,
+          analyze: true,
+          timeBudgetMs: 120,
+        })
+        return result.score
+      })
+      scope.postMessage({
+        id,
+        move: null,
+        score: 0,
+        depth: 0,
+        nodes: 0,
+        elapsedMs: 0,
+        line: [],
+        scores,
+        puzzle: null,
+      })
+      return
+    }
     if (puzzle) {
       const found = findPuzzle(puzzle.variant, puzzle.seed)
       scope.postMessage({
@@ -64,6 +105,7 @@ scope.onmessage = (event) => {
         nodes: 0,
         elapsedMs: 0,
         line: [],
+        scores: null,
         puzzle: found
           ? {
               state: found.state,
@@ -85,6 +127,7 @@ scope.onmessage = (event) => {
       nodes: result.nodes,
       elapsedMs: result.elapsedMs,
       line: wantLine ? describeLine(state, result.line) : [],
+      scores: null,
       puzzle: null,
     })
   } catch (error) {
@@ -96,6 +139,7 @@ scope.onmessage = (event) => {
       nodes: 0,
       elapsedMs: 0,
       line: [],
+      scores: null,
       puzzle: null,
     })
     throw error

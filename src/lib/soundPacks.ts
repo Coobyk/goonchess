@@ -29,7 +29,7 @@ export const SOUND_PACKS: SoundPack[] = [
     name: '8-bit',
     description: 'Chiptune blips and boops.',
     dir: '/sounds/eightbit',
-    credit: 'Synthesised for goonchess',
+    credit: 'Synthesised for Goonchess',
   },
   {
     id: 'memes',

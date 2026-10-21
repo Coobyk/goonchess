@@ -92,7 +92,7 @@ export function GameBoard() {
   const selected = useAppStore((s) => s.selected)
   const legalMoves = useAppStore((s) => s.legalMoves)
   const selectSquare = useAppStore((s) => s.selectSquare)
-  const analysisOn = useAppStore((s) => s.analysisOn)
+  const analysisMode = useAppStore((s) => s.analysisMode)
   const analysisResult = useAppStore((s) => s.analysisResult)
   const threatSettings = useAppStore((s) => s.threats)
   const turnView = useAppStore((s) => s.turnView)
@@ -347,7 +347,7 @@ export function GameBoard() {
 
   return (
     <div ref={container} className="flex w-full items-stretch justify-center gap-2">
-      {analysisOn && analysisResult && (
+      {analysisMode === 'engine' && analysisResult && (
         <EvalBar score={analysisResult.score} className="my-0.5" />
       )}
       <BoardShell

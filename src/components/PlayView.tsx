@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
+import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
@@ -18,11 +18,9 @@ import { ScrollArea } from './ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from './ui/alert'
 import { Label } from './ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-import { Switch } from './ui/switch'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { useAppStore } from '@/store/useAppStore'
 import { isInCheck } from '@/engine/rules'
-import { computeThreats, mergeThreats, threatSummary } from '@/engine/threats'
 import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
 import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
@@ -72,8 +70,6 @@ export function PlayView() {
   const resetGame = useAppStore((s) => s.resetGame)
   const undo = useAppStore((s) => s.undo)
   const canUndo = useAppStore((s) => s.undoStack.length > 0)
-  const threatSettings = useAppStore((s) => s.threats)
-  const setThreats = useAppStore((s) => s.setThreats)
   const turnView = useAppStore((s) => s.turnView)
   const setTurnView = useAppStore((s) => s.setTurnView)
   const bot = useAppStore((s) => s.bot)
@@ -87,13 +83,6 @@ export function PlayView() {
   const [replayOpen, setReplayOpen] = useState(false)
   const botThinking = useAppStore((s) => s.botThinking)
 
-  const threatReport = useMemo(() => {
-    if (!threatSettings.show) return null
-    const teams =
-      threatSettings.scope === 'both' ? variant.teams.map((t) => t.id) : [game.turn]
-    return mergeThreats(teams.map((team) => computeThreats(game, team)))
-  }, [game, variant.teams, threatSettings.show, threatSettings.scope])
-  const summary = threatReport ? threatSummary(threatReport, game) : null
 
   const prevWinner = useRef(game.winner)
 
@@ -290,7 +279,7 @@ export function PlayView() {
                 <p className="text-xs text-muted-foreground">
                   {bot.mode === 'all'
                     ? 'Every side is played by a bot — sit back and watch. Set a strength for each side.'
-                    : "The bot plays with goonchess' own rules engine, so it works in every variant — custom pieces, portals, blasts and all."}
+                    : "The bot plays with Goonchess's own rules engine, so it works in every variant — custom pieces, portals, blasts and all."}
                 </p>
               </div>
             </PopoverContent>
@@ -406,102 +395,6 @@ export function PlayView() {
 
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant={threatSettings.show ? 'secondary' : 'outline'} size="sm">
-                <ShieldAlert /> Threats
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80" align="center">
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">Threat visualizer</p>
-                    <p className="text-xs text-muted-foreground">
-                      See what the other side can attack before you move.
-                    </p>
-                  </div>
-                  <Switch
-                    aria-label="Show threats"
-                    checked={threatSettings.show}
-                    onCheckedChange={(show) => setThreats({ show })}
-                  />
-                </div>
-                <Separator />
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <Label className="text-sm">Threat arrows</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Arrows from each attacker to the piece it can take.
-                      </p>
-                    </div>
-                    <Switch
-                      aria-label="Show threat arrows"
-                      disabled={!threatSettings.show}
-                      checked={threatSettings.arrows}
-                      onCheckedChange={(arrows) => setThreats({ arrows })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <Label className="text-sm">Attacked squares</Label>
-                      <p className="text-xs text-muted-foreground">Faint dots on every square in range.</p>
-                    </div>
-                    <Switch
-                      aria-label="Show attacked squares"
-                      disabled={!threatSettings.show}
-                      checked={threatSettings.coverage}
-                      onCheckedChange={(coverage) => setThreats({ coverage })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <Label className="text-sm">Hanging pieces</Label>
-                      <p className="text-xs text-muted-foreground">Dashed red ring when there is no defender.</p>
-                    </div>
-                    <Switch
-                      aria-label="Show hanging pieces"
-                      disabled={!threatSettings.show}
-                      checked={threatSettings.hanging}
-                      onCheckedChange={(hanging) => setThreats({ hanging })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <Label className="text-sm">Defended pieces</Label>
-                      <p className="text-xs text-muted-foreground">Amber ring when an ally can recapture.</p>
-                    </div>
-                    <Switch
-                      aria-label="Show defended pieces"
-                      disabled={!threatSettings.show}
-                      checked={threatSettings.defended}
-                      onCheckedChange={(defended) => setThreats({ defended })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Whose threats</Label>
-                  <ToggleGroup
-                    type="single"
-                    className="w-full"
-                    value={threatSettings.scope}
-                    onValueChange={(scope) => {
-                      if (scope) setThreats({ scope: scope as 'turn' | 'both' })
-                    }}
-                  >
-                    <ToggleGroupItem value="turn" disabled={!threatSettings.show} className="flex-1">
-                      Side to move
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="both" disabled={!threatSettings.show} className="flex-1">
-                      Both sides
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <Popover>
-            <PopoverTrigger asChild>
               <Button variant={turnView !== 'off' ? 'secondary' : 'outline'} size="sm">
                 <FlipHorizontal2 /> Turn view
               </Button>
@@ -573,47 +466,6 @@ export function PlayView() {
               <span className="text-rose-500">Check — the royal piece is under attack.</span>
             ) : (
               <span>Move {game.moveHistory.length + 1} · select a piece to see its legal moves.</span>
-            )}
-
-            {threatSettings.show && (
-              <div className="mt-3 space-y-2 border-t pt-3 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-foreground">Threats</span>
-                  <span>
-                    {summary?.total ?? 0} attacked
-                    {summary ? ` · ${summary.hanging} hanging` : ''}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  {threatSettings.arrows && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-flex items-center gap-0.5 text-rose-400">
-                        <span className="h-0.5 w-3 rounded-full bg-current" />
-                        <span className="-ml-1">›</span>
-                      </span>
-                      arrows
-                    </span>
-                  )}
-                  {threatSettings.coverage && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="threat-coverage inline-block size-3 rounded-full ring-1 ring-rose-400/30" />
-                      attacked
-                    </span>
-                  )}
-                  {threatSettings.hanging && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block size-3 rounded-sm border-2 border-dashed border-rose-400" />
-                      hanging
-                    </span>
-                  )}
-                  {threatSettings.defended && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block size-3 rounded-sm border-2 border-amber-300" />
-                      defended
-                    </span>
-                  )}
-                </div>
-              </div>
             )}
           </CardContent>
         </Card>

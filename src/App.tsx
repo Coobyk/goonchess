@@ -60,7 +60,7 @@ export default function App() {
                 )}
               </span>
               <span>
-                goonchess · built by{' '}
+                Goonchess · built by{' '}
                 <a
                   href="https://coobyk.com"
                   target="_blank"

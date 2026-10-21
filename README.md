@@ -1,6 +1,6 @@
 <img src="public/logo.svg" width="64" height="64" alt="">
 
-# goonchess
+# Goonchess
 
 A client-side chess **variant maker**. Build a board, paint terrain, design piece
 movement, place the starting army, then play it — all in the browser.
@@ -41,10 +41,11 @@ Deployable to Cloudflare Workers with GitHub Actions.
   history move ordering, a capture-only horizon and a late-move reduction —
   about twice the speed and a full ply deeper than before, at the same
   thinking time.
-- **Analysis** — the bot looks at the position on the board and says what it
-  thinks: a score for the first army. The line it would play is hidden by
-  default and can be switched on. While the analysis is on, a bar stands to
-  the left of the board showing how the position stands.
+- **Analysis** — three modes. **Off**, which is nothing. **Engine**, which
+  looks at the position on the board and says what it thinks: a score for the
+  first army, with a bar to the left of the board showing the same thing. And
+  **Computer**, which looks at the whole game and draws a graph of how it
+  went, in dithered pixels. The threat visualiser lives in the same card.
 - **Puzzles** — positions taken from games the bot played against itself, each
   with a capture that cannot be taken back. The panel counts the ones you solve
   and lives in the Learn page, next to the guide to the rules.

@@ -212,7 +212,7 @@ export function fileNameFor(name: string, extension: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-  return `${base || 'goonchess'}.${extension}`
+  return `${base || 'Goonchess'}.${extension}`
 }
 
 export function positionName(state: GameState): string {

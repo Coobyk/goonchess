@@ -1,13 +1,13 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '@fontsource-variable/geist';
-@import '@fontsource-variable/geist-pixel';
+@import '@fontsource-variable/jetbrains-mono';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Pixel Variable', ui-monospace, SFMono-Regular, monospace;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

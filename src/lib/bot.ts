@@ -29,6 +29,8 @@ export interface BotResult {
     side: string
     gain: number
   } | null
+  /** The score of every position, when a whole game was analysed. */
+  scores?: number[] | null
 }
 
 interface Pending {
@@ -58,6 +60,7 @@ export class BotWorker {
         elapsedMs: event.data.elapsedMs,
         line: event.data.line ?? [],
         puzzle: event.data.puzzle ?? null,
+        scores: event.data.scores ?? null,
       })
     }
     worker.onerror = () => {
@@ -71,6 +74,7 @@ export class BotWorker {
         elapsedMs: 0,
         line: [],
         puzzle: null,
+        scores: null,
       })
     }
     this.worker = worker
@@ -125,6 +129,30 @@ export class BotWorker {
         level: 'normal',
         seed,
         puzzle: { variant, seed },
+      }
+      worker.postMessage(request)
+    })
+  }
+
+  /**
+   * Analyses a whole game, position by position.
+   *
+   * The scores come back in the order of the positions, so they can be drawn
+   * as a graph of how the game went.
+   */
+  analyseGame(states: GameState[], team: string): Promise<BotResult> {
+    this.cancel()
+    const worker = this.ensureWorker()
+    const id = this.nextId++
+    return new Promise<BotResult>((resolve) => {
+      this.pending = { id, resolve }
+      const request: BotRequest = {
+        id,
+        state: states[0] ?? emptyState({} as Variant),
+        team,
+        level: 'casual',
+        seed: 1,
+        analyse: { states, team },
       }
       worker.postMessage(request)
     })
