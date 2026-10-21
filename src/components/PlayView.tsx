@@ -4,7 +4,6 @@ import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, 
 import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
-import { PuzzlePanel } from './PuzzlePanel'
 import { StatsPanel } from './StatsPanel'
 import { ReplayView } from './ReplayView'
 import { BotPlayer } from './BotPlayer'
@@ -548,7 +547,6 @@ export function PlayView() {
       <aside className="flex flex-col gap-4">
         <LiveAnnouncer />
         <AnalysisPanel />
-        <PuzzlePanel />
         <StatsPanel />
         <Card className="py-4">
           <CardHeader className="px-4">
@@ -622,6 +620,12 @@ export function PlayView() {
 
         {variant.teams.map((team) => {
           const lost = game.captured.filter((c) => c.team === team.id)
+          // How much the side is worth less than it was — the material it has
+          // lost, not the number of pieces.
+          const material = lost.reduce((sum, c) => {
+            const type = variant.pieceTypes.find((p) => p.id === c.typeId)
+            return sum + (type?.value ?? 0)
+          }, 0)
           return (
             <Card key={team.id} className="py-4">
               <CardHeader className="px-4">
@@ -633,13 +637,15 @@ export function PlayView() {
                   {team.name}
                   <ClockFor team={team.id} />
                   <span className="text-muted-foreground ml-auto text-xs font-normal">
-                    {lost.length} lost
+                    {material} {material === 1 ? 'point' : 'points'} lost
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4">
                 <div className="flex min-h-8 flex-wrap gap-0.5">
-                  {lost.length === 0 && <span className="text-xs text-muted-foreground">No losses yet.</span>}
+                  {lost.length === 0 && (
+                    <span className="text-xs text-muted-foreground">No losses yet.</span>
+                  )}
                   {lost.map((c, i) => {
                     const pt = variant.pieceTypes.find((p) => p.id === c.typeId)
                     return (

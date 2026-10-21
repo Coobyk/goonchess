@@ -102,6 +102,8 @@ interface AppState {
   undoVariant: () => void
   redoVariant: () => void
   loadVariantIntoMaker: (v: Variant) => void
+  /** Loads a variant and opens it in the Play view. */
+  playVariant: (v: Variant) => void
   resizeBoard: (width: number, height: number) => void
   paintTerrain: (x: number, y: number, terrain: Terrain) => void
   linkPortal: (source: Vec, target: Vec, oneway: boolean) => void
@@ -132,6 +134,12 @@ interface AppState {
   /** The position a puzzle started from, so the puzzle can be set up again. */
   puzzleStart: GameState | null
   setPuzzleStart: (state: GameState | null) => void
+  /** Whether the analysis panel is switched on. */
+  analysisOn: boolean
+  setAnalysisOn: (on: boolean) => void
+  /** What the last analysis found, for the bar beside the board. */
+  analysisResult: { score: number; depth: number } | null
+  setAnalysisResult: (result: { score: number; depth: number } | null) => void
   undo: () => void
 
   /* bot */
@@ -303,6 +311,8 @@ export const useAppStore = create<AppState>((set, get) => {
     boardAnimating: false,
     queuedMove: null,
     puzzleStart: null,
+    analysisOn: false,
+    analysisResult: null,
     selectedPieceTypeId: initial.pieceTypes[0]?.id ?? null,
     brush: { mode: 'terrain', terrain: 'wall', team: initial.teams[0]?.id ?? 'white', typeId: null },
     portalPending: null,
@@ -370,6 +380,13 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     loadVariantIntoMaker: (v) => commit(structuredClone(v)),
+
+    playVariant: (v) => {
+      // A variant from the library is played, not edited: the Maker is one
+      // click away for anyone who wants to change it.
+      commit(structuredClone(v))
+      set({ view: 'play', makerTab: 'board' })
+    },
 
     resizeBoard: (width, height) => {
       const v = get().variant
@@ -688,6 +705,9 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setPuzzleStart: (state) => set({ puzzleStart: state }),
+
+    setAnalysisOn: (on) => set({ analysisOn: on }),
+    setAnalysisResult: (result) => set({ analysisResult: result }),
 
     undo: () => {
       const stack = get().undoStack

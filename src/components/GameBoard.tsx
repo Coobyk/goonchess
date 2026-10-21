@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { BoardShell, tileBackground } from './BoardShell'
 import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
+import { EvalBar } from './EvalBar'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
 import { ThreatArrows } from './ThreatArrows'
 import { useAppStore } from '@/store/useAppStore'
@@ -91,6 +92,8 @@ export function GameBoard() {
   const selected = useAppStore((s) => s.selected)
   const legalMoves = useAppStore((s) => s.legalMoves)
   const selectSquare = useAppStore((s) => s.selectSquare)
+  const analysisOn = useAppStore((s) => s.analysisOn)
+  const analysisResult = useAppStore((s) => s.analysisResult)
   const threatSettings = useAppStore((s) => s.threats)
   const turnView = useAppStore((s) => s.turnView)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
@@ -343,7 +346,10 @@ export function GameBoard() {
   }
 
   return (
-    <div ref={container} className="flex w-full justify-center">
+    <div ref={container} className="flex w-full items-stretch justify-center gap-2">
+      {analysisOn && analysisResult && (
+        <EvalBar score={analysisResult.score} className="my-0.5" />
+      )}
       <BoardShell
         width={cols}
         height={rows}

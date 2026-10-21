@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Separator } from './ui/separator'
 import { MakerBoard } from './MakerBoard'
 import { PieceGlyph } from './PieceGlyph'
+import { PuzzlePanel } from './PuzzlePanel'
 
 const ORTH_KEY = ['-1,0', '0,-1', '0,1', '1,0'].join('|')
 const DIAG_KEY = ['-1,-1', '-1,1', '1,-1', '1,1'].join('|')
@@ -196,13 +197,14 @@ export function RulebookView() {
 
   return (
     <div className="space-y-6">
+      <PuzzlePanel />
       <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 py-0 text-zinc-100 dark:from-zinc-900 dark:to-zinc-950">
         <CardContent className="relative px-6 py-8 sm:px-8">
           <div className="pointer-events-none absolute -right-16 -top-20 size-60 rounded-full bg-emerald-400/10 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 right-28 size-52 rounded-full bg-sky-400/10 blur-3xl" />
           <div className="relative max-w-3xl space-y-4">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-400">
-              <BookOpen className="size-4" /> Rulebook
+              <BookOpen className="size-4" /> Learn
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{variant.name}</h1>

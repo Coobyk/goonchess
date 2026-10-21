@@ -17,7 +17,9 @@ export function AnalysisPanel() {
   const game = useAppStore((s) => s.game)
   const analysis = useAppStore((s) => s.analysis)
   const setAnalysis = useAppStore((s) => s.setAnalysis)
-  const [enabled, setEnabled] = useState(false)
+  const enabled = useAppStore((s) => s.analysisOn)
+  const setEnabled = useAppStore((s) => s.setAnalysisOn)
+  const setAnalysisResult = useAppStore((s) => s.setAnalysisResult)
   const [result, setResult] = useState<BotResult | null>(null)
   const [busy, setBusy] = useState(false)
   const worker = useRef<BotWorker | null>(null)
@@ -33,6 +35,7 @@ export function AnalysisPanel() {
     if (!enabled || game.winner) {
       setResult(null)
       setBusy(false)
+      setAnalysisResult(null)
       return
     }
     const client = worker.current ?? new BotWorker()
@@ -47,8 +50,13 @@ export function AnalysisPanel() {
       .then((reply) => {
         setBusy(false)
         setResult(reply)
+        const firstTeam = game.variant.teams[0]
+        const raw = reply.score
+        // The search scores the side to move; the panel reports the first army.
+        const score = game.turn === firstTeam?.id ? raw : -raw
+        setAnalysisResult({ score, depth: reply.depth })
       })
-  }, [enabled, analysis.showLine, game, game.winner])
+  }, [enabled, analysis.showLine, game, game.winner, setAnalysisResult])
 
   const firstTeam = game.variant.teams[0]
   const mover = game.turn

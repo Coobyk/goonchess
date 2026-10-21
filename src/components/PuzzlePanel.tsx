@@ -90,6 +90,8 @@ export function PuzzlePanel() {
       // The position is kept, so restarting the game starts the puzzle over.
       setPuzzleStart(result.puzzle.state)
       useAppStore.getState().loadPosition(result.puzzle.state)
+      // A puzzle is solved on the board, so go there.
+      useAppStore.getState().setView('play')
     } finally {
       setBusy(false)
     }

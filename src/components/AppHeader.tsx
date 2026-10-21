@@ -40,6 +40,8 @@ export function AppHeader() {
   const setView = useAppStore((s) => s.setView)
   const setMakerTab = useAppStore((s) => s.setMakerTab)
   const loadVariantIntoMaker = useAppStore((s) => s.loadVariantIntoMaker)
+  const playVariant = useAppStore((s) => s.playVariant)
+  const library = useAppStore((s) => s.library)
   const variant = useAppStore((s) => s.variant)
   const soundEnabled = useAppStore((s) => s.soundEnabled)
   const setSoundEnabled = useAppStore((s) => s.setSoundEnabled)
@@ -55,23 +57,39 @@ export function AppHeader() {
     toast.success(`${name} loaded`)
   }
 
-  const templateItems = (
+  /** A template opens in the Play view, ready to be played. */
+  const playTemplate = (build: () => ReturnType<typeof blankVariant>, name: string) => {
+    playVariant(build())
+    toast.success(`${name} loaded`)
+  }
+
+  /** The templates and the saved variants, all in one list. */
+  const libraryItems = (
     <>
+      <DropdownMenuLabel>Templates</DropdownMenuLabel>
       {TEMPLATES.map((t) => (
-        <DropdownMenuItem key={t.id} onClick={() => loadTemplate(t.build, t.name)}>
+        <DropdownMenuItem key={t.id} onClick={() => playTemplate(t.build, t.name)}>
           <Sparkles className="text-muted-foreground" />
           <span className="flex-1">{t.name}</span>
           <span className="text-muted-foreground text-[10px]">{t.description}</span>
         </DropdownMenuItem>
       ))}
+      {library.length > 0 && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Your variants</DropdownMenuLabel>
+          {library.map((entry) => (
+            <DropdownMenuItem key={entry.id} onClick={() => playVariant(entry.variant)}>
+              <Library className="text-muted-foreground" />
+              <span className="flex-1">{entry.name}</span>
+            </DropdownMenuItem>
+          ))}
+        </>
+      )}
       <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}>
-        <Plus className="text-muted-foreground" />
-        Blank 8×8
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(12, 12), 'Blank 12×12')}>
-        <Plus className="text-muted-foreground" />
-        Blank 12×12
+      <DropdownMenuItem onClick={() => setLibraryOpen(true)}>
+        <Library className="text-muted-foreground" />
+        Manage the library
       </DropdownMenuItem>
     </>
   )
@@ -108,8 +126,8 @@ export function AppHeader() {
               <ToggleGroupItem value="maker" aria-label="Maker" className="gap-1.5 px-3">
                 <Wrench /> <span className="hidden sm:inline">Maker</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="rulebook" aria-label="Rulebook" className="gap-1.5 px-3">
-                <BookOpen /> <span className="hidden sm:inline">Rulebook</span>
+              <ToggleGroupItem value="rulebook" aria-label="Learn" className="gap-1.5 px-3">
+                <BookOpen /> <span className="hidden sm:inline">Learn</span>
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
@@ -125,15 +143,45 @@ export function AppHeader() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Templates</DropdownMenuLabel>
-                  {templateItems}
+                  <DropdownMenuLabel>New</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}>
+                    <Plus className="text-muted-foreground" />
+                    Blank 8×8 board
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(12, 12), 'Blank 12×12')}>
+                    <Plus className="text-muted-foreground" />
+                    Blank 12×12 board
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setLibraryOpen(true)}>
+                    <Library className="text-muted-foreground" />
+                    Save the current variant
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setMakerTab('board')
+                      setView('maker')
+                    }}
+                  >
+                    <Wrench className="text-muted-foreground" />
+                    Open the Maker
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Library" onClick={() => setLibraryOpen(true)}>
-                <Library />
-                <span className="hidden md:inline">Library</span>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Library">
+                    <Library />
+                    <span className="hidden md:inline">Library</span>
+                    <ChevronDown className="opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  {libraryItems}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Share and import" onClick={() => setShareOpen(true)}>
                 <FileJson />
                 <span className="hidden md:inline">Share</span>
@@ -204,13 +252,27 @@ export function AppHeader() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>New variant</DropdownMenuLabel>
-                {templateItems}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setLibraryOpen(true)}>
-                  <Library className="text-muted-foreground" />
-                  Library
+                <DropdownMenuLabel>New</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}>
+                  <Plus className="text-muted-foreground" />
+                  Blank 8×8 board
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(12, 12), 'Blank 12×12')}>
+                  <Plus className="text-muted-foreground" />
+                  Blank 12×12 board
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setMakerTab('board')
+                    setView('maker')
+                  }}
+                >
+                  <Wrench className="text-muted-foreground" />
+                  Open the Maker
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {libraryItems}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShareOpen(true)}>
                   <FileJson className="text-muted-foreground" />
                   Share &amp; import

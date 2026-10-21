@@ -29,7 +29,7 @@ Deployable to Cloudflare Workers with GitHub Actions.
   head. A collection of premade pieces — the plain shapes and the classic
   combinations — is there to start from, and every one of them can be pulled
   apart, moved, resized and restacked. The drawing travels with the piece:
-  it is on the board, in the rulebook and in the share link.
+  it is on the board, in the guide to the rules and in the share link.
 - **Opponent bot** — play against a bot in any variant. It searches with the
   same rules engine the game uses, so it understands custom pieces, portals and
   blasts; three strengths, from a casual opponent to a deep search. The search
@@ -43,9 +43,11 @@ Deployable to Cloudflare Workers with GitHub Actions.
   thinking time.
 - **Analysis** — the bot looks at the position on the board and says what it
   thinks: a score for the first army. The line it would play is hidden by
-  default and can be switched on.
+  default and can be switched on. While the analysis is on, a bar stands to
+  the left of the board showing how the position stands.
 - **Puzzles** — positions taken from games the bot played against itself, each
-  with a capture that cannot be taken back. The panel counts the ones you solve.
+  with a capture that cannot be taken back. The panel counts the ones you solve
+  and lives in the Learn page, next to the guide to the rules.
 - **Chess clocks** — time per side with an increment, from 1+0 to 15+10. The
   clock starts with the first move, and the bot never uses more than a third of
   its time.
@@ -55,7 +57,7 @@ Deployable to Cloudflare Workers with GitHub Actions.
   which imports back into the Maker.
 - **Keyboard play** — the arrow keys move a cursor over the board, Enter plays,
   and every move is announced for screen readers.
-- **Rulebook** — `/rulebook` renders a human-readable guide from the current
+- **Learn** — `/learn` renders a human-readable guide from the current
   variant: starting board, terrain key, armies, win conditions, movement and
   capture patterns, flags, effects, promotions and the active display settings.
 - **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
@@ -99,11 +101,13 @@ Deployable to Cloudflare Workers with GitHub Actions.
   blast wipes out every enemy piece inside it, spares the mover's own team, and
   plays a shockwave animation on the board), and spawning another piece type.
 - **Built-in Shadcn UI** — Radix primitives, dark-first theme with a light mode.
-- **Real URLs** — `/` plays, `/maker` builds, `/rulebook` explains the rules, and
+- **Real URLs** — `/` plays, `/maker` builds, `/learn` explains the rules, and
   every maker tab has its own address (`/maker/pieces`, `/maker/rules`, ...).
   Back/forward and direct links work; Cloudflare serves the SPA fallback for
   deep links.
-- **Library, links and JSON** — save named variants locally, share an encoded
+- **Library, links and JSON** — the Library menu holds every built-in variant
+  and the ones you have saved, and opens them straight into a game; save named
+  variants locally, share an encoded
   link, or import/export the raw JSON.
 - **Short share links** — a variant is packed into a compact array form
   (index references instead of random ids, a bitfield for flags, only non-empty
