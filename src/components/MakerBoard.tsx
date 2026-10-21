@@ -95,7 +95,7 @@ export function MakerBoard({ interactive = true }: { interactive?: boolean }) {
                   'relative flex items-center justify-center p-0 outline-none',
                   interactive && 'cursor-pointer hover:brightness-105',
                 )}
-                style={{ backgroundColor: tileBackground({ ...variant.board, x, y }) }}
+                style={{ backgroundColor: tileBackground(x, y) }}
               >
                 {tile?.terrain === 'wall' && (
                   <span className="absolute inset-0 bg-foreground/25 [background-image:repeating-linear-gradient(45deg,transparent_0_5px,rgba(0,0,0,0.25)_5px_7px)]" />

@@ -35,11 +35,11 @@ const KNIGHT: Vec[] = [
   { x: -1, y: 2 },
 ]
 
-export function emptyBoard(width: number, height: number, light = '#e9dfcd', dark = '#9b7b5c'): BoardConfig {
+export function emptyBoard(width: number, height: number): BoardConfig {
   const tiles: Tile[][] = Array.from({ length: height }, () =>
     Array.from({ length: width }, () => ({ terrain: 'normal' as Terrain })),
   )
-  return { width, height, light, dark, tiles }
+  return { width, height, tiles }
 }
 
 export function leaper(vectors: Vec[], id = uid(), firstMoveOnly = false): MovePattern {
@@ -176,7 +176,7 @@ export function miniChess(): Variant {
     id: 'mini',
     name: 'Mini Chess',
     description: 'A fast 6×6 duel. Pawns get a double step and promote to queens.',
-    board: emptyBoard(6, 6, '#dcd6c8', '#7d6b57'),
+    board: emptyBoard(6, 6),
     teams: [
       { id: 'white', name: 'White', color: '#f4f1ea', forward: 'up' },
       { id: 'black', name: 'Black', color: '#3f3f46', forward: 'down' },
@@ -424,7 +424,7 @@ export function chaosLab(): Variant {
 
   const pieceTypes = [king, crawler, diver, leaper31, diagonal2, bomber, gem]
 
-  const board = emptyBoard(8, 8, '#2b2b3d', '#1d1d2b')
+  const board = emptyBoard(8, 8)
   // A pair of portals and two walls.
   board.tiles[3][3] = { terrain: 'portal', target: { x: 5, y: 5 } }
   board.tiles[5][5] = { terrain: 'portal', target: { x: 3, y: 3 } }

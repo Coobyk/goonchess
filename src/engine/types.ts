@@ -18,8 +18,6 @@ export interface Tile {
 export interface BoardConfig {
   width: number
   height: number
-  light: string
-  dark: string
   /** tiles[y][x] */
   tiles: Tile[][]
 }

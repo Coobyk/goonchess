@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eraser, Grid3x3, Palette, Paintbrush } from 'lucide-react'
+import { Eraser, Grid3x3, Paintbrush } from 'lucide-react'
 import type { Terrain } from '@/engine/types'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
@@ -17,18 +17,9 @@ const TERRAINS: { id: Terrain; label: string; hint: string }[] = [
   { id: 'oneway', label: 'One-way', hint: 'Click source then destination' },
 ]
 
-const PALETTES: { label: string; light: string; dark: string }[] = [
-  { label: 'Walnut', light: '#e9dfcd', dark: '#9b7b5c' },
-  { label: 'Slate', light: '#cbd5e1', dark: '#475569' },
-  { label: 'Onyx', light: '#3f3f46', dark: '#18181b' },
-  { label: 'Rosewood', light: '#e7cfc4', dark: '#8d5b4c' },
-  { label: 'Neon', light: '#2dd4bf', dark: '#0f172a' },
-]
-
 export function BoardTab() {
   const variant = useAppStore((s) => s.variant)
   const resizeBoard = useAppStore((s) => s.resizeBoard)
-  const setBoardColors = useAppStore((s) => s.setBoardColors)
   const updateVariant = useAppStore((s) => s.updateVariant)
   const brush = useAppStore((s) => s.brush)
   const setBrush = useAppStore((s) => s.setBrush)
@@ -37,15 +28,11 @@ export function BoardTab() {
 
   const [w, setW] = useState(variant.board.width)
   const [h, setH] = useState(variant.board.height)
-  const [light, setLight] = useState(variant.board.light)
-  const [dark, setDark] = useState(variant.board.dark)
 
   useEffect(() => {
     setW(variant.board.width)
     setH(variant.board.height)
-    setLight(variant.board.light)
-    setDark(variant.board.dark)
-  }, [variant.board.width, variant.board.height, variant.board.light, variant.board.dark])
+  }, [variant.board.width, variant.board.height])
 
   const counts = variant.board.tiles
     .flat()
@@ -97,59 +84,6 @@ export function BoardTab() {
           <p className="text-xs text-muted-foreground">
             Shrinking the board trims pieces and terrain outside the new bounds.
           </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Palette className="size-4" /> Colors
-          </CardTitle>
-          <CardDescription>The two square shades, or pick a ready-made palette.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              Light
-              <input
-                type="color"
-                value={light}
-                onChange={(e) => {
-                  setLight(e.target.value)
-                  setBoardColors(e.target.value, dark)
-                }}
-                className="size-9 cursor-pointer rounded-md border bg-transparent"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              Dark
-              <input
-                type="color"
-                value={dark}
-                onChange={(e) => {
-                  setDark(e.target.value)
-                  setBoardColors(light, e.target.value)
-                }}
-                className="size-9 cursor-pointer rounded-md border bg-transparent"
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PALETTES.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => setBoardColors(p.light, p.dark)}
-                className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs hover:bg-accent"
-              >
-                <span className="flex overflow-hidden rounded-sm ring-1 ring-black/20">
-                  <span className="size-4" style={{ backgroundColor: p.light }} />
-                  <span className="size-4" style={{ backgroundColor: p.dark }} />
-                </span>
-                {p.label}
-              </button>
-            ))}
-          </div>
         </CardContent>
       </Card>
 

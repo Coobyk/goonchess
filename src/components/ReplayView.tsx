@@ -11,7 +11,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { BoardShell } from './BoardShell'
+import { BoardShell, tileBackground } from './BoardShell'
 import { PieceGlyph } from './PieceGlyph'
 import { Button } from './ui/button'
 import {
@@ -253,7 +253,7 @@ function ReplayBoard({ state }: { state: GameState }) {
               key={`${x}-${y}`}
               className="relative flex items-center justify-center"
               style={{
-                backgroundColor: (x + y) % 2 === 0 ? variant.board.light : variant.board.dark,
+                backgroundColor: tileBackground(x, y),
               }}
             >
               {highlighted && (

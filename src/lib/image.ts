@@ -1,4 +1,5 @@
 import type { GameState } from '@/engine/types'
+import { boardColors } from './palette'
 
 /**
  * Draws the board on a canvas so it can be saved as a picture, or turned into
@@ -44,6 +45,7 @@ async function drawBoard(
   originY: number,
 ) {
   const { variant } = state
+  const colors = boardColors()
   const cols = variant.board.width
   const rows = variant.board.height
   const cell = options.cell ?? 72
@@ -62,7 +64,7 @@ async function drawBoard(
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const light = (x + y) % 2 === 0
-      ctx.fillStyle = light ? variant.board.light : variant.board.dark
+      ctx.fillStyle = light ? colors.light : colors.dark
       ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
 
       const tile = variant.board.tiles[y]?.[x]

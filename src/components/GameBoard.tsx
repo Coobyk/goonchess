@@ -422,7 +422,7 @@ export function GameBoard() {
                   'relative flex cursor-pointer items-center justify-center p-0 transition-[filter] outline-none touch-none',
                   'hover:brightness-105 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',
                 )}
-                style={{ backgroundColor: tileBackground({ ...variant.board, x, y }) }}
+                style={{ backgroundColor: tileBackground(x, y) }}
               >
                 {isLast && <span className="absolute inset-0 bg-amber-400/25" />}
                 {tile?.terrain === 'wall' && (

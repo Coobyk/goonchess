@@ -98,7 +98,6 @@ interface AppState {
   redoVariant: () => void
   loadVariantIntoMaker: (v: Variant) => void
   resizeBoard: (width: number, height: number) => void
-  setBoardColors: (light: string, dark: string) => void
   paintTerrain: (x: number, y: number, terrain: Terrain) => void
   linkPortal: (source: Vec, target: Vec, oneway: boolean) => void
   placePiece: (typeId: string, team: string, x: number, y: number) => void
@@ -368,11 +367,6 @@ export const useAppStore = create<AppState>((set, get) => {
         board: { ...v.board, width: w, height: h, tiles },
         setup: v.setup.filter((s) => inBounds(s.x, s.y)),
       })
-    },
-
-    setBoardColors: (light, dark) => {
-      const v = get().variant
-      commit({ ...v, board: { ...v.board, light, dark } })
     },
 
     paintTerrain: (x, y, terrain) => {

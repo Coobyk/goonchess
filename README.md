@@ -60,8 +60,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
   pieces on their way, a portal swallows the piece and spits it out at the
   other end, and an explosion only fires once the mover has landed.
 - **Maker view** with four tabs and a live board preview:
-  - **Board** — size from 3×3 to 16×16, square colors and five palettes,
-    terrain brushes: open, wall, void, two-way portals and one-way portals.
+  - **Board** — size from 3×3 to 16×16 and terrain brushes: open, wall, void,
+    two-way portals and one-way portals. The squares keep the same colours
+    everywhere; the theme decides which pair they wear.
   - **Pieces** — click a movement grid to design leapers and sliders, give a
     piece a separate capture pattern, and set restrictions: jump, must capture,
     uncapturable, royal, moves once, mirror for the opposing team, rolls a die

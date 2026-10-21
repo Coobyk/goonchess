@@ -87,16 +87,6 @@ export function BoardShell({
   )
 }
 
-export function tileBackground({
-  light,
-  dark,
-  x,
-  y,
-}: {
-  light: string
-  dark: string
-  x: number
-  y: number
-}) {
-  return (x + y) % 2 === 0 ? light : dark
+export function tileBackground(x: number, y: number) {
+  return (x + y) % 2 === 0 ? 'var(--board-light)' : 'var(--board-dark)'
 }

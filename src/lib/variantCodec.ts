@@ -1,4 +1,5 @@
 import { uid } from '@/engine/rules'
+import { BOARD_DARK, BOARD_LIGHT } from './palette'
 import {
   PIECE_ICONS,
   type BoardConfig,
@@ -62,8 +63,10 @@ export function packVariant(variant: Variant): unknown {
     [
       variant.board.width,
       variant.board.height,
-      variant.board.light,
-      variant.board.dark,
+      // The square colours are no longer part of a variant, but the two slots
+      // stay in the link format so old links still open.
+      BOARD_LIGHT,
+      BOARD_DARK,
       packTiles(variant.board),
     ],
     variant.teams.map((t) => [t.id, t.name, t.color, t.forward === 'down' ? 1 : 0]),
@@ -139,7 +142,8 @@ export function unpackVariant(input: unknown): Variant {
     throw new Error('packed variant is missing required sections')
   }
 
-  const [width, height, light, dark, tiles] = board as [
+  // The colours in the link are ignored; every board uses the same two shades.
+  const [width, height, , , tiles] = board as [
     number,
     number,
     string,
@@ -250,8 +254,6 @@ export function unpackVariant(input: unknown): Variant {
     board: {
       width,
       height,
-      light: typeof light === 'string' ? light : '#e9dfcd',
-      dark: typeof dark === 'string' ? dark : '#9b7b5c',
       tiles: grid,
     },
     teams: teamList.length ? teamList : DEFAULT_TEAMS,
