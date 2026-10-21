@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine/types'
-import { applyMove, createInitialState, getLegalMoves, rerollPieces, uid } from '@/engine/rules'
-import { defaultVariant, randomChess } from '@/engine/templates'
+import { applyMove, createInitialState, getLegalMoves, rollRandomPieces, uid } from '@/engine/rules'
+import { defaultVariant } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
 import {
   DEFAULT_BOT_SETTINGS,
@@ -129,8 +129,6 @@ interface AppState {
   cancelPromotion: () => void
   loadPosition: (state: GameState) => void
   resetGame: () => void
-  /** Starts a fresh random chess game, with a new set of rolls. */
-  startRandomGame: () => void
   undo: () => void
 
   /* bot */
@@ -198,6 +196,7 @@ export function normalizeVariant(input: unknown): Variant | null {
         uncapturable: false,
         royal: false,
         movesOnce: false,
+        random: false,
         mirror: true,
         enPassant: false,
         dice: false,
@@ -466,6 +465,7 @@ export const useAppStore = create<AppState>((set, get) => {
           uncapturable: false,
           royal: false,
           movesOnce: false,
+        random: false,
           mirror: true,
           enPassant: false,
           dice: false,
@@ -654,8 +654,8 @@ export const useAppStore = create<AppState>((set, get) => {
       }
 
       const next = applyMove(game, { ...move, promotionTypeId }, { origin, san: true })
-      // In a chaos game the pieces are rolled anew after every move.
-      const settled = next.variant.chaos ? rerollPieces(next) : next
+      // A piece marked random turns into another kind after every move.
+      const settled = rollRandomPieces(next)
       set({
         game: settled,
         selected: null,
@@ -663,13 +663,6 @@ export const useAppStore = create<AppState>((set, get) => {
         undoStack: [...get().undoStack, game],
         clockState: clockNext,
       })
-    },
-
-    startRandomGame: () => {
-      // Every game gets its own rolls, so no two games play out the same.
-      const variant = randomChess(Math.floor(Math.random() * 2 ** 31))
-      commit(variant)
-      set({ view: 'play', makerTab: 'board' })
     },
 
     resetGame: () => {

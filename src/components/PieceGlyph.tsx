@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PieceType } from '@/engine/types'
-import { artToUri } from '@/lib/pieceArt'
+import { RAINBOW, SHAPE_OF_ICON, artToUri, rainbowUri } from '@/lib/pieceArt'
 
 const CODES: Record<string, string> = {
   king: 'K',
@@ -16,28 +16,40 @@ export function PieceGlyph({
   teamIndex,
   size = 40,
   muted = false,
-  hidden = false,
 }: {
   piece?: PieceType | null
   teamIndex: number
   size?: number
   muted?: boolean
-  /** Draw the piece as an unknown one, for a chaos game. */
-  hidden?: boolean
 }) {
   if (!piece) return null
   const code = CODES[piece.icon]
-  const glyph = hidden ? (
-    // Nobody knows what this is until it is used.
+  // A random piece is drawn in the colours of a rainbow: it changes its kind
+  // after every move, and it says so.
+  const shape = piece.flags?.random ? SHAPE_OF_ICON[piece.icon] : undefined
+  const glyph = shape ? (
+    <img
+      src={rainbowUri(shape)}
+      alt={piece.name}
+      width={size}
+      height={size}
+      draggable={false}
+      style={{ display: 'block', width: size, height: size }}
+    />
+  ) : piece.flags?.random ? (
+    // A letter on a rainbow.
     <span
       style={{
-        fontSize: size * 0.7,
+        fontSize: size * 0.82,
         lineHeight: 1,
         fontWeight: 700,
-        color: teamIndex === 0 ? '#f8fafc' : '#111827',
+        backgroundImage: `linear-gradient(180deg, ${RAINBOW.join(', ')})`,
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        color: 'transparent',
       }}
     >
-      ?
+      {piece.symbol || piece.name.slice(0, 1)}
     </span>
   ) : piece.art && piece.art.length ? (
     // A piece that was drawn in the composer.

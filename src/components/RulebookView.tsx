@@ -174,6 +174,8 @@ export function RulebookView() {
   const oneways = terrainCounts.oneway
 
   const pieceName = (id: string) => pieceTypes.find((p) => p.id === id)?.name ?? 'piece'
+  // The kinds that are rolled anew after every move.
+  const randomPieces = pieceTypes.filter((p) => p.flags.random).map((p) => p.name)
 
   const teamForPiece = (pieceId: string) => {
     const first = setup.find((s) => s.typeId === pieceId)
@@ -363,19 +365,14 @@ export function RulebookView() {
                 A stalemate — no legal move but no check — is a draw. Reaching the point target or
                 eliminating an army is reported in the turn panel.
               </p>
-              {variant.chaos && (
+              {randomPieces.length > 0 && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                   <p className="text-sm font-medium">The pieces are rolled anew</p>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    After every move each piece is given a new kind, drawn at random from{' '}
-                    {variant.chaos.pool?.length
-                      ? variant.chaos.pool
-                          .map((id) => pieceTypes.find((p) => p.id === id)?.name ?? id)
-                          .join(', ')
-                      : 'the piece kinds of this variant'}
-                    . {variant.chaos.hidden
-                      ? 'Nobody knows what a piece is until it has been used — the move history gives it away afterwards.'
-                      : 'The royal piece keeps its kind, or the game would be over at once.'}
+                    After every move each random piece is given a new kind, drawn at random from
+                    the kinds of this variant: {randomPieces.join(', ')}. They wear the colours of a
+                    rainbow, so it is clear which ones are random. The royal piece keeps its kind, or
+                    the game would be over at once.
                   </p>
                 </div>
               )}

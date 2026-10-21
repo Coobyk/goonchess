@@ -10,7 +10,7 @@
  * See public/pieces/cburnett/ATTRIBUTION.txt.
  */
 
-import type { ArtShape, PieceArt, PieceArtLayer } from '@/engine/types'
+import type { ArtShape, PieceArt, PieceArtLayer, PieceIcon } from '@/engine/types'
 
 export const ART_SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']
 
@@ -54,6 +54,19 @@ const DARK_FILL = '#111827'
 const LIGHT_LINE = '#000000'
 const DARK_LINE = '#e5e7eb'
 
+/** The colours of a random piece. */
+export const RAINBOW = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93']
+
+/** The shape each icon is drawn from, for the rainbow drawing. */
+export const SHAPE_OF_ICON: Partial<Record<PieceIcon, ArtShape>> = {
+  king: 'king',
+  queen: 'queen',
+  rook: 'rook',
+  bishop: 'bishop',
+  knight: 'knight',
+  pawn: 'pawn',
+}
+
 /** Paints the markup of a shape in the colour of a team. */
 function paint(markup: string, light: boolean): string {
   const fill = light ? LIGHT_FILL : DARK_FILL
@@ -63,6 +76,15 @@ function paint(markup: string, light: boolean): string {
     .replace(/fill="#000"/g, `fill="${line}"`)
     .replace(/stroke="#000"/g, `stroke="${line}"`)
     .replace(/stroke="#ececec"/g, `stroke="${line}"`)
+}
+
+/** Paints the markup of a shape in the colours of a rainbow. */
+function paintRainbow(markup: string): string {
+  return markup
+    .replace(/fill="#fff"/g, 'fill="url(#rainbow)"')
+    .replace(/fill="#000"/g, 'fill="#1f2937"')
+    .replace(/stroke="#000"/g, 'stroke="#1f2937"')
+    .replace(/stroke="#ececec"/g, 'stroke="#1f2937"')
 }
 
 function layerMarkup(layer: PieceArtLayer, light: boolean, index: number): string {
@@ -100,6 +122,28 @@ export function artToUri(art: PieceArt, light: boolean): string {
   const svg = artToSvg(art, light)
   const uri = `data:image/svg+xml,${encodeURIComponent(svg)}`
   uriCache.set(key, uri)
+  return uri
+}
+
+/**
+ * The drawing of a random piece: the shape of a piece in the colours of a
+ * rainbow, so it is clear at a glance that it is not what it seems.
+ */
+export function rainbowUri(shape: ArtShape): string {
+  const cached = uriCache.get(`rainbow:${shape}`)
+  if (cached) return cached
+  const stops = RAINBOW.map(
+    (colour, i) =>
+      `<stop offset="${Math.round((i / (RAINBOW.length - 1)) * 100)}%" stop-color="${colour}"/>`,
+  ).join('')
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45" width="45" height="45">` +
+    `<defs><linearGradient id="rainbow" x1="0" y1="0" x2="0" y2="1">${stops}</linearGradient></defs>` +
+    `<g fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">` +
+    paintRainbow(ART_MARKUP[shape]) +
+    `</g></svg>`
+  const uri = `data:image/svg+xml,${encodeURIComponent(svg)}`
+  uriCache.set(`rainbow:${shape}`, uri)
   return uri
 }
 

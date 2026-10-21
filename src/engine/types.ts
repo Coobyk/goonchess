@@ -108,6 +108,8 @@ export interface PieceFlags {
   enPassant: boolean
   /** Rolls a die to pick how it moves. */
   dice: boolean
+  /** Turns into a random other piece after every move. */
+  random: boolean
 }
 
 export type Effect =
@@ -161,22 +163,6 @@ export interface WinCondition {
   threshold?: number
 }
 
-/**
- * The rules of a chaos game.
- *
- * The pieces are rolled anew after every move: a pawn can be a knight by the
- * next turn. Their true identity is kept secret, so nobody knows what they
- * are holding until they use one.
- */
-export interface ChaosRules {
-  /** The piece types the pieces are drawn from. Empty means every type. */
-  pool?: string[]
-  /** Hide what the pieces really are. */
-  hidden?: boolean
-  /** The seed the rolls are made from. The same seed always plays the same. */
-  seed?: number
-}
-
 export interface Variant {
   schema: 1
   id: string
@@ -187,8 +173,11 @@ export interface Variant {
   pieceTypes: PieceType[]
   setup: SetupPiece[]
   winConditions: WinCondition[]
-  /** When set, the pieces are secretly rolled anew after every move. */
-  chaos?: ChaosRules
+  /**
+   * The seed the random pieces are rolled from. The same seed always plays
+   * the same game, so a game can be rebuilt and shared.
+   */
+  randomSeed?: number
 }
 
 /* ---------------------------------------------------------- game state */
@@ -276,6 +265,4 @@ export interface GameState {
     | 'points'
     | 'timeout'
     | 'threefold'
-  /** Where the rolls of a chaos game stand, so a game can be rebuilt. */
-  randomSeed?: number
 }

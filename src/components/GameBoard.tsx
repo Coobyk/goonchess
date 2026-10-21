@@ -99,9 +99,6 @@ export function GameBoard() {
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
 
   const { variant, board, pieceTypes, turn } = game
-  // In a chaos game nobody knows what the pieces are, so they are drawn as
-  // unknown ones and their legal squares are kept to themselves.
-  const hidden = !!variant.chaos?.hidden
   const { width: cols, height: rows } = variant.board
   const cell = boardCellSize(width, cols, 64, 24)
 
@@ -385,12 +382,8 @@ export function GameBoard() {
             const piece = pieceId ? game.pieces[pieceId] : null
             const pieceType = piece ? pieceTypes[piece.typeId] : null
             const isSelected = selected?.x === x && selected?.y === y
-            const dest = hidden
-              ? []
-              : legalMoves.filter((m) => m.finalTo.x === x && m.finalTo.y === y)
-            const hoverDest = hidden
-              ? []
-              : hoverMoves.filter((m) => m.finalTo.x === x && m.finalTo.y === y)
+            const dest = legalMoves.filter((m) => m.finalTo.x === x && m.finalTo.y === y)
+            const hoverDest = hoverMoves.filter((m) => m.finalTo.x === x && m.finalTo.y === y)
             const captures = [...dest, ...hoverDest].some((m) => !!m.capturedId)
             const hasDest = dest.length > 0 || hoverDest.length > 0
             const isLast =
@@ -412,7 +405,7 @@ export function GameBoard() {
                 type="button"
                 role="gridcell"
                 tabIndex={cursor?.x === x && cursor?.y === y ? 0 : -1}
-                aria-label={describeSquare(x, y, piece, hidden ? null : pieceType, variant)}
+                aria-label={describeSquare(x, y, piece, pieceType, variant)}
                 aria-selected={isSelected}
                 data-square={`${x},${y}`}
                 onFocus={() => setCursor({ x, y })}
@@ -477,7 +470,6 @@ export function GameBoard() {
                         piece={pieceType}
                         teamIndex={teamIndex(piece.team)}
                         size={Math.round(cell * 0.78)}
-                        hidden={hidden}
                       />
                     </span>
                   </span>
@@ -551,9 +543,7 @@ function describeSquare(
   const file = String.fromCharCode(97 + x)
   const rank = variant.board.height - y
   const name = `${file}${rank}`
-  if (!piece) return `${name}, empty`
+  if (!piece || !pieceType) return `${name}, empty`
   const team = variant.teams.find((t) => t.id === piece.team)
-  // A hidden piece is only a piece — its name would give it away.
-  if (!pieceType) return `${name}, ${team?.name ?? piece.team} piece`
   return `${name}, ${team?.name ?? piece.team} ${pieceType.name}`.replace(/\s+/g, ' ')
 }

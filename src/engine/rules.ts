@@ -511,28 +511,31 @@ export function findPiece(state: GameState, pieceId: string): Vec | null {
  * something changes one — then that single instance is copied first.
  */
 /**
- * Rolls new types for the pieces of a chaos game.
+ * Rolls the random pieces.
  *
- * After every move the pieces change: a pawn can be a knight by the next
- * turn. The new types live in the game's own table, so the variant itself is
- * never touched and the board can show the same piece twice with two
- * different shapes.
+ * A piece whose kind is marked random changes after every move: it borrows
+ * the way another piece moves, and it keeps the random mark so it goes on
+ * changing. The new kinds live in the game's own table, so the variant
+ * itself is never touched.
  *
  * The rolls come from a seed, so the same game always plays out the same way
  * and can be rebuilt later.
  */
-export function rerollPieces(state: GameState): GameState {
-  const chaos = state.variant.chaos
-  if (!chaos) return state
+export function rollRandomPieces(state: GameState): GameState {
+  const variant = state.variant
+  const randomPieces = Object.keys(state.pieces).filter((id) => {
+    const type = state.pieceTypes[state.pieces[id].typeId]
+    return !!type?.flags.random && !type.flags.royal
+  })
+  if (!randomPieces.length) return state
 
-  // The royal piece keeps its shape: a game without one would be over.
-  const wanted = chaos.pool?.length ? chaos.pool : Object.keys(state.pieceTypes)
-  const pool = wanted
-    .map((id) => state.pieceTypes[id])
-    .filter((type) => type && !type.flags.royal)
+  // A random piece becomes one of the kinds of the variant — never the royal
+  // one, or the game would be over at once, and never another random piece,
+  // or it would have no way of moving at all.
+  const pool = variant.pieceTypes.filter((type) => !type.flags.royal)
   if (!pool.length) return state
 
-  let seed = (chaos.seed ?? 1) >>> 0
+  let seed = (variant.randomSeed ?? 1) >>> 0
   const roll = () => {
     // A small, well-spread random number generator.
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
@@ -541,23 +544,16 @@ export function rerollPieces(state: GameState): GameState {
 
   const pieceTypes = { ...state.pieceTypes }
   const pieces = { ...state.pieces }
-  for (const id in pieces) {
+  for (const id of randomPieces) {
     const inst = pieces[id]
-    const type = state.pieceTypes[inst.typeId]
-    if (!type || type.flags.royal) continue
     const pick = pool[Math.floor(roll() * pool.length)]
     if (!pick) continue
-    // Every piece needs a type of its own, so the type is named after it.
+    // Every piece needs a kind of its own, so the kind is named after it.
     const typeId = `r|${id}`
-    pieceTypes[typeId] = { ...pick, id: typeId }
+    pieceTypes[typeId] = { ...pick, id: typeId, flags: { ...pick.flags, random: true } }
     pieces[id] = { ...inst, typeId }
   }
   return { ...state, pieceTypes, pieces }
-}
-
-/** Whether the pieces of a game are hiding what they are. */
-export function chaosIsHidden(state: GameState): boolean {
-  return !!state.variant.chaos?.hidden
 }
 
 export function cloneState(state: GameState): GameState {
