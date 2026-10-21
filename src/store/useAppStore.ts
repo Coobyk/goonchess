@@ -129,6 +129,9 @@ interface AppState {
   cancelPromotion: () => void
   loadPosition: (state: GameState) => void
   resetGame: () => void
+  /** The position a puzzle started from, so the puzzle can be set up again. */
+  puzzleStart: GameState | null
+  setPuzzleStart: (state: GameState | null) => void
   undo: () => void
 
   /* bot */
@@ -299,6 +302,7 @@ export const useAppStore = create<AppState>((set, get) => {
     pendingPromotion: null,
     boardAnimating: false,
     queuedMove: null,
+    puzzleStart: null,
     selectedPieceTypeId: initial.pieceTypes[0]?.id ?? null,
     brush: { mode: 'terrain', terrain: 'wall', team: initial.teams[0]?.id ?? 'white', typeId: null },
     portalPending: null,
@@ -668,8 +672,11 @@ export const useAppStore = create<AppState>((set, get) => {
 
     resetGame: () => {
       const variant = get().variant
+      // A puzzle is part of the game, so restarting means starting the puzzle
+      // over, not going back to the opening position.
+      const puzzle = get().puzzleStart
       set({
-        game: createInitialState(variant),
+        game: puzzle ?? createInitialState(variant),
         selected: null,
         legalMoves: [],
         undoStack: [],
@@ -679,6 +686,8 @@ export const useAppStore = create<AppState>((set, get) => {
         botSide: sideFor(get().bot, variant, get().botSide),
       })
     },
+
+    setPuzzleStart: (state) => set({ puzzleStart: state }),
 
     undo: () => {
       const stack = get().undoStack

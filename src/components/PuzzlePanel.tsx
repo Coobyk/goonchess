@@ -15,6 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 export function PuzzlePanel() {
   const variant = useAppStore((s) => s.variant)
   const game = useAppStore((s) => s.game)
+  const setPuzzleStart = useAppStore((s) => s.setPuzzleStart)
+  const resetGame = useAppStore((s) => s.resetGame)
   const worker = useRef<BotWorker | null>(null)
   const [busy, setBusy] = useState(false)
   const [puzzle, setPuzzle] = useState<{
@@ -32,6 +34,14 @@ export function PuzzlePanel() {
       worker.current = null
     }
   }, [])
+
+  // Another variant means another puzzle.
+  const variantId = variant.id
+  useEffect(() => {
+    setPuzzle(null)
+    setSolved(null)
+    setPuzzleStart(null)
+  }, [variantId, setPuzzleStart])
 
   // Watch for the player's answer.
   useEffect(() => {
@@ -53,6 +63,13 @@ export function PuzzlePanel() {
     }
   }, [game, puzzle, solved])
 
+  // Starting the puzzle over clears the verdict on it.
+  useEffect(() => {
+    if (!puzzle || solved === null) return
+    if (game.moveHistory.length !== movesBefore.current) return
+    setSolved(null)
+  }, [game, puzzle, solved])
+
   const loadPuzzle = async () => {
     setBusy(true)
     setSolved(null)
@@ -70,6 +87,8 @@ export function PuzzlePanel() {
         side: result.puzzle.side,
       })
       movesBefore.current = result.puzzle.state.moveHistory.length
+      // The position is kept, so restarting the game starts the puzzle over.
+      setPuzzleStart(result.puzzle.state)
       useAppStore.getState().loadPosition(result.puzzle.state)
     } finally {
       setBusy(false)
@@ -102,7 +121,15 @@ export function PuzzlePanel() {
                 <SkipForward /> Next puzzle
               </Button>
               {solved === false && (
-                <Button size="sm" variant="ghost" onClick={() => setSolved(null)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    // Back to the position the puzzle started from.
+                    resetGame()
+                    setSolved(null)
+                  }}
+                >
                   <Lightbulb /> Try again
                 </Button>
               )}
