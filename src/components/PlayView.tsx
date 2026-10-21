@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
+import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Shuffle, Undo2, Trophy, ShieldAlert, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
@@ -71,6 +71,7 @@ export function PlayView() {
   const game = useAppStore((s) => s.game)
   const variant = useAppStore((s) => s.variant)
   const resetGame = useAppStore((s) => s.resetGame)
+  const startRandomGame = useAppStore((s) => s.startRandomGame)
   const undo = useAppStore((s) => s.undo)
   const canUndo = useAppStore((s) => s.undoStack.length > 0)
   const threatSettings = useAppStore((s) => s.threats)
@@ -173,6 +174,9 @@ export function PlayView() {
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button variant="outline" size="sm" onClick={resetGame}>
             <RotateCcw /> Restart
+          </Button>
+          <Button variant="outline" size="sm" onClick={startRandomGame}>
+            <Shuffle /> Random game
           </Button>
           <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo}>
             <Undo2 /> Undo
@@ -574,7 +578,12 @@ export function PlayView() {
             ) : checked ? (
               <span className="text-rose-500">Check — the royal piece is under attack.</span>
             ) : (
-              <span>Move {game.moveHistory.length + 1} · select a piece to see its legal moves.</span>
+              <span>
+                Move {game.moveHistory.length + 1} ·{' '}
+                {variant.chaos?.hidden
+                  ? 'nobody knows what the pieces are — pick one and try a square.'
+                  : 'select a piece to see its legal moves.'}
+              </span>
             )}
 
             {threatSettings.show && (

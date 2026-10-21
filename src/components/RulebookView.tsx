@@ -363,6 +363,22 @@ export function RulebookView() {
                 A stalemate — no legal move but no check — is a draw. Reaching the point target or
                 eliminating an army is reported in the turn panel.
               </p>
+              {variant.chaos && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <p className="text-sm font-medium">The pieces are rolled anew</p>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    After every move each piece is given a new kind, drawn at random from{' '}
+                    {variant.chaos.pool?.length
+                      ? variant.chaos.pool
+                          .map((id) => pieceTypes.find((p) => p.id === id)?.name ?? id)
+                          .join(', ')
+                      : 'the piece kinds of this variant'}
+                    . {variant.chaos.hidden
+                      ? 'Nobody knows what a piece is until it has been used — the move history gives it away afterwards.'
+                      : 'The royal piece keeps its kind, or the game would be over at once.'}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

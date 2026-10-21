@@ -4,6 +4,7 @@ import {
   PIECE_ICONS,
   type ArtShape,
   type BoardConfig,
+  type ChaosRules,
   type Effect,
   type MovePattern,
   type PieceArtLayer,
@@ -30,7 +31,7 @@ import {
  *
  * Bump FORMAT_VERSION whenever the packed shape changes.
  */
-export const FORMAT_VERSION = 3
+export const FORMAT_VERSION = 4
 
 const TERRAINS: Terrain[] = ['normal', 'void', 'wall', 'portal', 'oneway']
 const WIN_KINDS: WinConditionKind[] = ['checkmate', 'kingCapture', 'elimination', 'points']
@@ -91,6 +92,18 @@ export function packVariant(variant: Variant): unknown {
     variant.winConditions.map((w) =>
       w.kind === 'points' ? [WIN_KINDS.indexOf('points'), w.threshold ?? 20] : [WIN_KINDS.indexOf(w.kind)],
     ),
+    packChaos(variant),
+  ]
+}
+
+/** The rules of a chaos game, if the variant has them. */
+function packChaos(variant: Variant): unknown[] | null {
+  const chaos = variant.chaos
+  if (!chaos) return null
+  return [
+    chaos.pool?.length ? chaos.pool.map((id) => variant.pieceTypes.findIndex((p) => p.id === id)) : [],
+    chaos.hidden ? 1 : 0,
+    chaos.seed ?? 0,
   ]
 }
 
@@ -146,12 +159,13 @@ function packEffect(effect: Effect, pieceIndex: Map<string, number>): unknown[] 
 /** Throws on anything that is not a well-formed packed variant. */
 export function unpackVariant(input: unknown): Variant {
   if (!Array.isArray(input)) throw new Error('packed variant must be an array')
-  // Version 2 is the same format without the drawings of composed pieces.
-  if (input[0] !== FORMAT_VERSION && input[0] !== 2) {
+  // Version 2 is the same format without the drawings of composed pieces, and
+  // version 3 without the rules of a chaos game.
+  if (input[0] !== FORMAT_VERSION && input[0] !== 3 && input[0] !== 2) {
     throw new Error(`unsupported packed variant version: ${String(input[0])}`)
   }
 
-  const [, name, description, board, teams, pieces, setup, wins] = input
+  const [, name, description, board, teams, pieces, setup, wins, chaos] = input
   if (!Array.isArray(board) || !Array.isArray(pieces)) {
     throw new Error('packed variant is missing required sections')
   }
@@ -276,6 +290,21 @@ export function unpackVariant(input: unknown): Variant {
     pieceTypes,
     setup: setupList,
     winConditions,
+    chaos: unpackChaos(chaos, pieceTypes),
+  }
+}
+
+/** The rules of a chaos game, if the link carries them. */
+function unpackChaos(raw: unknown, pieceTypes: PieceType[]): ChaosRules | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const [pool, hidden, seed] = raw as [number[], number, number]
+  const ids = (pool ?? [])
+    .map((i) => pieceTypes[i]?.id)
+    .filter((id): id is string => !!id)
+  return {
+    pool: ids.length ? ids : undefined,
+    hidden: hidden === 1,
+    seed: Number.isFinite(seed) ? seed : 1,
   }
 }
 

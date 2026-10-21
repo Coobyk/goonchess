@@ -510,6 +510,28 @@ export function blankVariant(width = 8, height = 8): Variant {
   }
 }
 
+/* ----------------------------------------------------------- random chess */
+
+/**
+ * A game where the pieces are rolled anew after every move.
+ *
+ * Nobody knows what the pieces are: they are all drawn the same way and they
+ * change under you. The move history gives them away one at a time, after
+ * they have been used.
+ */
+export function randomChess(seed = 20240521): Variant {
+  const base = classicChess()
+  const pool = base.pieceTypes.filter((p) => !p.flags.royal).map((p) => p.id)
+  return {
+    ...base,
+    id: 'random',
+    name: 'Random Chess',
+    description:
+      'The pieces are rolled anew after every move, and nobody knows what they are until they are used.',
+    chaos: { pool, hidden: true, seed },
+  }
+}
+
 export const TEMPLATES: { id: string; name: string; description: string; build: () => Variant }[] = [
   { id: 'classic', name: 'Classic Chess', description: 'Standard 8×8', build: classicChess },
   { id: 'mini', name: 'Mini Chess', description: 'Fast 6×6', build: miniChess },
@@ -517,6 +539,7 @@ export const TEMPLATES: { id: string; name: string; description: string; build: 
   { id: 'bomb-queen', name: 'Bomb Queen', description: 'A queen that detonates', build: bombQueen },
   { id: 'rollers', name: 'Lucky Rollers', description: 'They roll to move', build: luckyRollers },
   { id: 'chaos', name: 'Chaos Lab', description: 'Portals and bombers', build: chaosLab },
+  { id: 'random', name: 'Random Chess', description: 'The pieces change', build: randomChess },
 ]
 
 export function defaultVariant(): Variant {

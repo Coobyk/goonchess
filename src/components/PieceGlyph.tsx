@@ -16,46 +16,60 @@ export function PieceGlyph({
   teamIndex,
   size = 40,
   muted = false,
+  hidden = false,
 }: {
   piece?: PieceType | null
   teamIndex: number
   size?: number
   muted?: boolean
+  /** Draw the piece as an unknown one, for a chaos game. */
+  hidden?: boolean
 }) {
   if (!piece) return null
   const code = CODES[piece.icon]
-  const glyph =
-    piece.art && piece.art.length ? (
-      // A piece that was drawn in the composer.
-      <img
-        src={artToUri(piece.art, teamIndex === 0)}
-        alt={piece.name}
-        width={size}
-        height={size}
-        draggable={false}
-        style={{ display: 'block', width: size, height: size }}
-      />
-    ) : piece.icon !== 'custom' && code ? (
-      <img
-        src={`/pieces/cburnett/${teamIndex === 0 ? 'w' : 'b'}${code}.svg`}
-        alt={piece.name}
-        width={size}
-        height={size}
-        draggable={false}
-        style={{ display: 'block', width: size, height: size }}
-      />
-    ) : (
-      <span
-        style={{
-          fontSize: size * 0.82,
-          lineHeight: 1,
-          fontWeight: 600,
-          color: teamIndex === 0 ? '#f8fafc' : '#111827',
-        }}
-      >
-        {piece.symbol || piece.name.slice(0, 1)}
-      </span>
-    )
+  const glyph = hidden ? (
+    // Nobody knows what this is until it is used.
+    <span
+      style={{
+        fontSize: size * 0.7,
+        lineHeight: 1,
+        fontWeight: 700,
+        color: teamIndex === 0 ? '#f8fafc' : '#111827',
+      }}
+    >
+      ?
+    </span>
+  ) : piece.art && piece.art.length ? (
+    // A piece that was drawn in the composer.
+    <img
+      src={artToUri(piece.art, teamIndex === 0)}
+      alt={piece.name}
+      width={size}
+      height={size}
+      draggable={false}
+      style={{ display: 'block', width: size, height: size }}
+    />
+  ) : piece.icon !== 'custom' && code ? (
+    <img
+      src={`/pieces/cburnett/${teamIndex === 0 ? 'w' : 'b'}${code}.svg`}
+      alt={piece.name}
+      width={size}
+      height={size}
+      draggable={false}
+      style={{ display: 'block', width: size, height: size }}
+    />
+  ) : (
+    <span
+      style={{
+        fontSize: size * 0.82,
+        lineHeight: 1,
+        fontWeight: 600,
+        color: teamIndex === 0 ? '#f8fafc' : '#111827',
+      }}
+    >
+      {piece.symbol || piece.name.slice(0, 1)}
+    </span>
+  )
 
   return (
     <span

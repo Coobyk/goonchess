@@ -16,6 +16,10 @@ Deployable to Cloudflare Workers with GitHub Actions.
   uses: the pieces, the side to move, the castles still possible and the en
   passant right all have to match. The board wears the brown of Lichess,
   `#f0d9b5` and `#b58863`, in light and in dark mode alike.
+- **Random Chess** — a game where the pieces are rolled anew after every move.
+  Nobody knows what a piece is: they are all drawn the same way, they change
+  under you, and the move history gives them away one at a time, after they
+  have been used. Start one with **Random game** in the Play view.
 - **Piece composer** — draw a piece instead of settling for a letter. The six
   chess pieces are stacked on top of each other: a knight with a bishop's
   crown on its head, a queen wearing a king's crown, an amazon with a knight's

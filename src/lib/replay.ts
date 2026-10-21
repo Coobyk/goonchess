@@ -1,4 +1,4 @@
-import { applyMove, createInitialState } from '@/engine/rules'
+import { applyMove, createInitialState, rerollPieces } from '@/engine/rules'
 import type { GameState } from '@/engine/types'
 
 /**
@@ -13,6 +13,9 @@ export function replayStates(game: GameState): GameState[] {
   let current = start
   for (const record of game.moveHistory) {
     current = applyMove(current, record.move, { compute: false })
+    // A chaos game rolls its pieces anew after every move, the same way it
+    // did when the game was played.
+    if (current.variant.chaos) current = rerollPieces(current)
     states.push(current)
   }
   return states
