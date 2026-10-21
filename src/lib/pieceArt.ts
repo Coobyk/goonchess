@@ -61,10 +61,10 @@ const DARK_LINE = '#e5e7eb'
  * makes the two armies hard to tell apart. These are dusty enough to read as
  * a piece first and as a rainbow second.
  */
-export const RAINBOW = ['#e08b8b', '#e3c478', '#a6c983', '#82aad6', '#b190ca']
+export const RAINBOW = ['#f1b5b5', '#f5dfa7', '#c5e0a8', '#a6c8e6', '#cab7e3']
 
 /** The same colours, deeper, for the dark army. */
-export const RAINBOW_DARK = ['#a35f5f', '#9d8c55', '#6f8f5a', '#56799f', '#776490']
+export const RAINBOW_DARK = ['#b34848', '#ba9330', '#659632', '#2e6ba0', '#6e4c9a']
 
 /** The shape each icon is drawn from, for the rainbow drawing. */
 export const SHAPE_OF_ICON: Partial<Record<PieceIcon, ArtShape>> = {
@@ -154,14 +154,14 @@ export function rainbowUri(shape: ArtShape, light = true): string {
         `<stop offset="${Math.round((i / (colours.length - 1)) * 100)}%" stop-color="${colour}"/>`,
     )
     .join('')
-  // The gradient lies along a line from the top right to the bottom left, and
-  // slides one whole period downwards, so the shimmer never jumps. The line
-  // is the length of the piece's diagonal, so the whole rainbow shows.
+  // The gradient lies at forty-five degrees and slides one whole period
+  // downwards, so the shimmer never jumps. It is drawn against the piece's own
+  // box, so every piece shows the same rainbow in the same places.
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45" width="45" height="45">` +
     `<defs>` +
-    `<linearGradient id="rainbow" gradientUnits="userSpaceOnUse" x1="45" y1="0" x2="0" y2="45" spreadMethod="repeat">` +
-    `<animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="-45 45" dur="3.6s" repeatCount="indefinite"/>` +
+    `<linearGradient id="rainbow" x1="1" y1="0" x2="0" y2="1" spreadMethod="repeat">` +
+    `<animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="-1 1" dur="3.6s" repeatCount="indefinite"/>` +
     stops +
     `</linearGradient></defs>` +
     `<g fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">` +
