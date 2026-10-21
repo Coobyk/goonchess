@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PieceType } from '@/engine/types'
-import { RAINBOW, SHAPE_OF_ICON, artToUri, rainbowUri } from '@/lib/pieceArt'
+import { RAINBOW, RAINBOW_DARK, SHAPE_OF_ICON, artToUri, rainbowUri } from '@/lib/pieceArt'
 
 const CODES: Record<string, string> = {
   king: 'K',
@@ -26,10 +26,11 @@ export function PieceGlyph({
   const code = CODES[piece.icon]
   // A random piece is drawn in the colours of a rainbow: it changes its kind
   // after every move, and it says so.
+  const light = teamIndex === 0
   const shape = piece.flags?.random ? SHAPE_OF_ICON[piece.icon] : undefined
   const glyph = shape ? (
     <img
-      src={rainbowUri(shape)}
+      src={rainbowUri(shape, light)}
       alt={piece.name}
       width={size}
       height={size}
@@ -43,7 +44,9 @@ export function PieceGlyph({
         fontSize: size * 0.82,
         lineHeight: 1,
         fontWeight: 700,
-        backgroundImage: `linear-gradient(180deg, ${RAINBOW.join(', ')})`,
+        backgroundImage: `linear-gradient(-45deg, ${(light ? RAINBOW : RAINBOW_DARK).join(', ')})`,
+        backgroundSize: '200% 200%',
+        animation: 'rainbow-slide 3.6s linear infinite',
         WebkitBackgroundClip: 'text',
         backgroundClip: 'text',
         color: 'transparent',

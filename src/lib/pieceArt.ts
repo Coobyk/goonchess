@@ -54,8 +54,17 @@ const DARK_FILL = '#111827'
 const LIGHT_LINE = '#000000'
 const DARK_LINE = '#e5e7eb'
 
-/** The colours of a random piece. */
-export const RAINBOW = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93']
+/**
+ * The colours of a random piece.
+ *
+ * Soft on purpose: a rainbow that shouts drowns the shape of the piece and
+ * makes the two armies hard to tell apart. These are dusty enough to read as
+ * a piece first and as a rainbow second.
+ */
+export const RAINBOW = ['#e08b8b', '#e3c478', '#a6c983', '#82aad6', '#b190ca']
+
+/** The same colours, deeper, for the dark army. */
+export const RAINBOW_DARK = ['#a35f5f', '#9d8c55', '#6f8f5a', '#56799f', '#776490']
 
 /** The shape each icon is drawn from, for the rainbow drawing. */
 export const SHAPE_OF_ICON: Partial<Record<PieceIcon, ArtShape>> = {
@@ -79,12 +88,13 @@ function paint(markup: string, light: boolean): string {
 }
 
 /** Paints the markup of a shape in the colours of a rainbow. */
-function paintRainbow(markup: string): string {
+function paintRainbow(markup: string, light: boolean): string {
+  const line = light ? '#1f2937' : '#e5e7eb'
   return markup
     .replace(/fill="#fff"/g, 'fill="url(#rainbow)"')
-    .replace(/fill="#000"/g, 'fill="#1f2937"')
-    .replace(/stroke="#000"/g, 'stroke="#1f2937"')
-    .replace(/stroke="#ececec"/g, 'stroke="#1f2937"')
+    .replace(/fill="#000"/g, `fill="${line}"`)
+    .replace(/stroke="#000"/g, `stroke="${line}"`)
+    .replace(/stroke="#ececec"/g, `stroke="${line}"`)
 }
 
 function layerMarkup(layer: PieceArtLayer, light: boolean, index: number): string {
@@ -128,22 +138,37 @@ export function artToUri(art: PieceArt, light: boolean): string {
 /**
  * The drawing of a random piece: the shape of a piece in the colours of a
  * rainbow, so it is clear at a glance that it is not what it seems.
+ *
+ * The rainbow lies at forty-five degrees and slides slowly downwards, which
+ * gives it the shimmer of light running over the piece. The dark army gets
+ * deeper colours and a light rim, so the two armies stay apart.
  */
-export function rainbowUri(shape: ArtShape): string {
-  const cached = uriCache.get(`rainbow:${shape}`)
+export function rainbowUri(shape: ArtShape, light = true): string {
+  const key = `rainbow:${light ? 'w' : 'b'}:${shape}`
+  const cached = uriCache.get(key)
   if (cached) return cached
-  const stops = RAINBOW.map(
-    (colour, i) =>
-      `<stop offset="${Math.round((i / (RAINBOW.length - 1)) * 100)}%" stop-color="${colour}"/>`,
-  ).join('')
+  const colours = light ? RAINBOW : RAINBOW_DARK
+  const stops = colours
+    .map(
+      (colour, i) =>
+        `<stop offset="${Math.round((i / (colours.length - 1)) * 100)}%" stop-color="${colour}"/>`,
+    )
+    .join('')
+  // The gradient lies along a line from the top right to the bottom left, and
+  // slides one whole period downwards, so the shimmer never jumps. The line
+  // is the length of the piece's diagonal, so the whole rainbow shows.
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45" width="45" height="45">` +
-    `<defs><linearGradient id="rainbow" x1="0" y1="0" x2="0" y2="1">${stops}</linearGradient></defs>` +
+    `<defs>` +
+    `<linearGradient id="rainbow" gradientUnits="userSpaceOnUse" x1="45" y1="0" x2="0" y2="45" spreadMethod="repeat">` +
+    `<animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="-45 45" dur="3.6s" repeatCount="indefinite"/>` +
+    stops +
+    `</linearGradient></defs>` +
     `<g fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">` +
-    paintRainbow(ART_MARKUP[shape]) +
+    paintRainbow(ART_MARKUP[shape], light) +
     `</g></svg>`
   const uri = `data:image/svg+xml,${encodeURIComponent(svg)}`
-  uriCache.set(`rainbow:${shape}`, uri)
+  uriCache.set(key, uri)
   return uri
 }
 

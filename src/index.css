@@ -231,6 +231,15 @@
     animation-fill-mode: both;
   }
   /* The selected piece grows a little and wiggles in place. */
+  /* The rainbow of a random letter slides downwards, like a shimmer. */
+  @keyframes rainbow-slide {
+    from {
+      background-position: 100% 0%;
+    }
+    to {
+      background-position: 0% 100%;
+    }
+  }
   .piece-selected {
     animation: piece-selected 1100ms ease-in-out infinite;
     transform-origin: 50% 62%;
