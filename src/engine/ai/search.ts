@@ -77,6 +77,11 @@ export interface SearchOptions {
   timeBudgetMs?: number
   /** Analyse the position: always the best line, never a weaker move. */
   analyze?: boolean
+  /**
+   * Moves the search must not play, by name. The bot uses this to stay out of
+   * a repetition, which would be a draw.
+   */
+  exclude?: string[]
 }
 
 export interface SearchResult {
@@ -106,6 +111,8 @@ interface SearchContext {
   teams: string[]
   /** The best line found, one array per ply. */
   pv: Move[][]
+  /** Moves the search must not play. */
+  exclude?: Set<string>
 }
 
 /** Small deterministic random generator, so a seed gives a repeatable game. */
@@ -326,6 +333,8 @@ function searchRoot(state: GameState, depth: number, ctx: SearchContext): RootMo
   // the root does not search every line from scratch.
   let alpha = -Infinity
   for (const option of orderMoves(allLegalMoves(state), state)) {
+    // Some moves are off the table — repeating a position is a draw.
+    if (ctx.exclude?.has(moveName(option.move))) continue
     let score: number
     if (reachedPointTarget(state, option, ctx)) {
       score = MATE - 1
@@ -337,6 +346,11 @@ function searchRoot(state: GameState, depth: number, ctx: SearchContext): RootMo
     if (ctx.aborted) break
   }
   return results
+}
+
+/** A short name for a move, so the search can be told to leave it alone. */
+function moveName(move: Move) {
+  return `${move.from.x},${move.from.y}->${move.finalTo.x},${move.finalTo.y}`
 }
 
 /** Picks the move to play, given a level and the position. */
@@ -355,6 +369,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     kingCaptureWins: false,
     teams: state.variant.teams.map((t) => t.id),
     pv: [],
+    exclude: options.exclude?.length ? new Set(options.exclude) : undefined,
   }
   for (const condition of state.variant.winConditions) {
     if (condition.kind === 'points') ctx.pointTarget = condition.threshold ?? Infinity
@@ -377,11 +392,13 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
 
   if (!rootResults.length) {
     // Nothing was searched — fall back to any legal move.
-    const fallback = allLegalMoves(state)
+    const all = allLegalMoves(state)
+    const fallback = all.filter((o) => !ctx.exclude?.has(moveName(o.move)))
+    const pool = fallback.length ? fallback : all
     return {
-      move: fallback.length ? fallback[0].move : null,
+      move: pool.length ? pool[0].move : null,
       score: 0,
-      line: fallback.length ? [fallback[0].move] : [],
+      line: pool.length ? [pool[0].move] : [],
       depth: 0,
       nodes: ctx.nodes,
       elapsedMs: performance.now() - started,
@@ -395,7 +412,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   // reports the best line.
   let chosen = sorted[0]
   if (!options.analyze && profile.randomness > 0 && random() < profile.randomness) {
-    const any = allLegalMoves(state)
+    const any = allLegalMoves(state).filter((o) => !ctx.exclude?.has(moveName(o.move)))
     if (any.length) chosen = { option: any[Math.floor(random() * any.length)], score: 0 }
   } else if (!options.analyze && profile.slop > 0 && sorted.length > 1) {
     // The scores of the moves that were cut off are only upper bounds, so the

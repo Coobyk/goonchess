@@ -4,7 +4,8 @@ import { BotWorker } from '@/lib/bot'
 import { LEVELS } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam } from '@/engine/ai/botSettings'
 import { clockIsOn } from '@/lib/clock'
-import { getLegalMoves } from '@/engine/rules'
+import { moveKey, wouldRepeat } from '@/lib/repetition'
+import { getLegalMoves, legalOptionsForTeam } from '@/engine/rules'
 import type { GameState, Move } from '@/engine/types'
 
 /**
@@ -58,8 +59,13 @@ export function BotPlayer() {
     const budget = clockIsOn(clock)
       ? Math.max(200, Math.min(LEVELS[level].timeBudgetMs, remaining / 3 - 800))
       : undefined
+    // Playing a position that has been on the board before would be a draw, so
+    // those moves are taken off the table.
+    const repeating = legalOptionsForTeam(state, team)
+      .filter((option) => wouldRepeat(state, option.move))
+      .map((option) => moveKey(option.move))
 
-    void client.think(state, team, level, seed, budget).then((result) => {
+    void client.think(state, team, level, seed, budget, false, repeating).then((result) => {
       running.current = false
       setBotThinking(false)
       const store = useAppStore.getState()

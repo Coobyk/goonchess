@@ -1,4 +1,5 @@
-import type { GameState } from '@/engine/types'
+import { applyMove } from '@/engine/rules'
+import type { GameState, Move } from '@/engine/types'
 
 /**
  * The identity of a position.
@@ -96,4 +97,30 @@ function findSquare(state: GameState, pieceId: string) {
     if (x >= 0) return { x, y }
   }
   return null
+}
+
+/** How often a position has stood on the board so far. */
+export function countPosition(state: GameState, key: string): number {
+  let count = state.startKey === key ? 1 : 0
+  for (const record of state.moveHistory) {
+    if (record.positionKey === key) count += 1
+  }
+  return count
+}
+
+/**
+ * Would this move bring back a position that has already been played?
+ *
+ * The third time round is a draw, and shuffling towards it is never good
+ * play, so a bot that can avoid it should.
+ */
+export function wouldRepeat(state: GameState, move: Move): boolean {
+  const next = applyMove(state, move, { compute: false })
+  const key = positionKey(next)
+  return countPosition(next, key) > 0
+}
+
+/** A short name for a move, so the search can be told to leave it alone. */
+export function moveKey(move: Move): string {
+  return `${move.from.x},${move.from.y}->${move.finalTo.x},${move.finalTo.y}`
 }

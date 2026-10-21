@@ -85,13 +85,23 @@ export class BotWorker {
     seed = Date.now(),
     timeBudgetMs?: number,
     analyze = false,
+    exclude?: string[],
   ): Promise<BotResult> {
     this.cancel()
     const worker = this.ensureWorker()
     const id = this.nextId++
     return new Promise<BotResult>((resolve) => {
       this.pending = { id, resolve }
-      const request: BotRequest = { id, state, team, level, seed, timeBudgetMs, analyze }
+      const request: BotRequest = {
+        id,
+        state,
+        team,
+        level,
+        seed,
+        timeBudgetMs,
+        analyze,
+        exclude,
+      }
       worker.postMessage(request)
     })
   }

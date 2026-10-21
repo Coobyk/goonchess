@@ -20,6 +20,8 @@ export interface BotRequest {
   analyze?: boolean
   /** Look for a puzzle in the variant instead of playing. */
   puzzle?: { variant: Variant; seed: number }
+  /** Moves the bot must not play, by name. */
+  exclude?: string[]
 }
 
 export interface BotReply {
@@ -47,7 +49,7 @@ const scope = self as unknown as {
 }
 
 scope.onmessage = (event) => {
-  const { id, state, team, level, seed, timeBudgetMs, analyze, puzzle } = event.data
+  const { id, state, team, level, seed, timeBudgetMs, analyze, puzzle, exclude } = event.data
   try {
     if (puzzle) {
       const found = findPuzzle(puzzle.variant, puzzle.seed)
@@ -71,7 +73,7 @@ scope.onmessage = (event) => {
       })
       return
     }
-    const result = searchBestMove(state, { team, level, seed, timeBudgetMs, analyze })
+    const result = searchBestMove(state, { team, level, seed, timeBudgetMs, analyze, exclude })
     scope.postMessage({
       id,
       move: result.move,
