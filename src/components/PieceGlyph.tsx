@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PieceType } from '@/engine/types'
-import { RAINBOW, RAINBOW_DARK, SHAPE_OF_ICON, artToUri, rainbowUri } from '@/lib/pieceArt'
+import { RAINBOW, SHAPE_OF_ICON, artToUri, rainbowUri } from '@/lib/pieceArt'
 
 const CODES: Record<string, string> = {
   king: 'K',
@@ -44,7 +44,7 @@ export function PieceGlyph({
         fontSize: size * 0.82,
         lineHeight: 1,
         fontWeight: 700,
-        backgroundImage: `linear-gradient(-45deg, ${(light ? RAINBOW : RAINBOW_DARK).join(', ')})`,
+        backgroundImage: `linear-gradient(-45deg, ${RAINBOW.join(', ')})`,
         backgroundSize: '200% 200%',
         animation: 'rainbow-slide 3.6s linear infinite',
         WebkitBackgroundClip: 'text',

@@ -57,14 +57,11 @@ const DARK_LINE = '#e5e7eb'
 /**
  * The colours of a random piece.
  *
- * Soft on purpose: a rainbow that shouts drowns the shape of the piece and
- * makes the two armies hard to tell apart. These are dusty enough to read as
- * a piece first and as a rainbow second.
+ * The body of a random piece is an ordinary piece — white for one army, dark
+ * for the other. Only its rim wears the rainbow, so it is marked without
+ * being painted over.
  */
-export const RAINBOW = ['#f1b5b5', '#f5dfa7', '#c5e0a8', '#a6c8e6', '#cab7e3']
-
-/** The same colours, deeper, for the dark army. */
-export const RAINBOW_DARK = ['#b34848', '#ba9330', '#659632', '#2e6ba0', '#6e4c9a']
+export const RAINBOW = ['#e57676', '#ecc459', '#92c65c', '#589cd0', '#9b77c9']
 
 /** The shape each icon is drawn from, for the rainbow drawing. */
 export const SHAPE_OF_ICON: Partial<Record<PieceIcon, ArtShape>> = {
@@ -87,14 +84,18 @@ function paint(markup: string, light: boolean): string {
     .replace(/stroke="#ececec"/g, `stroke="${line}"`)
 }
 
-/** Paints the markup of a shape in the colours of a rainbow. */
+/**
+ * Paints the markup of a shape as a random piece: an ordinary body with a rim
+ * of rainbow. The eyes of the knight keep the colour of the team.
+ */
 function paintRainbow(markup: string, light: boolean): string {
-  const line = light ? '#1f2937' : '#e5e7eb'
+  const fill = light ? LIGHT_FILL : DARK_FILL
+  const eyes = light ? '#1f2937' : '#e5e7eb'
   return markup
-    .replace(/fill="#fff"/g, 'fill="url(#rainbow)"')
-    .replace(/fill="#000"/g, `fill="${line}"`)
-    .replace(/stroke="#000"/g, `stroke="${line}"`)
-    .replace(/stroke="#ececec"/g, `stroke="${line}"`)
+    .replace(/fill="#fff"/g, `fill="${fill}"`)
+    .replace(/fill="#000"/g, `fill="${eyes}"`)
+    .replace(/stroke="#000"/g, 'stroke="url(#rainbow)"')
+    .replace(/stroke="#ececec"/g, 'stroke="url(#rainbow)"')
 }
 
 function layerMarkup(layer: PieceArtLayer, light: boolean, index: number): string {
@@ -136,35 +137,29 @@ export function artToUri(art: PieceArt, light: boolean): string {
 }
 
 /**
- * The drawing of a random piece: the shape of a piece in the colours of a
- * rainbow, so it is clear at a glance that it is not what it seems.
+ * The drawing of a random piece: an ordinary piece with a rim of rainbow.
  *
- * The rainbow lies at forty-five degrees and slides slowly downwards, which
- * gives it the shimmer of light running over the piece. The dark army gets
- * deeper colours and a light rim, so the two armies stay apart.
+ * The rim lies at minus forty-five degrees and slides one whole period
+ * downwards, so the light runs over the edge of the piece. It is drawn
+ * against the piece's own box, so every piece shows the same rainbow in the
+ * same places.
  */
 export function rainbowUri(shape: ArtShape, light = true): string {
   const key = `rainbow:${light ? 'w' : 'b'}:${shape}`
   const cached = uriCache.get(key)
   if (cached) return cached
-  const colours = light ? RAINBOW : RAINBOW_DARK
-  const stops = colours
-    .map(
-      (colour, i) =>
-        `<stop offset="${Math.round((i / (colours.length - 1)) * 100)}%" stop-color="${colour}"/>`,
-    )
-    .join('')
-  // The gradient lies at forty-five degrees and slides one whole period
-  // downwards, so the shimmer never jumps. It is drawn against the piece's own
-  // box, so every piece shows the same rainbow in the same places.
+  const stops = RAINBOW.map(
+    (colour, i) =>
+      `<stop offset="${Math.round((i / (RAINBOW.length - 1)) * 100)}%" stop-color="${colour}"/>`,
+  ).join('')
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45" width="45" height="45">` +
     `<defs>` +
-    `<linearGradient id="rainbow" x1="1" y1="0" x2="0" y2="1" spreadMethod="repeat">` +
+    `<linearGradient id="rainbow" x1="0" y1="1" x2="1" y2="0" spreadMethod="repeat">` +
     `<animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="-1 1" dur="3.6s" repeatCount="indefinite"/>` +
     stops +
     `</linearGradient></defs>` +
-    `<g fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">` +
+    `<g fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6">` +
     paintRainbow(ART_MARKUP[shape], light) +
     `</g></svg>`
   const uri = `data:image/svg+xml,${encodeURIComponent(svg)}`
