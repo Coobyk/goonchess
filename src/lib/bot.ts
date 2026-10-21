@@ -82,10 +82,14 @@ export class BotWorker {
     state: GameState,
     team: string,
     level: BotLevel,
-    seed = Date.now(),
-    timeBudgetMs?: number,
-    analyze = false,
-    exclude?: string[],
+    options: {
+      seed?: number
+      timeBudgetMs?: number
+      analyze?: boolean
+      exclude?: string[]
+      /** Ask for the best line as well. */
+      wantLine?: boolean
+    } = {},
   ): Promise<BotResult> {
     this.cancel()
     const worker = this.ensureWorker()
@@ -97,10 +101,11 @@ export class BotWorker {
         state,
         team,
         level,
-        seed,
-        timeBudgetMs,
-        analyze,
-        exclude,
+        seed: options.seed ?? Date.now(),
+        timeBudgetMs: options.timeBudgetMs,
+        analyze: options.analyze,
+        exclude: options.exclude,
+        wantLine: options.wantLine,
       }
       worker.postMessage(request)
     })

@@ -66,26 +66,28 @@ export function BotPlayer() {
       .filter((option) => wouldRepeat(state, option.move))
       .map((option) => moveKey(option.move))
 
-    void client.think(state, team, level, seed, budget, false, repeating).then((result) => {
-      running.current = false
-      setBotThinking(false)
-      const store = useAppStore.getState()
-      if (!isBotTeam(store.bot, team, store.botSide)) return
-      if (store.game !== state) {
-        // The position changed while the bot was thinking — think again.
-        bump()
-        return
-      }
-      if (!result.move) return
-      // The bot may only play a move the engine agrees with.
-      const move = legalMoveFor(state, result.move)
-      if (!move) return
-      const wait = Math.max(0, LEVELS[level].minThinkMs - result.elapsedMs)
-      window.setTimeout(() => {
-        if (useAppStore.getState().game !== state) return
-        useAppStore.getState().playMove(move)
-      }, wait)
-    })
+    void client
+      .think(state, team, level, { seed, timeBudgetMs: budget, exclude: repeating })
+      .then((result) => {
+        running.current = false
+        setBotThinking(false)
+        const store = useAppStore.getState()
+        if (!isBotTeam(store.bot, team, store.botSide)) return
+        if (store.game !== state) {
+          // The position changed while the bot was thinking — think again.
+          bump()
+          return
+        }
+        if (!result.move) return
+        // The bot may only play a move the engine agrees with.
+        const move = legalMoveFor(state, result.move)
+        if (!move) return
+        const wait = Math.max(0, LEVELS[level].minThinkMs - result.elapsedMs)
+        window.setTimeout(() => {
+          if (useAppStore.getState().game !== state) return
+          useAppStore.getState().playMove(move)
+        }, wait)
+      })
   }, [bot, botSide, game, retry, setBotThinking])
 
   return null

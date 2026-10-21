@@ -10,7 +10,9 @@ import {
   type BotSettings,
 } from '@/engine/ai/botSettings'
 import { variantFromHash } from '@/lib/encoding'
+import { DEFAULT_ANALYSIS_SETTINGS, type AnalysisSettings } from '@/lib/analysis'
 import {
+  loadAnalysisSettings,
   loadBotSettings,
   loadClockSettings,
   loadLibrary,
@@ -20,6 +22,7 @@ import {
   loadThreatSettings,
   loadTurnView,
   loadVariant,
+  saveAnalysisSettings,
   saveBotSettings,
   saveClockSettings,
   saveLibrary,
@@ -56,6 +59,7 @@ interface AppState {
   theme: Theme
   soundEnabled: boolean
   soundPack: string
+  analysis: AnalysisSettings
   threats: ThreatSettings
   turnView: TurnView
   library: SavedVariant[]
@@ -89,6 +93,7 @@ interface AppState {
   setTheme: (theme: Theme) => void
   setSoundEnabled: (enabled: boolean) => void
   setSoundPack: (pack: string) => void
+  setAnalysis: (patch: Partial<AnalysisSettings>) => void
   setThreats: (patch: Partial<ThreatSettings>) => void
   setTurnView: (view: TurnView) => void
 
@@ -276,6 +281,7 @@ export const useAppStore = create<AppState>((set, get) => {
     theme: loadTheme(),
     soundEnabled: loadSoundEnabled(),
     soundPack: initialPack,
+    analysis: { ...DEFAULT_ANALYSIS_SETTINGS, ...loadAnalysisSettings() },
     threats: loadThreatSettings(),
     turnView: loadTurnView(),
     library: loadLibrary(),
@@ -319,6 +325,12 @@ export const useAppStore = create<AppState>((set, get) => {
       saveSoundPack(pack)
       applySoundPack(pack)
       set({ soundPack: pack })
+    },
+
+    setAnalysis: (patch) => {
+      const analysis = { ...get().analysis, ...patch }
+      saveAnalysisSettings(analysis)
+      set({ analysis })
     },
 
     setThreats: (patch) => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BrainCircuit, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { BotWorker, type BotResult } from '@/lib/bot'
-import { Badge } from './ui/badge'
+import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Switch } from './ui/switch'
 
@@ -10,17 +10,17 @@ import { Switch } from './ui/switch'
  * The analysis panel.
  *
  * The bot looks at the position on the board and says what it thinks: a score
- * for the first army and the line it would play. It runs in the worker, so the
- * board stays responsive while it thinks.
+ * for the first army. The line it would play is hidden by default and can be
+ * switched on.
  */
 export function AnalysisPanel() {
   const game = useAppStore((s) => s.game)
-  const variant = useAppStore((s) => s.variant)
+  const analysis = useAppStore((s) => s.analysis)
+  const setAnalysis = useAppStore((s) => s.setAnalysis)
   const [enabled, setEnabled] = useState(false)
   const [result, setResult] = useState<BotResult | null>(null)
   const [busy, setBusy] = useState(false)
   const worker = useRef<BotWorker | null>(null)
-  const requestId = useRef(0)
 
   useEffect(() => {
     return () => {
@@ -29,8 +29,6 @@ export function AnalysisPanel() {
     }
   }, [])
 
-  // Re-analyse whenever the position changes.
-  const position = game.moveHistory.length
   useEffect(() => {
     if (!enabled || game.winner) {
       setResult(null)
@@ -39,18 +37,20 @@ export function AnalysisPanel() {
     }
     const client = worker.current ?? new BotWorker()
     worker.current = client
-    const id = ++requestId.current
     setBusy(true)
     void client
-      .think(game, game.turn, 'normal', Date.now(), 1200, true)
+      .think(game, game.turn, 'normal', {
+        analyze: true,
+        timeBudgetMs: 1200,
+        wantLine: analysis.showLine,
+      })
       .then((reply) => {
-        if (id !== requestId.current) return
         setBusy(false)
         setResult(reply)
       })
-  }, [enabled, position, game, game.winner])
+  }, [enabled, analysis.showLine, game, game.winner])
 
-  const firstTeam = variant.teams[0]
+  const firstTeam = game.variant.teams[0]
   const mover = game.turn
   // The search scores the side to move; show it for the first army.
   const raw = result?.score ?? 0
@@ -80,18 +80,28 @@ export function AnalysisPanel() {
             <>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-lg tabular-nums">{label}</span>
-                <Badge variant="secondary" className="font-mono text-[10px]">
-                  depth {result.depth}
-                </Badge>
+                <span className="text-muted-foreground text-[10px]">depth {result.depth}</span>
                 <span className="text-muted-foreground text-xs">
-                  for {variant.teams.find((t) => t.id === firstTeam?.id)?.name ?? 'the first army'}
+                  for {game.variant.teams.find((t) => t.id === firstTeam?.id)?.name ?? 'the first army'}
                 </span>
               </div>
-              {result.line.length > 0 && (
-                <p className="text-muted-foreground font-mono text-[11px] leading-relaxed">
-                  {result.line.join(' ')}
-                </p>
-              )}
+              <div className="flex items-center justify-between gap-2">
+                {analysis.showLine ? (
+                  <p className="text-muted-foreground font-mono text-[11px] leading-relaxed">
+                    {result.line.length ? result.line.join(' ') : '—'}
+                  </p>
+                ) : (
+                  <span className="text-muted-foreground text-[11px]">The best line is hidden.</span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => setAnalysis({ showLine: !analysis.showLine })}
+                >
+                  {analysis.showLine ? 'Hide the line' : 'Show the line'}
+                </Button>
+              </div>
             </>
           )}
         </CardContent>

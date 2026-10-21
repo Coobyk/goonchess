@@ -22,7 +22,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
   take a fixed side or a random one that is rolled for every new game, and two
   bots can play each other, each with its own strength, while you watch.
 - **Analysis** — the bot looks at the position on the board and says what it
-  thinks: a score for the first army and the line it would play.
+  thinks: a score for the first army. The line it would play is hidden by
+  default and can be switched on.
 - **Puzzles** — positions taken from games the bot played against itself, each
   with a capture that cannot be taken back. The panel counts the ones you solve.
 - **Chess clocks** — time per side with an increment, from 1+0 to 15+10. The

@@ -22,6 +22,8 @@ export interface BotRequest {
   puzzle?: { variant: Variant; seed: number }
   /** Moves the bot must not play, by name. */
   exclude?: string[]
+  /** Send the best line back as well. */
+  wantLine?: boolean
 }
 
 export interface BotReply {
@@ -49,7 +51,8 @@ const scope = self as unknown as {
 }
 
 scope.onmessage = (event) => {
-  const { id, state, team, level, seed, timeBudgetMs, analyze, puzzle, exclude } = event.data
+  const { id, state, team, level, seed, timeBudgetMs, analyze, puzzle, exclude, wantLine } =
+    event.data
   try {
     if (puzzle) {
       const found = findPuzzle(puzzle.variant, puzzle.seed)
@@ -81,7 +84,7 @@ scope.onmessage = (event) => {
       depth: result.depth,
       nodes: result.nodes,
       elapsedMs: result.elapsedMs,
-      line: describeLine(state, result.line),
+      line: wantLine ? describeLine(state, result.line) : [],
       puzzle: null,
     })
   } catch (error) {

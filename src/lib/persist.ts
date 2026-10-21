@@ -3,6 +3,7 @@ import { DEFAULT_THREAT_SETTINGS, type ThreatSettings } from '@/engine/threats'
 import { normalizeBotSettings, type BotSettings } from '@/engine/ai/botSettings'
 import { NO_CLOCK, type ClockSettings } from './clock'
 import { DEFAULT_PACK } from './soundPacks'
+import { DEFAULT_ANALYSIS_SETTINGS, type AnalysisSettings } from './analysis'
 
 const VARIANT_KEY = 'goonchess:variant'
 const LIBRARY_KEY = 'goonchess:library'
@@ -13,6 +14,7 @@ const TURN_VIEW_KEY = 'goonchess:turn-view'
 const BOT_KEY = 'goonchess:bot'
 const CLOCK_KEY = 'goonchess:clock'
 const PACK_KEY = 'goonchess:sound-pack'
+const ANALYSIS_KEY = 'goonchess:analysis'
 
 export type TurnView = 'off' | 'board' | 'pieces'
 
@@ -80,3 +82,9 @@ export const loadSoundPack = (): string => {
   return typeof value === 'string' && value ? value : DEFAULT_PACK
 }
 export const saveSoundPack = (v: string) => write(PACK_KEY, v)
+
+export const loadAnalysisSettings = (): AnalysisSettings => ({
+  ...DEFAULT_ANALYSIS_SETTINGS,
+  ...read<Partial<AnalysisSettings>>(ANALYSIS_KEY, {}),
+})
+export const saveAnalysisSettings = (v: AnalysisSettings) => write(ANALYSIS_KEY, v)
