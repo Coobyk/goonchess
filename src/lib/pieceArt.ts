@@ -61,7 +61,10 @@ const DARK_LINE = '#e5e7eb'
  * for the other. Only its rim wears the rainbow, so it is marked without
  * being painted over.
  */
-export const RAINBOW = ['#e57676', '#ecc459', '#92c65c', '#589cd0', '#9b77c9']
+export const RAINBOW = ['#c2453f', '#c99b23', '#5a9e28', '#2f7ec4', '#7b46b3']
+
+/** The same colours, brighter, for the rim of the dark army. */
+export const RAINBOW_DARK = ['#f08a8a', '#f0cf6a', '#8fd06a', '#6fb0ea', '#b48ce0']
 
 /** The shape each icon is drawn from, for the rainbow drawing. */
 export const SHAPE_OF_ICON: Partial<Record<PieceIcon, ArtShape>> = {
@@ -148,10 +151,13 @@ export function rainbowUri(shape: ArtShape, light = true): string {
   const key = `rainbow:${light ? 'w' : 'b'}:${shape}`
   const cached = uriCache.get(key)
   if (cached) return cached
-  const stops = RAINBOW.map(
-    (colour, i) =>
-      `<stop offset="${Math.round((i / (RAINBOW.length - 1)) * 100)}%" stop-color="${colour}"/>`,
-  ).join('')
+  const colours = light ? RAINBOW : RAINBOW_DARK
+  const stops = colours
+    .map(
+      (colour, i) =>
+        `<stop offset="${Math.round((i / (colours.length - 1)) * 100)}%" stop-color="${colour}"/>`,
+    )
+    .join('')
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45" width="45" height="45">` +
     `<defs>` +

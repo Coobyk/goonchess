@@ -14,8 +14,8 @@ export function replayStates(game: GameState): GameState[] {
   for (const record of game.moveHistory) {
     current = applyMove(current, record.move, { compute: false })
     // A random piece is rolled anew after every move, the same way it was
-    // when the game was played.
-    current = rollRandomPieces(current)
+    // when the game was played. The piece that has just moved keeps its kind.
+    current = rollRandomPieces(current, record.move.pieceId)
     states.push(current)
   }
   return states

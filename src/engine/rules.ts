@@ -162,6 +162,9 @@ export function createInitialState(variant: Variant): GameState {
     winner: null,
     scores,
     status: 'active',
+    // The rolls of the random pieces start from the seed of the variant, so a
+    // game can be rebuilt and played out the same way.
+    randomSeed: variant.randomSeed ?? 1,
   }
   // The opening position counts towards a repetition.
   state.startKey = positionKey(state)
@@ -521,7 +524,7 @@ export function findPiece(state: GameState, pieceId: string): Vec | null {
  * The rolls come from a seed, so the same game always plays out the same way
  * and can be rebuilt later.
  */
-export function rollRandomPieces(state: GameState): GameState {
+export function rollRandomPieces(state: GameState, exceptPieceId?: string): GameState {
   const variant = state.variant
   const randomPieces = Object.keys(state.pieces).filter((id) => {
     const type = state.pieceTypes[state.pieces[id].typeId]
@@ -535,7 +538,9 @@ export function rollRandomPieces(state: GameState): GameState {
   const pool = variant.pieceTypes.filter((type) => !type.flags.royal)
   if (!pool.length) return state
 
-  let seed = (variant.randomSeed ?? 1) >>> 0
+  // The seed moves on with every roll, so a piece does not keep rolling into
+  // the same kind over and over.
+  let seed = (state.randomSeed ?? variant.randomSeed ?? 1) >>> 0
   const roll = () => {
     // A small, well-spread random number generator.
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
@@ -545,6 +550,9 @@ export function rollRandomPieces(state: GameState): GameState {
   const pieceTypes = { ...state.pieceTypes }
   const pieces = { ...state.pieces }
   for (const id of randomPieces) {
+    // The piece that has just moved keeps its kind: a pawn that has just
+    // promoted should be seen as a queen, not as something else at once.
+    if (id === exceptPieceId) continue
     const inst = pieces[id]
     const pick = pool[Math.floor(roll() * pool.length)]
     if (!pick) continue
@@ -553,7 +561,7 @@ export function rollRandomPieces(state: GameState): GameState {
     pieceTypes[typeId] = { ...pick, id: typeId, flags: { ...pick.flags, random: true } }
     pieces[id] = { ...inst, typeId }
   }
-  return { ...state, pieceTypes, pieces }
+  return { ...state, pieceTypes, pieces, randomSeed: seed }
 }
 
 export function cloneState(state: GameState): GameState {
@@ -1059,9 +1067,22 @@ export function applyMove(
           : options[0]
       const target = chosen ? next.pieceTypes[chosen] : undefined
       if (target) {
-        promotionTypeId = target.id
         touch(move.pieceId)
-        next.pieces[move.pieceId].typeId = target.id
+        if (piece.flags.random && !target.flags.random) {
+          // A random piece keeps its random mark when it promotes: it borrows
+          // the way of the piece it turned into, and goes on changing.
+          const typeId = `r|${move.pieceId}`
+          next.pieceTypes[typeId] = {
+            ...target,
+            id: typeId,
+            flags: { ...target.flags, random: true },
+          }
+          next.pieces[move.pieceId].typeId = typeId
+          promotionTypeId = typeId
+        } else {
+          promotionTypeId = target.id
+          next.pieces[move.pieceId].typeId = target.id
+        }
       }
     }
   }

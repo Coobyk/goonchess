@@ -654,8 +654,9 @@ export const useAppStore = create<AppState>((set, get) => {
       }
 
       const next = applyMove(game, { ...move, promotionTypeId }, { origin, san: true })
-      // A piece marked random turns into another kind after every move.
-      const settled = rollRandomPieces(next)
+      // A piece marked random turns into another kind after every move. The
+      // piece that has just moved keeps its kind, so a promotion is seen.
+      const settled = rollRandomPieces(next, move.pieceId)
       set({
         game: settled,
         selected: null,
