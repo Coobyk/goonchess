@@ -84,6 +84,7 @@ export function PlayView() {
   const setClock = useAppStore((s) => s.setClock)
   const [replayOpen, setReplayOpen] = useState(false)
   const botThinking = useAppStore((s) => s.botThinking)
+  const setOpponentOpen = useAppStore((s) => s.setOpponentOpen)
 
 
   const prevWinner = useRef(game.winner)
@@ -220,7 +221,7 @@ export function PlayView() {
             <Undo2 /> Undo
           </Button>
 
-          <Popover>
+          <Popover onOpenChange={setOpponentOpen}>
             <PopoverTrigger asChild>
               <Button variant={bot.mode === 'off' ? 'outline' : 'secondary'} size="sm">
                 {botThinking ? (

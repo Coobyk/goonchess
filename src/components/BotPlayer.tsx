@@ -21,10 +21,10 @@ export function BotPlayer() {
   const game = useAppStore((s) => s.game)
   const bot = useAppStore((s) => s.bot)
   const botSide = useAppStore((s) => s.botSide)
+  const opponentOpen = useAppStore((s) => s.opponentOpen)
   const clock = useAppStore((s) => s.clock)
   const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
-  const reviewingHistory = useAppStore((s) => s.reviewingHistory)
   const worker = useRef<BotWorker | null>(null)
   const running = useRef(false)
   // Bumped when a search finished on a position that is no longer current, so
@@ -40,12 +40,8 @@ export function BotPlayer() {
 
   useEffect(() => {
     const team = game.turn
-    const botTurn = isBotTeam(bot, team, botSide)
-    // A terminal game (win / draw / stalemate / timeout) is a separate state:
-    // the bots stop and stay stopped. When reviewing a finished game's history
-    // (graph or undo), bots stay stopped too, so you can analyse without
-    // pieces moving under you.
-    if (!botTurn || game.winner || game.status !== 'active' || reviewingHistory) {
+    const botTurn = !opponentOpen && isBotTeam(bot, team, botSide)
+    if (!botTurn || game.winner) {
       worker.current?.cancel()
       running.current = false
       setBotThinking(false)
@@ -93,7 +89,7 @@ export function BotPlayer() {
           useAppStore.getState().playMove(move)
         }, wait)
       })
-  }, [bot, botSide, game, retry, setBotThinking, reviewingHistory])
+  }, [bot, botSide, game, retry, setBotThinking, opponentOpen])
 
   return null
 }

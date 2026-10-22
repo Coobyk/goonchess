@@ -74,6 +74,7 @@ interface AppState {
   /** The side the bot plays in the current game, when it plays one side. */
   botSide: string | null
   botThinking: boolean
+  opponentOpen: boolean
   /** True while a piece is still gliding across the board. */
   boardAnimating: boolean
   /** A move that is waiting for the current animation to finish. */
@@ -152,6 +153,7 @@ interface AppState {
   /* bot */
   setBot: (patch: Partial<BotSettings>) => void
   setBotThinking: (thinking: boolean) => void
+  setOpponentOpen: (open: boolean) => void
   setBoardAnimating: (busy: boolean) => void
 
   /* clock */
@@ -307,6 +309,7 @@ export const useAppStore = create<AppState>((set, get) => {
     bot: initialBot,
     botSide: sideFor(initialBot, initial, null),
     botThinking: false,
+    opponentOpen: false,
     clock: initialClock,
     clockState: initialClockState(initialClock, initial.teams.map((t) => t.id)),
     variantHistory: [],
@@ -784,6 +787,7 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setBotThinking: (botThinking) => set({ botThinking }),
+    setOpponentOpen: (opponentOpen) => set({ opponentOpen }),
 
     setBoardAnimating: (busy) => {
       if (busy) {
