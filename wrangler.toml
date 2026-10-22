@@ -3,4 +3,7 @@ account_id = "bde77f9c2a0a3740e0f502b18fd5c2c6"
 compatibility_date = "2026-10-12"
 assets = { directory = "./dist", not_found_handling = "single-page-application" }
 workers_dev = true
-routes = [{ pattern = "chess.coobyk.com", custom_domain = true }]
+routes = [
+  { pattern = "chess.coobyk.com", custom_domain = true },
+  { pattern = "goonchess.com", custom_domain = true },
+]
