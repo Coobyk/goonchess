@@ -120,13 +120,13 @@ export function AppHeader() {
                 if (v) setView(v as 'play' | 'maker' | 'rulebook')
               }}
             >
-              <ToggleGroupItem value="play" aria-label="Play" className="gap-1.5 px-3">
+              <ToggleGroupItem value="play" aria-label="Play" className="gap-1.5 px-3 py-1.5">
                 <Swords /> <span className="hidden sm:inline">Play</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="maker" aria-label="Maker" className="gap-1.5 px-3">
+              <ToggleGroupItem value="maker" aria-label="Maker" className="gap-1.5 px-3 py-1.5">
                 <Wrench /> <span className="hidden sm:inline">Maker</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="rulebook" aria-label="Learn" className="gap-1.5 px-3">
+              <ToggleGroupItem value="rulebook" aria-label="Learn" className="gap-1.5 px-3 py-1.5">
                 <BookOpen /> <span className="hidden sm:inline">Learn</span>
               </ToggleGroupItem>
             </ToggleGroup>

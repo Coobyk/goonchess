@@ -106,7 +106,7 @@ export function BoardTab() {
             }}
           >
             {TERRAINS.map((t) => (
-              <ToggleGroupItem key={t.id} value={t.id} title={t.hint} className="px-3">
+              <ToggleGroupItem key={t.id} value={t.id} title={t.hint} className="px-3 py-1.5">
                 {t.label}
               </ToggleGroupItem>
             ))}

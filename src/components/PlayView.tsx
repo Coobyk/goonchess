@@ -258,13 +258,13 @@ export function PlayView() {
                       })
                     }}
                   >
-                    <ToggleGroupItem value="off" className="flex-1">
+                    <ToggleGroupItem value="off" className="flex-1 py-1.5">
                       Two players
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="one" className="flex-1">
+                    <ToggleGroupItem value="one" className="flex-1 py-1.5">
                       One bot
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="all" className="flex-1">
+                    <ToggleGroupItem value="all" className="flex-1 py-1.5">
                       Bot vs Bot
                     </ToggleGroupItem>
                   </ToggleGroup>
@@ -280,11 +280,11 @@ export function PlayView() {
                       onValueChange={(value) => value && setBot({ side: value })}
                     >
                       {variant.teams.map((team) => (
-                        <ToggleGroupItem key={team.id} value={team.id} className="flex-1">
+                        <ToggleGroupItem key={team.id} value={team.id} className="flex-1 py-1.5">
                           {team.name}
                         </ToggleGroupItem>
                       ))}
-                      <ToggleGroupItem value="random" className="flex-1">
+                      <ToggleGroupItem value="random" className="flex-1 py-1.5">
                         Random
                       </ToggleGroupItem>
                     </ToggleGroup>
@@ -470,13 +470,13 @@ export function PlayView() {
                     if (value) setTurnView(value as 'off' | 'board' | 'pieces')
                   }}
                 >
-                  <ToggleGroupItem value="off" className="flex-1">
+                  <ToggleGroupItem value="off" className="flex-1 py-1.5">
                     Off
                   </ToggleGroupItem>
-                  <ToggleGroupItem value="board" className="flex-1">
+                  <ToggleGroupItem value="board" className="flex-1 py-1.5">
                     Flip board
                   </ToggleGroupItem>
-                  <ToggleGroupItem value="pieces" className="flex-1">
+                  <ToggleGroupItem value="pieces" className="flex-1 py-1.5">
                     Turn pieces
                   </ToggleGroupItem>
                 </ToggleGroup>
