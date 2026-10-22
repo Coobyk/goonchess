@@ -348,7 +348,7 @@ export function GameBoard() {
   return (
     <div ref={container} className="flex w-full items-stretch justify-center gap-2">
       {analysisMode === 'engine' && (analysisResult || game.winner) && (
-        <EvalBar score={analysisResult?.score ?? 0} className="my-0.5" />
+        <EvalBar score={game.winner ? (game.winner === variant.teams[0]?.id ? 1000 : -1000) : (analysisResult?.score ?? 0)} className="my-0.5" />
       )}
       <BoardShell
         width={cols}
