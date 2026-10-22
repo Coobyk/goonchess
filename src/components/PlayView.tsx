@@ -52,7 +52,7 @@ function StrengthButtons({
         <Button
           key={option}
           size="sm"
-          className="h-7 px-1 text-xs"
+          className="h-7 px-3 text-xs"
           variant={level === option ? 'secondary' : 'outline'}
           onClick={() => onChange(option)}
         >
