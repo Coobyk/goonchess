@@ -252,7 +252,7 @@ export function PlayView() {
                         mode,
                         side:
                           mode === 'one'
-                            ? (bot.side ?? variant.teams[0]?.id ?? null)
+                            ? (bot.side ?? variant.teams[1]?.id ?? null)
                             : bot.side,
                       })
                     }}
