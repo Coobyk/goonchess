@@ -144,6 +144,8 @@ interface AppState {
   analysisResult: { score: number; depth: number } | null
   setAnalysisResult: (result: { score: number; depth: number } | null) => void
   undo: () => void
+  /** Goes back to the position after a given number of moves. */
+  jumpToPly: (ply: number) => void
 
   /* bot */
   setBot: (patch: Partial<BotSettings>) => void
@@ -265,7 +267,7 @@ export const useAppStore = create<AppState>((set, get) => {
       game: createInitialState(variant),
       selected: null,
       legalMoves: [],
-      undoStack: [],
+      undoStack: [createInitialState(variant)],
       variantHistory: [...get().variantHistory, previous].slice(-60),
       variantFuture: [],
       botSide: sideFor(bot, variant, get().botSide),
@@ -309,7 +311,8 @@ export const useAppStore = create<AppState>((set, get) => {
     variantFuture: [],
     selected: null,
     legalMoves: [],
-    undoStack: [],
+    // Every position the game has been in, the opening one first.
+    undoStack: [createInitialState(initial)],
     pendingPromotion: null,
     boardAnimating: false,
     queuedMove: null,
@@ -685,7 +688,9 @@ export const useAppStore = create<AppState>((set, get) => {
         game: settled,
         selected: null,
         legalMoves: [],
-        undoStack: [...get().undoStack, game],
+        // The position the move leads to joins the history. A move made
+        // after the game was moved back replaces what came after it.
+        undoStack: [...get().undoStack.slice(0, game.moveHistory.length + 1), next],
         clockState: clockNext,
       })
     },
@@ -712,21 +717,44 @@ export const useAppStore = create<AppState>((set, get) => {
     setAnalysisMode: (mode) => set({ analysisMode: mode }),
     setAnalysisResult: (result) => set({ analysisResult: result }),
 
+    jumpToPly: (ply) => {
+      const { undoStack } = get()
+      // The history holds the opening and every position after it, so the
+      // last one is the position the game is on.
+      const total = undoStack.length - 1
+      const target = Math.max(0, Math.min(Math.floor(ply), total))
+      if (target === total) return
+      const position = undoStack[target]
+      if (!position) return
+      set({
+        game: position,
+        selected: null,
+        legalMoves: [],
+        pendingPromotion: null,
+        queuedMove: null,
+      })
+    },
+
     undo: () => {
-      const stack = get().undoStack
-      if (!stack.length) return
-      const bot = get().bot
-      const botSide = get().botSide
-      let rest = stack.slice(0, -1)
-      let prev = rest[rest.length - 1]
+      const { game, undoStack, bot, botSide } = get()
+      // The history holds the opening and every position after it, so the one
+      // before the position the game is on is in it.
+      const ply = game.moveHistory.length
+      if (ply === 0) return
+      let target = ply - 1
+      const before = undoStack[target]
       // When the bot is playing, take back its move and the human's with it,
       // so it is the human's turn again.
-      if (prev && isBotTeam(bot, prev.turn, botSide) && rest.length > 1) {
-        rest = rest.slice(0, -1)
-        prev = rest[rest.length - 1]
-      }
+      if (before && isBotTeam(bot, before.turn, botSide) && target >= 1) target -= 1
+      const prev = undoStack[target]
       if (!prev) return
-      set({ game: prev, undoStack: rest, selected: null, legalMoves: [], queuedMove: null })
+      set({
+        game: prev,
+        undoStack: undoStack.slice(0, target + 1),
+        selected: null,
+        legalMoves: [],
+        queuedMove: null,
+      })
     },
 
     setBot: (patch) => {

@@ -31,6 +31,8 @@ export function AnalysisPanel() {
   const mode = useAppStore((s) => s.analysisMode)
   const setMode = useAppStore((s) => s.setAnalysisMode)
   const setAnalysisResult = useAppStore((s) => s.setAnalysisResult)
+  const jumpToPly = useAppStore((s) => s.jumpToPly)
+  const undoStack = useAppStore((s) => s.undoStack)
   const threatSettings = useAppStore((s) => s.threats)
   const setThreats = useAppStore((s) => s.setThreats)
   const [result, setResult] = useState<BotResult | null>(null)
@@ -39,12 +41,23 @@ export function AnalysisPanel() {
   const [graphBusy, setGraphBusy] = useState(false)
   const worker = useRef<BotWorker | null>(null)
 
+  // The game with every move played, even when the board is showing an earlier
+  // position. Its result is whether the game is over.
+  const full = undoStack[undoStack.length - 1] ?? game
+  const over = full.status !== 'active'
+
   useEffect(() => {
     return () => {
       worker.current?.dispose()
       worker.current = null
     }
   }, [])
+
+  // The graph belongs to a finished game, so a game being played again — a new
+  // one, or one taken back — drops the picture of the old one.
+  useEffect(() => {
+    if (!over) setGraph(null)
+  }, [over])
 
   // The live analysis of the position on the board.
   useEffect(() => {
@@ -80,9 +93,17 @@ export function AnalysisPanel() {
     worker.current = client
     setGraphBusy(true)
     try {
-      const states = replayStates(game)
-      const firstTeam = game.variant.teams[0]
+      // The whole game, even when the board has been moved back.
+      const latest = useAppStore.getState()
+      const finished = latest.undoStack[latest.undoStack.length - 1] ?? latest.game
+      const states = replayStates(finished)
+      const firstTeam = finished.variant.teams[0]
       const reply = await client.analyseGame(states, firstTeam?.id ?? 'white')
+      // If the game was taken back while the scores were being worked out,
+      // they are scores of a game that no longer exists.
+      const now = useAppStore.getState()
+      const nowGame = now.undoStack[now.undoStack.length - 1] ?? now.game
+      if (nowGame !== finished) return
       const raw = reply.scores ?? []
       // Every score is from the side to move; the graph is from the first army.
       setGraph(
@@ -180,15 +201,34 @@ export function AnalysisPanel() {
 
         {mode === 'computer' && (
           <div className="space-y-2">
-            <p className="text-muted-foreground text-xs">
-              Every position of the game is looked at, and the scores are drawn as a graph.
-            </p>
-            <Button size="sm" variant="secondary" onClick={analyseGame} disabled={graphBusy}>
-              {graphBusy ? <Loader2 className="animate-spin" /> : <LineChart />}
-              {graph ? 'Analyse again' : 'Analyse the game'}
-            </Button>
-            {graph && graph.length > 0 && (
-              <AnalysisGraph scores={graph} variantName={variant.name} />
+            {over ? (
+              <>
+                <p className="text-muted-foreground text-xs">
+                  Every position of the game is looked at, and the scores are drawn as a graph.
+                </p>
+                <Button size="sm" variant="secondary" onClick={analyseGame} disabled={graphBusy}>
+                  {graphBusy ? <Loader2 className="animate-spin" /> : <LineChart />}
+                  {graph ? 'Analyse again' : 'Analyse the game'}
+                </Button>
+                {graph && graph.length > 0 && (
+                  <AnalysisGraph
+                    scores={graph}
+                    variantName={variant.name}
+                    current={
+                      game.moveHistory.length < graph.length ? game.moveHistory.length : null
+                    }
+                    onPick={(ply) => {
+                      jumpToPly(ply)
+                      setGraphBusy(false)
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                The graph is drawn once the game is over, so it is not remade move by move. Play
+                it out, or take moves back, and it will be here at the end.
+              </p>
             )}
           </div>
         )}

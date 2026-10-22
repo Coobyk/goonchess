@@ -20,6 +20,7 @@ import { Label } from './ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { useAppStore } from '@/store/useAppStore'
+import { cn } from '@/lib/utils'
 import { isInCheck } from '@/engine/rules'
 import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
@@ -68,8 +69,10 @@ export function PlayView() {
   const game = useAppStore((s) => s.game)
   const variant = useAppStore((s) => s.variant)
   const resetGame = useAppStore((s) => s.resetGame)
+  const jumpToPly = useAppStore((s) => s.jumpToPly)
+  const undoStack = useAppStore((s) => s.undoStack)
   const undo = useAppStore((s) => s.undo)
-  const canUndo = useAppStore((s) => s.undoStack.length > 0)
+  const canUndo = useAppStore((s) => s.undoStack.length > 1)
   const turnView = useAppStore((s) => s.turnView)
   const setTurnView = useAppStore((s) => s.setTurnView)
   const bot = useAppStore((s) => s.bot)
@@ -102,6 +105,10 @@ export function PlayView() {
   }, [game.winner, game.status])
 
   const teamIndex = (id: string) => variant.teams.findIndex((t) => t.id === id)
+  // The moves of the whole game, even when the board has been moved back to an
+  // earlier position.
+  const fullMoves = undoStack[undoStack.length - 1]?.moveHistory ?? game.moveHistory
+  const currentPly = game.moveHistory.length
   const turnTeam = variant.teams.find((t) => t.id === game.turn)
   const checked = !game.winner && isInCheck(game, game.turn)
 
@@ -519,19 +526,47 @@ export function PlayView() {
           <CardContent className="px-4">
             <Separator className="mb-2" />
             <ScrollArea className="h-48 pr-2">
-              {game.moveHistory.length === 0 ? (
+              {fullMoves.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No moves yet.</p>
               ) : (
                 <ol className="space-y-1">
-                  {game.moveHistory.map((rec, i) => (
-                    <li key={i} className="flex items-baseline gap-2 font-mono text-[11px]">
-                      <span className="w-5 text-right text-muted-foreground">{i + 1}</span>
-                      <span className="w-10 truncate text-muted-foreground">
-                        {variant.teams.find((t) => t.id === rec.team)?.name ?? rec.team}
-                      </span>
-                      <span>{rec.notation}</span>
-                    </li>
-                  ))}
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => jumpToPly(0)}
+                      className={cn(
+                        'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
+                        currentPly === 0 && 'bg-accent',
+                      )}
+                    >
+                      <span className="w-5 text-right text-muted-foreground">0</span>
+                      <span className="w-10 truncate text-muted-foreground">start</span>
+                      <span className="text-muted-foreground">the opening position</span>
+                    </button>
+                  </li>
+                  {fullMoves.map((rec, i) => {
+                    const ply = i + 1
+                    const current = ply === currentPly
+                    return (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => jumpToPly(ply)}
+                          title="Go to this position"
+                          className={cn(
+                            'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
+                            current && 'bg-accent',
+                          )}
+                        >
+                          <span className="w-5 text-right text-muted-foreground">{ply}</span>
+                          <span className="w-10 truncate text-muted-foreground">
+                            {variant.teams.find((t) => t.id === rec.team)?.name ?? rec.team}
+                          </span>
+                          <span>{rec.notation}</span>
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ol>
               )}
             </ScrollArea>
