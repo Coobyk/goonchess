@@ -23,7 +23,7 @@ export function EvalBar({
   const share = 50 + clamped * 5
   const label = mate
     ? `M${Math.max(1, Math.ceil((100_000 - Math.abs(score)) / 100))}`
-    : `${score >= 0 ? '+' : '−'}${Math.abs(score / 100).toFixed(1)}`
+    : `${score >= 0 ? '+' : '−'}${Math.abs(clamped).toFixed(1)}`
 
   return (
     <div
