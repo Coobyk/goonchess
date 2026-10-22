@@ -186,7 +186,7 @@ export function PlayView() {
                   )
                 })}
               </div>
-              <span className="text-muted-foreground text-xs tabular-nums">{material} pts lost</span>
+              <span className="text-muted-foreground text-xs tabular-nums">{material} pts</span>
             </div>
           )
         })()}
@@ -212,7 +212,7 @@ export function PlayView() {
                   )
                 })}
               </div>
-              <span className="text-muted-foreground text-xs tabular-nums">{material} pts lost</span>
+              <span className="text-muted-foreground text-xs tabular-nums">{material} pts</span>
             </div>
           )
         })()}
