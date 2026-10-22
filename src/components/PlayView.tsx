@@ -47,19 +47,18 @@ function StrengthButtons({
   onChange: (level: BotLevel) => void
 }) {
   return (
-    <div className="grid shrink-0 grid-cols-3 gap-1">
+    <ToggleGroup
+      type="single"
+      className="shrink-0"
+      value={level}
+      onValueChange={(value) => value && onChange(value as BotLevel)}
+    >
       {(Object.keys(LEVEL_LABELS) as BotLevel[]).map((option) => (
-        <Button
-          key={option}
-          size="sm"
-          className="h-7 px-3 text-xs"
-          variant={level === option ? 'secondary' : 'outline'}
-          onClick={() => onChange(option)}
-        >
+        <ToggleGroupItem key={option} value={option} className="flex-1 py-1.5 text-xs">
           {LEVEL_LABELS[option]}
-        </Button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }
 
