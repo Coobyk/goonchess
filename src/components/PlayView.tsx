@@ -67,6 +67,7 @@ function StrengthButtons({
 
 export function PlayView() {
   const game = useAppStore((s) => s.game)
+  const theme = useAppStore((s) => s.theme)
   const variant = useAppStore((s) => s.variant)
   const resetGame = useAppStore((s) => s.resetGame)
   const jumpToPly = useAppStore((s) => s.jumpToPly)
@@ -164,7 +165,57 @@ export function PlayView() {
             </AlertDescription>
           </Alert>
         )}
+        {(() => {
+          const team = variant.teams[1]
+          const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
+          const material = lost.reduce((sum, c) => sum + (variant.pieceTypes.find((p) => p.id === c.typeId)?.value ?? 0), 0)
+          return (
+            <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
+              <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
+              <span className="text-sm font-medium">{team.name}</span>
+              <ClockFor team={team.id} />
+              <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
+                {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
+                  const pt = variant.pieceTypes.find((p) => p.id === typeId)
+                  return (
+                    <div key={typeId} className="flex -space-x-2">
+                      {grp.map((c, i) => (
+                        <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+              <span className="text-muted-foreground text-xs tabular-nums">{material} pts lost</span>
+            </div>
+          )
+        })()}
         <GameBoard />
+        {(() => {
+          const team = variant.teams[0]
+          const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
+          const material = lost.reduce((sum, c) => sum + (variant.pieceTypes.find((p) => p.id === c.typeId)?.value ?? 0), 0)
+          return (
+            <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
+              <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
+              <span className="text-sm font-medium">{team.name}</span>
+              <ClockFor team={team.id} />
+              <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
+                {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
+                  const pt = variant.pieceTypes.find((p) => p.id === typeId)
+                  return (
+                    <div key={typeId} className="flex -space-x-2">
+                      {grp.map((c, i) => (
+                        <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+              <span className="text-muted-foreground text-xs tabular-nums">{material} pts lost</span>
+            </div>
+          )
+        })()}
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button variant="outline" size="sm" onClick={resetGame}>
             <RotateCcw /> Restart
@@ -447,77 +498,6 @@ export function PlayView() {
       <aside className="flex flex-col gap-4">
         <LiveAnnouncer />
         <AnalysisPanel />
-        <StatsPanel />
-        <Card className="py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="flex items-center justify-between text-sm">
-              <span>Turn</span>
-              <Badge variant={game.winner ? 'secondary' : 'default'} className="gap-1.5">
-                <span
-                  className="size-2.5 rounded-full ring-1 ring-black/20"
-                  style={{ backgroundColor: turnTeam?.color ?? '#888' }}
-                />
-                {turnTeam?.name ?? game.turn}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 text-sm text-muted-foreground">
-            {game.winner ? (
-              <span>{STATUS_TEXT[game.status] ?? game.status.replace('-', ' ')}</span>
-            ) : botThinking ? (
-              <span className="flex items-center gap-2 text-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                The bot is thinking…
-              </span>
-            ) : checked ? (
-              <span className="text-rose-500">Check — the royal piece is under attack.</span>
-            ) : (
-              <span>Move {game.moveHistory.length + 1} · select a piece to see its legal moves.</span>
-            )}
-          </CardContent>
-        </Card>
-
-        {variant.teams.map((team) => {
-          const lost = game.captured.filter((c) => c.team === team.id)
-          // How much the side is worth less than it was — the material it has
-          // lost, not the number of pieces.
-          const material = lost.reduce((sum, c) => {
-            const type = variant.pieceTypes.find((p) => p.id === c.typeId)
-            return sum + (type?.value ?? 0)
-          }, 0)
-          return (
-            <Card key={team.id} className="py-4">
-              <CardHeader className="px-4">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <span
-                    className="size-2.5 rounded-full ring-1 ring-black/20"
-                    style={{ backgroundColor: team.color }}
-                  />
-                  {team.name}
-                  <ClockFor team={team.id} />
-                  <span className="text-muted-foreground ml-auto text-xs font-normal">
-                    {material} {material === 1 ? 'point' : 'points'} lost
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4">
-                <div className="flex min-h-8 flex-wrap gap-0.5">
-                  {lost.length === 0 && (
-                    <span className="text-xs text-muted-foreground">No losses yet.</span>
-                  )}
-                  {lost.map((c, i) => {
-                    const pt = variant.pieceTypes.find((p) => p.id === c.typeId)
-                    return (
-                      <span key={i} title={pt?.name}>
-                        <PieceGlyph piece={pt} teamIndex={teamIndex(team.id)} size={24} muted />
-                      </span>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
 
         <Card className="py-4">
           <CardHeader className="px-4">
@@ -572,6 +552,8 @@ export function PlayView() {
             </ScrollArea>
           </CardContent>
         </Card>
+
+        <StatsPanel />
       </aside>
     </div>
   )

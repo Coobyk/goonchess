@@ -39,37 +39,34 @@ export default function App() {
         </main>
         <footer className="border-t">
           <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-xs lg:px-8">
-            <span>Every rule is editable. Nothing is fixed.</span>
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
-                <span>
-                  built{' '}
-                  <time dateTime={__BUILD_TIME__} title={new Date(__BUILD_TIME__).toUTCString()}>
-                    {buildTimeLabel}
-                  </time>
-                </span>
-                {__BUILD_COMMIT__ !== 'unknown' && (
-                  <a
-                    href={`https://github.com/Coobyk/goonchess/commit/${__BUILD_COMMIT__}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-border underline-offset-4 hover:text-foreground"
-                  >
-                    commit {__BUILD_COMMIT__.slice(0, 7)}
-                  </a>
-                )}
-              </span>
+            <span>
+              Goonchess · built by{' '}
+              <a
+                href="https://coobyk.com"
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-border underline-offset-4 hover:text-foreground"
+              >
+                Coobyk
+              </a>
+            </span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
               <span>
-                Goonchess · built by{' '}
+                built{' '}
+                <time dateTime={__BUILD_TIME__} title={new Date(__BUILD_TIME__).toUTCString()}>
+                  {buildTimeLabel}
+                </time>
+              </span>
+              {__BUILD_COMMIT__ !== 'unknown' && (
                 <a
-                  href="https://coobyk.com"
+                  href={`https://github.com/Coobyk/goonchess/commit/${__BUILD_COMMIT__}`}
                   target="_blank"
                   rel="noreferrer"
                   className="underline decoration-border underline-offset-4 hover:text-foreground"
                 >
-                  Coobyk
+                  commit {__BUILD_COMMIT__.slice(0, 7)}
                 </a>
-              </span>
+              )}
             </span>
           </div>
         </footer>
