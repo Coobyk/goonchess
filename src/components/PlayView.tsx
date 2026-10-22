@@ -85,7 +85,6 @@ export function PlayView() {
   const setClock = useAppStore((s) => s.setClock)
   const [replayOpen, setReplayOpen] = useState(false)
   const [replayIndex, setReplayIndex] = useState(0)
-  const [replayPlaying, setReplayPlaying] = useState(false)
   const botThinking = useAppStore((s) => s.botThinking)
   const setOpponentOpen = useAppStore((s) => s.setOpponentOpen)
 
