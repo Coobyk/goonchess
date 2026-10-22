@@ -24,6 +24,7 @@ export function BotPlayer() {
   const clock = useAppStore((s) => s.clock)
   const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
+  const reviewingHistory = useAppStore((s) => s.reviewingHistory)
   const worker = useRef<BotWorker | null>(null)
   const running = useRef(false)
   // Bumped when a search finished on a position that is no longer current, so
@@ -41,9 +42,10 @@ export function BotPlayer() {
     const team = game.turn
     const botTurn = isBotTeam(bot, team, botSide)
     // A terminal game (win / draw / stalemate / timeout) is a separate state:
-    // the bots stop and stay stopped so the position can be analysed without
-    // pieces moving around under them.
-    if (!botTurn || game.winner || game.status !== 'active') {
+    // the bots stop and stay stopped. When reviewing a finished game's history
+    // (graph or undo), bots stay stopped too, so you can analyse without
+    // pieces moving under you.
+    if (!botTurn || game.winner || game.status !== 'active' || reviewingHistory) {
       worker.current?.cancel()
       running.current = false
       setBotThinking(false)
@@ -91,7 +93,7 @@ export function BotPlayer() {
           useAppStore.getState().playMove(move)
         }, wait)
       })
-  }, [bot, botSide, game, retry, setBotThinking])
+  }, [bot, botSide, game, retry, setBotThinking, reviewingHistory])
 
   return null
 }

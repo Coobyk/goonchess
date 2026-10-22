@@ -78,6 +78,8 @@ interface AppState {
   boardAnimating: boolean
   /** A move that is waiting for the current animation to finish. */
   queuedMove: { move: Move; origin?: Vec; promotionTypeId?: string } | null
+  /** While reviewing a finished game's history (graph / undo), bots stay stopped. */
+  reviewingHistory: boolean
   clock: ClockSettings
   clockState: ClockState
   /** Earlier versions of the variant, for undo. */
@@ -316,6 +318,7 @@ export const useAppStore = create<AppState>((set, get) => {
     pendingPromotion: null,
     boardAnimating: false,
     queuedMove: null,
+    reviewingHistory: false,
     puzzleStart: null,
     analysisMode: 'off',
     analysisResult: null,
@@ -692,6 +695,7 @@ export const useAppStore = create<AppState>((set, get) => {
         // after the game was moved back replaces what came after it.
         undoStack: [...get().undoStack.slice(0, game.moveHistory.length + 1), next],
         clockState: clockNext,
+        reviewingHistory: false,
       })
     },
 
@@ -723,7 +727,21 @@ export const useAppStore = create<AppState>((set, get) => {
       // last one is the position the game is on.
       const total = undoStack.length - 1
       const target = Math.max(0, Math.min(Math.floor(ply), total))
-      if (target === total) return
+      const last = undoStack[total]
+      // Reviewing a finished game's history — bots must stay stopped so the
+      // position can be analysed without pieces moving under you.
+      const reviewing = last && last.status !== 'active' && target < total
+      if (target === total) {
+        set({
+          game: last,
+          selected: null,
+          legalMoves: [],
+          pendingPromotion: null,
+          queuedMove: null,
+          reviewingHistory: false,
+        })
+        return
+      }
       const position = undoStack[target]
       if (!position) return
       set({
@@ -732,6 +750,7 @@ export const useAppStore = create<AppState>((set, get) => {
         legalMoves: [],
         pendingPromotion: null,
         queuedMove: null,
+        reviewingHistory: reviewing,
       })
     },
 
@@ -754,6 +773,7 @@ export const useAppStore = create<AppState>((set, get) => {
         selected: null,
         legalMoves: [],
         queuedMove: null,
+        reviewingHistory: false,
       })
     },
 
