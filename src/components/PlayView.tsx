@@ -10,7 +10,6 @@ import { BotPlayer } from './BotPlayer'
 import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
 import { WinConfetti } from './WinConfetti'
-import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Separator } from './ui/separator'
@@ -110,8 +109,6 @@ export function PlayView() {
   // earlier position.
   const fullMoves = undoStack[undoStack.length - 1]?.moveHistory ?? game.moveHistory
   const currentPly = game.moveHistory.length
-  const turnTeam = variant.teams.find((t) => t.id === game.turn)
-  const checked = !game.winner && isInCheck(game, game.turn)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -179,7 +176,7 @@ export function PlayView() {
                   const pt = variant.pieceTypes.find((p) => p.id === typeId)
                   return (
                     <div key={typeId} className="flex -space-x-2">
-                      {grp.map((c, i) => (
+                      {grp.map((_c, i) => (
                         <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
                       ))}
                     </div>
@@ -205,7 +202,7 @@ export function PlayView() {
                   const pt = variant.pieceTypes.find((p) => p.id === typeId)
                   return (
                     <div key={typeId} className="flex -space-x-2">
-                      {grp.map((c, i) => (
+                      {grp.map((_c, i) => (
                         <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
                       ))}
                     </div>
