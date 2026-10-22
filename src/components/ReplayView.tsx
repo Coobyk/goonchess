@@ -223,7 +223,7 @@ export function ReplayView({ open, onOpenChange }: { open: boolean; onOpenChange
 }
 
 /** A quiet, read-only board for the replay. */
-function ReplayBoard({ state }: { state: GameState }) {
+export function ReplayBoard({ state }: { state: GameState }) {
   const { variant } = state
   const cols = variant.board.width
   const rows = variant.board.height

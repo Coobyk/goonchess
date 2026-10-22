@@ -6,6 +6,7 @@ import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
 import { StatsPanel } from './StatsPanel'
 import { ReplayView } from './ReplayView'
+import { ReplayBoard } from './ReplayView'
 import { BotPlayer } from './BotPlayer'
 import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
@@ -25,6 +26,7 @@ import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSetting
 import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
 import { toFen } from '@/lib/fen'
 import { toPgn } from '@/lib/pgn'
+import { replayStates } from '@/lib/replay'
 import { downloadBlob, fileNameFor, positionName, renderBoardImage } from '@/lib/image'
 import { playSound } from '@/lib/sound'
 
@@ -82,6 +84,8 @@ export function PlayView() {
   const clock = useAppStore((s) => s.clock)
   const setClock = useAppStore((s) => s.setClock)
   const [replayOpen, setReplayOpen] = useState(false)
+  const [replayIndex, setReplayIndex] = useState(0)
+  const [replayPlaying, setReplayPlaying] = useState(false)
   const botThinking = useAppStore((s) => s.botThinking)
   const setOpponentOpen = useAppStore((s) => s.setOpponentOpen)
 
@@ -108,13 +112,14 @@ export function PlayView() {
   // earlier position.
   const fullMoves = undoStack[undoStack.length - 1]?.moveHistory ?? game.moveHistory
   const currentPly = game.moveHistory.length
+  const replayStatesArr = replayStates(game)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <WinConfetti />
       <BotPlayer />
       <ClockTicker />
-      <ReplayView open={replayOpen} onOpenChange={setReplayOpen} />
+      <ReplayView open={false} onOpenChange={setReplayOpen} />
       <div className="flex flex-col items-center gap-4">
         {pendingPromotion && (
           <div
@@ -186,7 +191,7 @@ export function PlayView() {
             </div>
           )
         })()}
-        <GameBoard />
+        {replayOpen ? <ReplayBoard state={replayStatesArr[Math.min(replayIndex, replayStatesArr.length-1)] ?? game} /> : <GameBoard />}
         {(() => {
           const team = variant.teams[0]
           const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
@@ -339,7 +344,7 @@ export function PlayView() {
             </PopoverContent>
           </Popover>
 
-          <Button variant="outline" size="sm" onClick={() => setReplayOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => { setReplayOpen(true); setReplayIndex(replayStatesArr.length - 1) }}>
             <RotateCcw /> Replay
           </Button>
 
