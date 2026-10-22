@@ -92,7 +92,7 @@ export function PieceGlyph({
       style={{
         width: size,
         height: size,
-        opacity: muted ? 0.45 : 1,
+        opacity: muted ? 0.7 : 1,
         filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.45))',
       }}
     >
