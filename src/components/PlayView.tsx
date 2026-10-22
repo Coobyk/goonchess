@@ -111,7 +111,12 @@ export function PlayView() {
   // earlier position.
   const fullMoves = undoStack[undoStack.length - 1]?.moveHistory ?? game.moveHistory
   const currentPly = game.moveHistory.length
+  const moveHistoryRef = useRef<HTMLDivElement>(null)
   const replayStatesArr = replayStates(game)
+  useEffect(() => {
+    const el = moveHistoryRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [fullMoves.length])
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -505,7 +510,7 @@ export function PlayView() {
           </CardHeader>
           <CardContent className="px-4">
             <Separator className="mb-2" />
-            <ScrollArea className="h-48 pr-2">
+            <ScrollArea className="h-48 pr-2" ref={moveHistoryRef}>
               {fullMoves.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No moves yet.</p>
               ) : (
