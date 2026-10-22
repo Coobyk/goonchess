@@ -40,7 +40,10 @@ export function BotPlayer() {
   useEffect(() => {
     const team = game.turn
     const botTurn = isBotTeam(bot, team, botSide)
-    if (!botTurn || game.winner) {
+    // A terminal game (win / draw / stalemate / timeout) is a separate state:
+    // the bots stop and stay stopped so the position can be analysed without
+    // pieces moving around under them.
+    if (!botTurn || game.winner || game.status !== 'active') {
       worker.current?.cancel()
       running.current = false
       setBotThinking(false)
