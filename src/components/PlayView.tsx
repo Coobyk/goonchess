@@ -54,7 +54,7 @@ function StrengthButtons({
       onValueChange={(value) => value && onChange(value as BotLevel)}
     >
       {(Object.keys(LEVEL_LABELS) as BotLevel[]).map((option) => (
-        <ToggleGroupItem key={option} value={option} className="flex-1 py-1.5 text-xs">
+        <ToggleGroupItem key={option} value={option} className="flex-1 py-1 px-2 text-xs">
           {LEVEL_LABELS[option]}
         </ToggleGroupItem>
       ))}
@@ -257,13 +257,13 @@ export function PlayView() {
                       })
                     }}
                   >
-                    <ToggleGroupItem value="off" className="flex-1 py-1.5">
+                    <ToggleGroupItem value="off" className="flex-1 py-1 px-2">
                       Two players
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="one" className="flex-1 py-1.5">
+                    <ToggleGroupItem value="one" className="flex-1 py-1 px-2">
                       One bot
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="all" className="flex-1 py-1.5">
+                    <ToggleGroupItem value="all" className="flex-1 py-1 px-2">
                       Bot vs Bot
                     </ToggleGroupItem>
                   </ToggleGroup>
@@ -279,11 +279,11 @@ export function PlayView() {
                       onValueChange={(value) => value && setBot({ side: value })}
                     >
                       {variant.teams.map((team) => (
-                        <ToggleGroupItem key={team.id} value={team.id} className="flex-1 py-1.5">
+                        <ToggleGroupItem key={team.id} value={team.id} className="flex-1 py-1 px-2">
                           {team.name}
                         </ToggleGroupItem>
                       ))}
-                      <ToggleGroupItem value="random" className="flex-1 py-1.5">
+                      <ToggleGroupItem value="random" className="flex-1 py-1 px-2">
                         Random
                       </ToggleGroupItem>
                     </ToggleGroup>
@@ -323,7 +323,7 @@ export function PlayView() {
                         )}
                     <p className="text-xs text-muted-foreground">
                       {bot.mode === 'all'
-                        ? 'Each side plays with the strength you pick for it.'
+                        ? ''
                         : LEVEL_HINTS[bot.level]}
                     </p>
                   </div>
@@ -332,7 +332,7 @@ export function PlayView() {
                 <Separator />
                 <p className="text-xs text-muted-foreground">
                   {bot.mode === 'all'
-                    ? 'Every side is played by a bot — sit back and watch. Set a strength for each side.'
+                    ? ''
                     : "The bot plays with Goonchess's own rules engine, so it works in every variant — custom pieces, portals, blasts and all."}
                 </p>
               </div>
@@ -469,13 +469,13 @@ export function PlayView() {
                     if (value) setTurnView(value as 'off' | 'board' | 'pieces')
                   }}
                 >
-                  <ToggleGroupItem value="off" className="flex-1 py-1.5">
+                  <ToggleGroupItem value="off" className="flex-1 py-1 px-2">
                     Off
                   </ToggleGroupItem>
-                  <ToggleGroupItem value="board" className="flex-1 py-1.5">
+                  <ToggleGroupItem value="board" className="flex-1 py-1 px-2">
                     Flip board
                   </ToggleGroupItem>
-                  <ToggleGroupItem value="pieces" className="flex-1 py-1.5">
+                  <ToggleGroupItem value="pieces" className="flex-1 py-1 px-2">
                     Turn pieces
                   </ToggleGroupItem>
                 </ToggleGroup>
