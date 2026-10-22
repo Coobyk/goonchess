@@ -536,6 +536,7 @@ export function PlayView() {
                           className={cn(
                             'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
                             current && 'bg-accent',
+                            i % 2 === 0 ? 'dark:bg-white/5' : 'bg-black/5 dark:bg-transparent',
                           )}
                         >
                           <span className="w-5 text-right text-muted-foreground">{ply}</span>
