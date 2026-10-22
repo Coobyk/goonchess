@@ -21,6 +21,7 @@ export function BotPlayer() {
   const game = useAppStore((s) => s.game)
   const bot = useAppStore((s) => s.bot)
   const botSide = useAppStore((s) => s.botSide)
+  const opponentOpen = useAppStore((s) => s.opponentOpen)
   const clock = useAppStore((s) => s.clock)
   const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
@@ -39,7 +40,7 @@ export function BotPlayer() {
 
   useEffect(() => {
     const team = game.turn
-    const botTurn = isBotTeam(bot, team, botSide)
+    const botTurn = !opponentOpen && isBotTeam(bot, team, botSide)
     if (!botTurn || game.winner) {
       worker.current?.cancel()
       running.current = false
@@ -88,7 +89,7 @@ export function BotPlayer() {
           useAppStore.getState().playMove(move)
         }, wait)
       })
-  }, [bot, botSide, game, retry, setBotThinking])
+  }, [bot, botSide, game, retry, setBotThinking, opponentOpen])
 
   return null
 }
