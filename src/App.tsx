@@ -8,10 +8,17 @@ import { TooltipProvider } from './components/ui/tooltip'
 import { pathFor, replaceRoute, routeFromLocation } from './lib/router'
 import { useAppStore } from './store/useAppStore'
 
-const buildTimeLabel = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-}).format(new Date(__BUILD_TIME__))
+const buildDate = new Date(__BUILD_TIME__)
+const buildTimeLabel = buildDate.toISOString().slice(0, 19).replace('T', ' ')
+const ago = (() => {
+  const s = Math.max(0, Math.floor((Date.now() - buildDate.getTime()) / 1000))
+  if (s < 60) return `${s}s ago`
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  if (s < 2592000) return `${Math.floor(s / 86400)}d ago`
+  if (s < 31536000) return `${Math.floor(s / 2592000)}mo ago`
+  return `${Math.floor(s / 31536000)}y ago`
+})()
 
 export default function App() {
   const view = useAppStore((s) => s.view)
