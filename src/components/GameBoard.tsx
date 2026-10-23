@@ -235,7 +235,6 @@ export function GameBoard() {
     if (!grew || !lastRecord) return
     const move = lastRecord.move
     if (move.promotionTypeId) playSound('promote')
-    else if (!game.winner && isInCheck(game, game.turn)) playSound('check')
     else if (move.capturedId) playSound('capture')
     else playSound('move')
   }, [historyLen, lastRecord, game])
