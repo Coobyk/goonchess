@@ -41,7 +41,8 @@ export function BotPlayer() {
 
   useEffect(() => {
     const team = game.turn
-    const botTurn = !opponentOpen && isBotTeam(bot, team, botSide)
+    const isLatest = game.moveHistory.length === (undoStack[undoStack.length-1]?.moveHistory ?? game.moveHistory).length
+    const botTurn = !opponentOpen && isLatest && isBotTeam(bot, team, botSide)
     if (!botTurn || game.winner) {
       worker.current?.cancel()
       running.current = false
