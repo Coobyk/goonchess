@@ -722,7 +722,7 @@ export const useAppStore = create<AppState>((set, get) => {
     setPuzzleStart: (state) => set({ puzzleStart: state }),
 
     setAnalysisMode: (mode) => set({ analysisMode: mode }),
-    setAnalysisResult: (result) => set({ analysisResult: result }),
+    setAnalysisResult: (result) => set({ analysisResult: result ? { ...result, score: Math.max(-1000, Math.min(1000, result.score)) } : null }),
 
     jumpToPly: (ply) => {
       const { undoStack } = get()
