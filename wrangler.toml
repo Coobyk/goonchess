@@ -23,3 +23,21 @@ class_name = "GameRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+# The design revamp lives on its own Worker and its own hostname, so the
+# `revamp` branch can be shown without touching goonchess.com.
+[env.revamp]
+name = "goonchess-revamp"
+routes = [
+  { pattern = "revamp.goonchess.com", custom_domain = true },
+]
+
+[[env.revamp.durable_objects.bindings]]
+name = "GAME"
+class_name = "GameRoom"
+
+# A Worker of its own has a namespace of its own, so it needs the class
+# declared here too.
+[[env.revamp.migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]

@@ -10,9 +10,7 @@ import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
 import { WinConfetti } from './WinConfetti'
 import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Separator } from './ui/separator'
-import { Alert, AlertDescription, AlertTitle } from './ui/alert'
 import { Label } from './ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
@@ -35,6 +33,90 @@ const STATUS_TEXT: Record<string, string> = {
   stalemate: 'Stalemate — draw',
   timeout: 'Time ran out',
   threefold: 'Draw by threefold repetition',
+}
+
+/**
+ * One side of the table: who is playing, their clock, what they have taken and
+ * whether they are the side to move.
+ */
+function PlayerStrip({ teamIndex }: { teamIndex: number }) {
+  const game = useAppStore((s) => s.game)
+  const variant = useAppStore((s) => s.variant)
+  const theme = useAppStore((s) => s.theme)
+
+  const team = variant.teams[teamIndex]
+  const other = variant.teams[(teamIndex + 1) % variant.teams.length]
+  if (!team) return null
+
+  const active = game.turn === team.id && !game.winner
+  const lost = game.captured
+    .filter((c) => c.team === team.id)
+    .sort((a, b) => a.typeId.localeCompare(b.typeId))
+  const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
+  const ownLosses = lost.reduce((sum, c) => sum + value(c.typeId), 0)
+  // The difference, not what each side has taken: equal material shows nothing.
+  const advantage =
+    (other ? game.captured.filter((c) => c.team === other.id) : []).reduce(
+      (sum, c) => sum + value(c.typeId),
+      0,
+    ) - ownLosses
+
+  const groups = lost.reduce(
+    (all, c) => {
+      ;(all[c.typeId] ??= []).push(c)
+      return all
+    },
+    {} as Record<string, typeof lost>,
+  )
+
+  return (
+    <div
+      className={cn(
+        'flex w-full items-center gap-2.5 border px-2.5 py-2 transition-colors',
+        active ? 'border-foreground/25 bg-secondary' : 'border-border bg-card',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn('h-7 w-[2px] shrink-0', active ? 'bg-signal' : 'bg-transparent')}
+      />
+      <span
+        className="size-2.5 shrink-0 rounded-full ring-1 ring-black/20"
+        style={{ backgroundColor: team.color }}
+        aria-hidden
+      />
+      <span className="truncate text-[13px] font-medium">{team.name}</span>
+      {active && <span className="label-mono hidden shrink-0 text-signal sm:inline">to move</span>}
+      <ClockFor team={team.id} />
+
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end">
+        {Object.entries(groups).map(([typeId, group]) => {
+          const pieceType = variant.pieceTypes.find((p) => p.id === typeId)
+          return (
+            <div key={typeId} className="flex -space-x-2">
+              {group.map((_capture, i) => (
+                <span key={i} title={pieceType?.name}>
+                  <PieceGlyph
+                    piece={pieceType}
+                    teamIndex={theme === 'dark' ? 0 : 1}
+                    size={17}
+                    muted
+                  />
+                </span>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+
+      {advantage !== 0 && (
+        <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+          {advantage > 0 ? '+' : ''}
+          {advantage} pts
+        </span>
+      )}
+    </div>
+  )
 }
 
 /** The three strengths, as a compact row of buttons. */
@@ -63,7 +145,6 @@ function StrengthButtons({
 
 export function PlayView() {
   const game = useAppStore((s) => s.game)
-  const theme = useAppStore((s) => s.theme)
   const variant = useAppStore((s) => s.variant)
   const resetGame = useAppStore((s) => s.resetGame)
   const jumpToPly = useAppStore((s) => s.jumpToPly)
@@ -115,17 +196,17 @@ export function PlayView() {
   }, [fullMoves.length])
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-0">
       <WinConfetti />
       <BotPlayer />
       <ClockTicker />
-      <div className="flex flex-col items-center gap-4">
+      <div className="mx-auto flex w-full max-w-[640px] min-w-0 flex-col items-center gap-3">
         <OnlineBar />
         {pendingPromotion && (
           <div
             role="dialog"
             aria-label="Choose a promotion"
-            className="flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-card p-3 shadow-lg"
+            className="flex w-full flex-wrap items-center justify-center gap-2 border bg-card p-2.5"
           >
             <span className="text-muted-foreground mr-1 text-sm">Promote into</span>
             {(pendingPromotion.move.promotionOptions ?? []).map((typeId) => {
@@ -136,7 +217,7 @@ export function PlayView() {
                   key={typeId}
                   type="button"
                   onClick={() => choosePromotion(typeId)}
-                  className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors hover:bg-muted"
+                  className="flex items-center gap-2 rounded-[2px] border px-2.5 py-1.5 text-[13px] transition-colors hover:border-foreground/25 hover:bg-accent"
                 >
                   <PieceGlyph piece={type} teamIndex={teamIndex(game.turn)} size={22} />
                   {type.name}
@@ -149,91 +230,27 @@ export function PlayView() {
           </div>
         )}
         {game.winner && (
-          <Alert className="w-full max-w-xl">
-            <Trophy className="size-4" />
-            <AlertTitle>
-              {game.winner === 'draw'
-                ? 'Draw'
-                : `${variant.teams.find((t) => t.id === game.winner)?.name ?? game.winner}${
-                    isBotTeam(bot, game.winner, botSide) ? ' (bot)' : ''
-                  } wins`}
-            </AlertTitle>
-            <AlertDescription className="flex items-center justify-between gap-4">
-              <span>{STATUS_TEXT[game.status] ?? 'Game over'}</span>
-              <Button size="sm" onClick={resetGame}>
-                Play again
-              </Button>
-            </AlertDescription>
-          </Alert>
+          <div className="flex w-full items-center gap-3 border border-foreground/20 bg-secondary px-2.5 py-2">
+            <Trophy className="text-signal size-4 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium">
+                {game.winner === 'draw'
+                  ? 'Draw'
+                  : `${variant.teams.find((t) => t.id === game.winner)?.name ?? game.winner}${
+                      isBotTeam(bot, game.winner, botSide) ? ' (bot)' : ''
+                    } wins`}
+              </p>
+              <p className="label-mono">{STATUS_TEXT[game.status] ?? 'Game over'}</p>
+            </div>
+            <Button size="sm" onClick={resetGame}>
+              Play again
+            </Button>
+          </div>
         )}
-        {(() => {
-          const team = variant.teams[1]
-          const other = variant.teams[0]
-          const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
-          const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
-          const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
-          // The difference, not what each side has taken: equal material shows nothing.
-          const advantage = game.captured.filter((c) => c.team === other.id).reduce((sum, c) => sum + value(c.typeId), 0) - material
-          return (
-            <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
-              <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
-              <span className="text-sm font-medium">{team.name}</span>
-              <ClockFor team={team.id} />
-              <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
-                {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
-                  const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                  return (
-                    <div key={typeId} className="flex -space-x-2">
-                      {grp.map((_c, i) => (
-                        <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-              {advantage !== 0 && (
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {advantage > 0 ? '+' : ''}{advantage} pts
-                </span>
-              )}
-            </div>
-          )
-        })()}
+        <PlayerStrip teamIndex={1} />
         <GameBoard />
-        {(() => {
-          const team = variant.teams[0]
-          const other = variant.teams[1]
-          const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
-          const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
-          const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
-          // The difference, not what each side has taken: equal material shows nothing.
-          const advantage = game.captured.filter((c) => c.team === other.id).reduce((sum, c) => sum + value(c.typeId), 0) - material
-          return (
-            <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
-              <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
-              <span className="text-sm font-medium">{team.name}</span>
-              <ClockFor team={team.id} />
-              <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
-                {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
-                  const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                  return (
-                    <div key={typeId} className="flex -space-x-2">
-                      {grp.map((_c, i) => (
-                        <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-              {advantage !== 0 && (
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {advantage > 0 ? '+' : ''}{advantage} pts
-                </span>
-              )}
-            </div>
-          )
-        })()}
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <PlayerStrip teamIndex={0} />
+        <div className="flex w-full flex-wrap items-center justify-center gap-1.5 border-t pt-3">
           {!online && (
             <>
               <Button variant="outline" size="sm" onClick={resetGame}>
@@ -516,64 +533,82 @@ export function PlayView() {
         </div>
       </div>
 
-      <aside className="flex flex-col gap-4">
+      <aside className="flex min-w-0 flex-col gap-6 lg:border-l lg:border-border lg:pl-7">
         <LiveAnnouncer />
         <AnalysisPanel />
 
-        <Card className="py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="text-sm">Move history</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4">
-            <Separator className="mb-2" />
-            <div ref={moveHistoryRef} className="h-48 overflow-y-auto pr-2">
-              {fullMoves.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No moves yet.</p>
-              ) : (
-                <ol className="space-y-1">
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => jumpToPly(0)}
-                      className={cn(
-                        'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
-                        currentPly === 0 && 'bg-accent',
-                      )}
-                    >
-                      <span className="w-5 text-right text-muted-foreground">0</span>
-                      <span className="w-10 truncate text-muted-foreground">start</span>
-                      <span className="text-muted-foreground">the opening position</span>
-                    </button>
-                  </li>
-                  {fullMoves.map((rec, i) => {
-                    const ply = i + 1
-                    const current = ply === currentPly
-                    return (
-                      <li key={i}>
-                        <button
-                          type="button"
-                          onClick={() => jumpToPly(ply)}
-                          title="Go to this position"
-                          className={cn(
-                            'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
-                            current && 'bg-accent',
-                            i % 2 === 0 ? 'dark:bg-white/5' : 'bg-black/5 dark:bg-transparent',
-                          )}
-                        >
-                          <span className="w-5 text-right text-muted-foreground">{ply}</span>
-                          <span className="w-10 truncate text-muted-foreground">
-                            {variant.teams.find((t) => t.id === rec.team)?.name ?? rec.team}
-                          </span>
+        <section>
+          <div className="mb-2 flex items-baseline justify-between gap-2 border-t pt-4">
+            <h2 className="label-mono">Move history</h2>
+            <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
+              {currentPly} {currentPly === 1 ? 'ply' : 'plies'}
+            </span>
+          </div>
+          <div
+            ref={moveHistoryRef}
+            className={cn(
+              'overflow-y-auto border-t pt-1 pr-1',
+              fullMoves.length > 0 && 'h-52',
+            )}
+          >
+            {fullMoves.length === 0 ? (
+              <p className="text-muted-foreground py-2 text-xs">No moves yet.</p>
+            ) : (
+              <ol>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => jumpToPly(0)}
+                    className={cn(
+                      'border-l-2 border-transparent hover:bg-accent',
+                      'grid w-full grid-cols-[1.5rem_0.5rem_1fr] items-baseline gap-2 px-1.5 py-[3px] text-left font-mono text-[11px] transition-colors',
+                      currentPly === 0 && 'border-signal bg-accent',
+                    )}
+                  >
+                    <span className="text-muted-foreground/60 text-right tabular-nums">0</span>
+                    <span />
+                    <span className="text-muted-foreground">the opening position</span>
+                  </button>
+                </li>
+                {fullMoves.map((rec, i) => {
+                  const ply = i + 1
+                  const current = ply === currentPly
+                  const team = variant.teams.find((t) => t.id === rec.team)
+                  return (
+                    <li key={i}>
+                      <button
+                        type="button"
+                        onClick={() => jumpToPly(ply)}
+                        title="Go to this position"
+                        className={cn(
+                          'border-l-2 border-transparent hover:bg-accent',
+                          'grid w-full grid-cols-[1.5rem_0.5rem_1fr] items-baseline gap-2 px-1.5 py-[3px] text-left font-mono text-[11px] transition-colors',
+                          current && 'border-signal bg-accent',
+                          !current && i % 2 === 0 && 'bg-foreground/[0.03]',
+                        )}
+                      >
+                        <span className="text-muted-foreground/60 text-right tabular-nums">
+                          {ply}
+                        </span>
+                        <span
+                          aria-hidden
+                          className="size-1.5 shrink-0 rounded-full ring-1 ring-black/20"
+                          style={{ backgroundColor: team?.color }}
+                        />
+                        <span className="flex items-baseline justify-between gap-2">
                           <span>{rec.notation}</span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ol>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                          <span className="text-muted-foreground/60 truncate text-[10px]">
+                            {team?.name ?? rec.team}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </div>
+        </section>
 
         <StatsPanel />
       </aside>

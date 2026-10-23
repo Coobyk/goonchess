@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { BarChart3 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { loadStats, recordResult, saveStats, type Stats } from '@/lib/stats'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 /**
  * Keeps track of how the games went.
@@ -37,13 +36,11 @@ export function StatsPanel() {
   const others = Object.entries(stats).filter(([id]) => id !== variant.id)
 
   return (
-    <Card className="py-4">
-      <CardHeader className="px-4">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <BarChart3 className="text-muted-foreground size-4" /> Games played
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 px-4 text-sm">
+    <section className="border-t pt-4">
+      <h2 className="label-mono mb-2 flex items-center gap-1.5">
+        <BarChart3 className="size-3" /> Games played
+      </h2>
+      <div className="space-y-2 text-sm">
         {!row && others.length === 0 && (
           <p className="text-muted-foreground text-xs">
             No finished games yet. The tally is kept in this browser only.
@@ -66,7 +63,7 @@ export function StatsPanel() {
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

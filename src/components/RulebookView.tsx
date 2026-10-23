@@ -198,54 +198,54 @@ export function RulebookView() {
   return (
     <div className="space-y-6">
       <PuzzlePanel />
-      <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 py-0 text-zinc-100 dark:from-zinc-900 dark:to-zinc-950">
-        <CardContent className="relative px-6 py-8 sm:px-8">
-          <div className="pointer-events-none absolute -right-16 -top-20 size-60 rounded-full bg-emerald-400/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 right-28 size-52 rounded-full bg-sky-400/10 blur-3xl" />
-          <div className="relative max-w-3xl space-y-4">
-            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-400">
-              <BookOpen className="size-4" /> Learn
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{variant.name}</h1>
-              <p className="text-sm text-zinc-300 sm:text-base">
-                {variant.description ||
-                  'A custom chess variant. Every rule on this page comes from the current setup.'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
-                {board.width} × {board.height} board
-              </Badge>
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
-                {teams.length} armies
-              </Badge>
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
-                {pieceTypes.length} piece types
-              </Badge>
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
-                {winConditions.length} win condition{winConditions.length === 1 ? '' : 's'}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" onClick={() => setView('play')}>
-                <Swords /> Play this variant
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="bg-white/10 text-zinc-100 hover:bg-white/20"
-                onClick={() => {
-                  setMakerTab('rules')
-                  setView('maker')
-                }}
-              >
-                <Wrench /> Edit the rules
-              </Button>
-            </div>
+      <header className="border-b pb-6">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="min-w-0 max-w-2xl">
+            <p className="label-mono flex items-center gap-1.5">
+              <BookOpen className="size-3" /> Learn
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] sm:text-[2.5rem] sm:leading-[1.05]">
+              {variant.name}
+            </h1>
+            <p className="text-muted-foreground mt-2.5 text-sm sm:text-base">
+              {variant.description ||
+                'A custom chess variant. Every rule on this page comes from the current setup.'}
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex flex-wrap gap-1.5">
+            <Button size="sm" onClick={() => setView('play')}>
+              <Swords /> Play this variant
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setMakerTab('rules')
+                setView('maker')
+              }}
+            >
+              <Wrench /> Edit the rules
+            </Button>
+          </div>
+        </div>
+
+        <dl className="mt-6 grid grid-cols-2 gap-px border-t bg-border sm:grid-cols-4">
+          {[
+            { label: 'Board', value: `${board.width} × ${board.height}` },
+            { label: 'Armies', value: String(teams.length) },
+            { label: 'Piece types', value: String(pieceTypes.length) },
+            {
+              label: 'Win conditions',
+              value: String(winConditions.length),
+            },
+          ].map((spec) => (
+            <div key={spec.label} className="bg-background px-3 py-2.5">
+              <dt className="label-mono">{spec.label}</dt>
+              <dd className="mt-0.5 font-mono text-sm tabular-nums">{spec.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </header>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
@@ -338,9 +338,9 @@ export function RulebookView() {
                   return (
                     <div
                       key={condition.id}
-                      className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
+                      className="flex items-start gap-3 rounded-[3px] border bg-muted/30 p-3"
                     >
-                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
+                      <span className="text-signal mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-signal/30 bg-signal/10">
                         <ArrowRight className="size-3.5" />
                       </span>
                       <div className="min-w-0">
@@ -368,7 +368,7 @@ export function RulebookView() {
                 eliminating an army is reported in the turn panel.
               </p>
               {randomPieces.length > 0 && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <div className="rounded-[3px] border border-signal/35 bg-signal/[0.06] p-3">
                   <p className="text-sm font-medium">The pieces are rolled anew</p>
                   <p className="text-muted-foreground mt-1 text-sm">
                     After every move each random piece is given a new kind, drawn at random from
@@ -394,7 +394,7 @@ export function RulebookView() {
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
               {teams.map((team, i) => (
-                <div key={team.id} className="rounded-lg border p-3">
+                <div key={team.id} className="rounded-[3px] border bg-muted/20 p-3">
                   <ArmyBadge team={team} teamIndex={i} />
                   <div className="text-muted-foreground mt-2 flex items-center justify-between text-xs">
                     <span>{teamPieces(variant, team.id)} pieces in the starting setup</span>
@@ -425,9 +425,9 @@ export function RulebookView() {
                   : 'captures the same way it moves'
                 const flags = flagCopy(piece)
                 return (
-                  <div key={piece.id} className="rounded-xl border p-4">
+                  <div key={piece.id} className="rounded-[4px] border bg-card p-4">
                     <div className="flex items-start gap-4">
-                      <div className="grid size-12 shrink-0 place-items-center rounded-lg border bg-zinc-100">
+                      <div className="grid size-12 shrink-0 place-items-center rounded-[2px] border" style={{ backgroundColor: 'var(--board-light)' }}>
                         <PieceGlyph piece={piece} teamIndex={teamForPiece(piece.id)} size={34} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -437,7 +437,7 @@ export function RulebookView() {
                             {piece.value} pt{piece.value === 1 ? '' : 's'}
                           </Badge>
                           {piece.flags.royal && (
-                            <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                            <Badge variant="outline" className="border-signal/50 text-signal">
                               Royal
                             </Badge>
                           )}
@@ -576,13 +576,13 @@ export function RulebookView() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border p-3">
+                <div className="rounded-[3px] border bg-muted/20 p-3">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <FlipHorizontal2 className="text-muted-foreground size-4" /> Turn view
                   </div>
                   <p className="text-muted-foreground mt-1 text-sm">{TURN_VIEW_COPY[turnView]}</p>
                 </div>
-                <div className="rounded-lg border p-3">
+                <div className="rounded-[3px] border bg-muted/20 p-3">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <ShieldAlert className="text-muted-foreground size-4" /> Threat visualizer
                   </div>
@@ -594,7 +594,7 @@ export function RulebookView() {
                     </p>
                   )}
                 </div>
-                <div className="rounded-lg border p-3">
+                <div className="rounded-[3px] border bg-muted/20 p-3">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     {soundEnabled ? (
                       <Volume2 className="text-muted-foreground size-4" />
@@ -609,7 +609,7 @@ export function RulebookView() {
                       : 'Muted. Use the speaker button in the header to turn sounds back on.'}
                   </p>
                 </div>
-                <div className="rounded-lg border p-3">
+                <div className="rounded-[3px] border bg-muted/20 p-3">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Map className="text-muted-foreground size-4" /> Board map
                   </div>

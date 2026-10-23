@@ -118,6 +118,8 @@ export function useElementWidth<T extends HTMLElement>() {
 
 export function boardCellSize(containerWidth: number, cols: number, max = 64, min = 20) {
   if (!containerWidth) return max
-  const raw = Math.floor((containerWidth - 44) / cols)
+  // The frame, its padding and the coordinate columns all sit inside the
+  // measured width, so they are taken off before the squares are shared out.
+  const raw = Math.floor((containerWidth - 58) / cols)
   return Math.max(min, Math.min(max, raw))
 }

@@ -6,7 +6,6 @@ import { replayStates } from '@/lib/replay'
 import { computeThreats, mergeThreats, threatSummary } from '@/engine/threats'
 import { AnalysisGraph } from './AnalysisGraph'
 import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Label } from './ui/label'
 import { Separator } from './ui/separator'
 import { Switch } from './ui/switch'
@@ -136,14 +135,14 @@ export function AnalysisPanel() {
     : `${score >= 0 ? '+' : '−'}${(Math.abs(score) / 100).toFixed(1)}`
 
   return (
-    <Card className="py-4">
-      <CardHeader className="px-4">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <BrainCircuit className="text-muted-foreground size-4" /> Analysis
-          {busy && <Loader2 className="text-muted-foreground size-3.5 animate-spin" />}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 px-4 text-sm">
+    <section className="border-b pb-5">
+      <div className="mb-2 flex items-center gap-2">
+        <h2 className="label-mono flex items-center gap-1.5">
+          <BrainCircuit className="size-3" /> Analysis
+        </h2>
+        {busy && <Loader2 className="text-muted-foreground size-3 animate-spin" />}
+      </div>
+      <div className="space-y-3 text-sm">
         <ToggleGroup
           type="single"
           className="w-full"
@@ -335,7 +334,7 @@ export function AnalysisPanel() {
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

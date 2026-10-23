@@ -40,25 +40,29 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <div className="flex min-h-full flex-col">
+      <div className="relative flex min-h-full flex-col">
+        {/* A drawing sheet under everything: faint, and gone before it reaches
+            the board. */}
+        <div aria-hidden className="app-grid pointer-events-none fixed inset-0 z-0" />
         <AppHeader />
-        <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-8">
+        <main className="relative z-10 mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 lg:px-8 lg:py-8">
           {view === 'play' ? <PlayView /> : view === 'maker' ? <MakerView /> : <RulebookView />}
         </main>
-        <footer className="border-t">
-          <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-xs lg:px-8">
-            <span>
-              Goonchess · built by{' '}
+        <footer className="relative z-10 mt-8 border-t">
+          <div className="text-muted-foreground mx-auto flex w-full max-w-[1440px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 font-mono text-[10px] tracking-[0.12em] uppercase lg:px-8">
+            <span className="flex items-center gap-2">
+              <span>Goonchess</span>
+              <span className="text-border">/</span>
               <a
                 href="https://coobyk.com"
                 target="_blank"
                 rel="noreferrer"
-                className="underline decoration-border underline-offset-4 hover:text-foreground"
+                className="decoration-border hover:text-foreground underline-offset-4 hover:underline"
               >
                 Coobyk
               </a>
             </span>
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>
                 built{' '}
                 <time dateTime={__BUILD_TIME__} title={new Date(__BUILD_TIME__).toUTCString()}>
@@ -67,11 +71,12 @@ export default function App() {
               </span>
               {__BUILD_COMMIT__ !== 'unknown' && (
                 <>
+                  <span className="text-border">/</span>
                   <a
                     href={`https://github.com/Coobyk/goonchess/commit/${__BUILD_COMMIT__}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="underline decoration-border underline-offset-4 hover:text-foreground"
+                    className="decoration-border hover:text-foreground underline-offset-4 hover:underline"
                   >
                     commit {__BUILD_COMMIT__.slice(0, 7)}
                   </a>

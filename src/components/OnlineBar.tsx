@@ -58,12 +58,17 @@ export function OnlineBar() {
   return (
     <div
       className={cn(
-        'flex w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3 py-2 text-sm',
-        tone === 'live' && 'border-primary/40 bg-primary/5',
-        tone === 'warn' && 'border-destructive/40 bg-destructive/5',
+        'flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 border bg-card px-2.5 py-2 text-[13px]',
+        tone === 'live' && 'border-signal/45 bg-signal/[0.06]',
+        tone === 'warn' && 'border-destructive/40 bg-destructive/[0.06]',
       )}
     >
-      <span className="flex items-center gap-2 font-medium">
+      <span
+        className={cn(
+          'flex items-center gap-2 font-medium',
+          tone === 'live' && 'text-signal',
+        )}
+      >
         {!online.connected ? (
           <WifiOff className="size-4" />
         ) : online.status === 'spectating' ? (
@@ -77,13 +82,15 @@ export function OnlineBar() {
       </span>
 
       {online.seat !== null && (
-        <span className="text-muted-foreground">
+        <span className="text-muted-foreground text-xs">
           You are {variant.teams[online.seat]?.name ?? `team ${online.seat + 1}`}
         </span>
       )}
 
       {online.status === 'waiting' && (
-        <span className="text-muted-foreground">Share the link — the first person to open it takes the other side.</span>
+        <span className="text-muted-foreground text-xs">
+          Share the link — the first person to open it takes the other side.
+        </span>
       )}
 
       {online.status === 'playing' && other !== null && !online.presence[other] && (
@@ -103,8 +110,10 @@ export function OnlineBar() {
         </span>
       )}
 
-      <span className="ml-auto flex items-center gap-2">
-        <span className="text-muted-foreground hidden font-mono text-xs sm:inline">/g/{online.code}</span>
+      <span className="ml-auto flex items-center gap-1.5">
+        <span className="text-muted-foreground/70 hidden font-mono text-[11px] tracking-tight sm:inline">
+          /g/{online.code}
+        </span>
         <Button size="sm" variant="outline" onClick={copy}>
           {copied ? <Check /> : <Copy />} Copy link
         </Button>

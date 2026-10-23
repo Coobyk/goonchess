@@ -6,10 +6,7 @@ import { BoardTab } from './BoardTab'
 import { PiecesTab } from './PiecesTab'
 import { SetupTab } from './SetupTab'
 import { RulesTab } from './RulesTab'
-import { Badge } from './ui/badge'
 import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Separator } from './ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
 const TABS: { id: MakerTab; label: string; icon: typeof LayoutGrid }[] = [
@@ -58,96 +55,96 @@ export function MakerView() {
   })()
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:gap-0">
       <Tabs
         value={makerTab}
         onValueChange={(v) => setMakerTab(v as MakerTab)}
-        className="min-w-0"
+        className="min-w-0 gap-4 xl:pr-8"
       >
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
+          <div className="min-w-0">
+            <p className="label-mono">Maker</p>
+            <h1 className="mt-1 truncate text-xl font-semibold tracking-[-0.02em]">
+              {variant.name}
+            </h1>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Undo the last change"
+              disabled={!canUndoVariant}
+              onClick={undoVariant}
+            >
+              <Undo2 /> Undo
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Redo the last undone change"
+              disabled={!canRedoVariant}
+              onClick={redoVariant}
+            >
+              <Redo2 /> Redo
+            </Button>
+          </div>
+        </header>
+
+        <TabsList className="grid w-full grid-cols-2 sm:flex sm:justify-start">
           {TABS.map((t) => (
-            <TabsTrigger key={t.id} value={t.id} className="flex-none px-3">
+            <TabsTrigger key={t.id} value={t.id} className="min-w-0 justify-start px-3 sm:flex-none sm:justify-center">
               <t.icon />
               {t.label}
             </TabsTrigger>
           ))}
         </TabsList>
-        {/* The undo and redo sit on their own row: in the tab strip they
-            pushed the whole page sideways on a narrow screen. */}
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Undo the last change"
-            disabled={!canUndoVariant}
-            onClick={undoVariant}
-          >
-            <Undo2 /> Undo
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Redo the last undone change"
-            disabled={!canRedoVariant}
-            onClick={redoVariant}
-          >
-            <Redo2 /> Redo
-          </Button>
-        </div>
-        <TabsContent value="board" className="mt-4">
+
+        <TabsContent value="board" className="max-w-[900px]">
           <BoardTab />
         </TabsContent>
-        <TabsContent value="pieces" className="mt-4">
+        <TabsContent value="pieces" className="max-w-[900px]">
           <PiecesTab />
         </TabsContent>
-        <TabsContent value="setup" className="mt-4">
+        <TabsContent value="setup" className="max-w-[900px]">
           <SetupTab />
         </TabsContent>
-        <TabsContent value="rules" className="mt-4">
+        <TabsContent value="rules" className="max-w-[900px]">
           <RulesTab />
         </TabsContent>
       </Tabs>
 
-      <aside className="h-fit space-y-4 xl:sticky xl:top-20">
-        <Card className="py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="flex items-center justify-between gap-2 text-sm">
-              <span className="truncate">{variant.name}</span>
-              <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
-                {variant.board.width}×{variant.board.height}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 px-4">
-            <MakerBoard interactive={makerTab === 'board' || makerTab === 'setup'} />
-            <Separator />
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="text-muted-foreground">{brushLabel}</span>
-              <Button size="sm" variant="ghost" onClick={() => setMakerTab('rules')}>
-                Rules
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm border bg-[repeating-linear-gradient(45deg,transparent_0_3px,rgba(0,0,0,0.3)_3px_5px)]" />
-                wall
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm bg-black" /> void
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.9),rgba(56,189,248,0.15))]" />
-                portal
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.9),rgba(56,189,248,0.15))] font-mono text-[8px] text-cyan-100">
-                  1→
-                </span>
-                one-way
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+      <aside className="h-fit xl:sticky xl:top-20 xl:border-l xl:border-border xl:pl-7">
+        <div className="mb-2.5 flex items-baseline justify-between gap-2">
+          <h2 className="label-mono">Preview</h2>
+          <span className="text-muted-foreground/70 font-mono text-[10px]">
+            {variant.board.width}×{variant.board.height}
+          </span>
+        </div>
+        <MakerBoard interactive={makerTab === 'board' || makerTab === 'setup'} />
+        <div className="mt-3 flex items-center justify-between gap-2 border-t pt-2">
+          <span className="text-muted-foreground truncate text-xs">{brushLabel}</span>
+          <Button size="sm" variant="ghost" onClick={() => setMakerTab('rules')}>
+            Rules
+          </Button>
+        </div>
+        <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-3 gap-y-1.5 font-mono text-[10px]">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-[1px] border bg-[repeating-linear-gradient(45deg,transparent_0_3px,rgba(0,0,0,0.3)_3px_5px)]" />
+            wall
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-[1px] bg-black" />
+            void
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-[1px] bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.9),rgba(56,189,248,0.15))]" />
+            portal
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-[1px] bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.9),rgba(56,189,248,0.15))]" />
+            one-way
+          </span>
+        </div>
       </aside>
     </div>
   )

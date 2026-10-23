@@ -111,28 +111,30 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
-          <div className="flex min-w-0 shrink-0 items-center gap-3">
+      <header className="bg-background/85 sticky top-0 z-40 border-b backdrop-blur-xl">
+        <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-2 px-3 sm:px-4 lg:px-8">
+          <div className="flex min-w-0 shrink-0 items-center gap-2.5">
             <a
               href="/"
               aria-label="Goonchess home"
               onClick={goHome}
-              className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm transition-opacity hover:opacity-90"
+              className="grid size-8 shrink-0 place-items-center rounded-[3px] border border-white/10 bg-[#141416] transition-colors hover:border-white/25"
             >
-              <img src="/logo.svg" alt="" className="size-7" />
+              <img src="/logo.svg" alt="" className="size-6" />
             </a>
             <div className="hidden min-w-0 sm:block">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-semibold tracking-tight">Goonchess</span>
+              <div className="flex items-baseline gap-2">
+                <span className="truncate text-[13px] font-semibold tracking-[-0.02em]">
+                  Goonchess
+                </span>
+                <span className="text-muted-foreground/50 hidden font-mono text-[10px] lg:inline">
+                  / {variant.name}
+                </span>
               </div>
-              <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
-                {variant.name}
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 lg:mx-auto">
+          <div className="flex items-center gap-1.5 sm:ml-4 lg:mx-auto">
             <ToggleGroup
               type="single"
               value={view}
@@ -152,7 +154,7 @@ export function AppHeader() {
             </ToggleGroup>
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1 lg:ml-0">
+          <div className="ml-auto flex shrink-0 items-center gap-0.5 lg:ml-0 lg:border-l lg:border-border/70 lg:pl-2">
             <div className="hidden items-center gap-1 lg:flex">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

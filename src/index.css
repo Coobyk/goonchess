@@ -38,6 +38,7 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-board-light: var(--board-light);
   --color-board-dark: var(--board-dark);
+  --color-signal: var(--signal);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -46,68 +47,72 @@
 }
 
 :root {
-  --radius: 0.25rem;
-  --background: #ffffff;
-  --foreground: #000000;
+  /* Almost square: the controls read as instruments, not as pills. */
+  --radius: 0.125rem;
+  --background: #f7f6f2;
+  --foreground: #15130f;
   --card: #ffffff;
-  --card-foreground: #000000;
+  --card-foreground: #15130f;
   --popover: #ffffff;
-  --popover-foreground: #000000;
-  --primary: #000000;
-  --primary-foreground: #ffffff;
-  --secondary: #f5f5f5;
-  --secondary-foreground: #000000;
-  --muted: #f5f5f5;
-  --muted-foreground: #666666;
-  --accent: #f5f5f5;
-  --accent-foreground: #000000;
-  --destructive: #ff3b30;
+  --popover-foreground: #15130f;
+  --primary: #15130f;
+  --primary-foreground: #faf8f4;
+  --secondary: #eeeae2;
+  --secondary-foreground: #15130f;
+  --muted: #efece5;
+  --muted-foreground: #6d675d;
+  --accent: #e9e4da;
+  --accent-foreground: #15130f;
+  --destructive: #bc3f2b;
   --destructive-foreground: #ffffff;
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #000000;
-  --sidebar: #fafafa;
-  --sidebar-foreground: #000000;
-  --sidebar-primary: #000000;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5f5f5;
-  --sidebar-accent-foreground: #000000;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #000000;
+  --border: #ddd8ce;
+  --input: #cdc7ba;
+  --ring: #15130f;
+  --sidebar: #f2efe8;
+  --sidebar-foreground: #15130f;
+  --sidebar-primary: #15130f;
+  --sidebar-primary-foreground: #faf8f4;
+  --sidebar-accent: #e9e4da;
+  --sidebar-accent-foreground: #15130f;
+  --sidebar-border: #ddd8ce;
+  --sidebar-ring: #15130f;
+  /* The one warm note in the interface, borrowed from the board. */
+  --signal: #8a6524;
   /* The board of Lichess: the brown one. It is the same in light and dark
      mode, the way it is there. */
-  --board-light: #f0d9b5;
-  --board-dark: #b58863;
+  --board-light: #eedcb8;
+  --board-dark: #b07a4e;
 }
 
 .dark {
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #0a0a0a;
-  --card-foreground: #ffffff;
-  --popover: #0a0a0a;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #ffffff;
-  --muted: #1a1a1a;
-  --muted-foreground: #888888;
-  --accent: #1a1a1a;
-  --accent-foreground: #ffffff;
-  --destructive: #ff453a;
+  --background: #0b0b0c;
+  --foreground: #f1efea;
+  --card: #121213;
+  --card-foreground: #f1efea;
+  --popover: #161617;
+  --popover-foreground: #f1efea;
+  --primary: #f1efea;
+  --primary-foreground: #0b0b0c;
+  --secondary: #1b1b1d;
+  --secondary-foreground: #f1efea;
+  --muted: #171718;
+  --muted-foreground: #8e8a82;
+  --accent: #1f1f21;
+  --accent-foreground: #f1efea;
+  --destructive: #dd5039;
   --destructive-foreground: #ffffff;
-  --border: #262626;
-  --input: #262626;
-  --ring: #ffffff;
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #1a1a1a;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #262626;
-  --sidebar-ring: #ffffff;
+  --border: #262628;
+  --input: #2f2f32;
+  --ring: #f1efea;
+  --sidebar: #0e0e0f;
+  --sidebar-foreground: #f1efea;
+  --sidebar-primary: #f1efea;
+  --sidebar-primary-foreground: #0b0b0c;
+  --sidebar-accent: #1f1f21;
+  --sidebar-accent-foreground: #f1efea;
+  --sidebar-border: #262628;
+  --sidebar-ring: #f1efea;
+  --signal: #c9a469;
 }
 
 @layer base {
@@ -123,8 +128,13 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
   }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
   ::selection {
-    background: oklch(0.85 0.08 85 / 0.35);
+    background: color-mix(in oklab, var(--signal) 35%, transparent);
   }
 
   /*
@@ -151,10 +161,41 @@
   .text-balance {
     text-wrap: balance;
   }
-  .board-grid-shadow {
+
+  /* Small caps in mono: the label voice of the whole interface. */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.4;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* A drawing sheet: a faint grid that fades out under the content. */
+  :root:not(.dark) .app-grid {
+    opacity: 0.55;
+  }
+
+  .app-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, #000 0%, transparent 78%);
+  }
+
+  /* The board sits on the page like a plate on a desk. */
+  .board-frame {
+    border: 1px solid var(--border);
+    background: var(--card);
     box-shadow:
-      0 1px 2px rgb(0 0 0 / 0.08),
-      0 18px 50px -18px rgb(0 0 0 / 0.45);
+      inset 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent),
+      0 30px 70px -40px rgb(0 0 0 / 0.85);
+  }
+
+  .board-grid-shadow {
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.35);
   }
   .scrollbar-none {
     scrollbar-width: none;
