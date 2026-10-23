@@ -345,12 +345,10 @@ export function GameBoard() {
   }
 
   return (
-    <div ref={container} className="flex w-full items-stretch justify-center gap-2">
-      <div className="w-5 shrink-0">
-        {(analysisMode === 'engine' || analysisMode === 'computer') && (analysisResult || game.winner) && (
-          <EvalBar score={game.winner ? (game.winner === variant.teams[0]?.id ? 1000 : -1000) : (analysisResult?.score ?? 0)} className="my-0.5" />
-        )}
-      </div>
+    <div ref={container} className="relative flex w-full items-stretch justify-center gap-2">
+      {(analysisMode === 'engine' || analysisMode === 'computer') && (analysisResult || game.winner) && (
+        <EvalBar score={game.winner ? (game.winner === variant.teams[0]?.id ? 1000 : -1000) : (analysisResult?.score ?? 0)} className="my-0.5 absolute left-0" />
+      )}
       <BoardShell
         width={cols}
         height={rows}
