@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type MouseEvent } from 'react'
 import { toast } from 'sonner'
 import {
   BookOpen,
@@ -42,6 +42,18 @@ export function AppHeader() {
   const loadVariantIntoMaker = useAppStore((s) => s.loadVariantIntoMaker)
   const playVariant = useAppStore((s) => s.playVariant)
   const library = useAppStore((s) => s.library)
+
+  /**
+   * The logo is home: the root, with no game code and no variant hash left on
+   * the address. Modified clicks are left to the browser, so new-tab works.
+   */
+  const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+    event.preventDefault()
+    useAppStore.getState().applyRoute({ view: 'play', makerTab: 'board', gameCode: null })
+    window.history.pushState(null, '', '/')
+    window.scrollTo({ top: 0 })
+  }
   const variant = useAppStore((s) => s.variant)
   const soundEnabled = useAppStore((s) => s.soundEnabled)
   const setSoundEnabled = useAppStore((s) => s.setSoundEnabled)
@@ -99,9 +111,14 @@ export function AppHeader() {
       <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
-            <div className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm">
-              <img src="/logo.svg" alt="Goonchess" className="size-7" />
-            </div>
+            <a
+              href="/"
+              aria-label="Goonchess home"
+              onClick={goHome}
+              className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm transition-opacity hover:opacity-90"
+            >
+              <img src="/logo.svg" alt="" className="size-7" />
+            </a>
             <div className="hidden min-w-0 sm:block">
               <div className="flex items-center gap-2">
                 <span className="truncate text-sm font-semibold tracking-tight">Goonchess</span>
