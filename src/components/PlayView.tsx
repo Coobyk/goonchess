@@ -108,7 +108,7 @@ export function PlayView() {
   const moveHistoryRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = moveHistoryRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
   }, [fullMoves.length])
 
   return (
