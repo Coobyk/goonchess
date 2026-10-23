@@ -6,13 +6,7 @@ import { captchaMessage } from '@/lib/captcha'
 import { variantToHash } from '@/lib/encoding'
 import { fromFen, toFen } from '@/lib/fen'
 import { Button } from './ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Textarea } from './ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Label } from './ui/label'
@@ -96,10 +90,6 @@ export function ShareDialog({
           <DialogTitle className="flex items-center gap-2">
             <FileJson className="size-4" /> Share &amp; import
           </DialogTitle>
-          <DialogDescription>
-            Links pack the whole variant into a compressed, URL-safe code. JSON is handy for backups
-            and hand-editing.
-          </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="link">
@@ -123,10 +113,6 @@ export function ShareDialog({
 
           <TabsContent value="online" className="space-y-3 pt-3">
             <p className="text-sm text-muted-foreground">
-              Play this variant live against whoever opens the link. No account: the link is the
-              invitation, and this browser keeps its side of the board.
-            </p>
-            <p className="text-sm text-muted-foreground">
               The first person to open it becomes the opponent; everyone after that can watch.
             </p>
             {playError && <p className="text-destructive text-sm">{playError}</p>}
@@ -134,10 +120,6 @@ export function ShareDialog({
               {creating ? <Loader2 className="animate-spin" /> : <Users />}
               {creating ? 'Making a link…' : 'Create a game link'}
             </Button>
-            <p className="text-muted-foreground text-xs">
-              A short proof of work runs in this tab before the link is made — invisible, takes
-              about a tenth of a second, and keeps a script from creating games by the thousand.
-            </p>
           </TabsContent>
 
           <TabsContent value="link" className="space-y-3 pt-3">
