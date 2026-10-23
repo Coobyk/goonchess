@@ -36,16 +36,27 @@ import {
 } from '@/lib/persist'
 import {
   preloadSounds,
+  playSound,
   setSoundEnabled as applySoundEnabled,
   setSoundPack as applySoundPack,
 } from '@/lib/sound'
 import {
   clockIsOn,
   initialClockState,
+  NO_CLOCK,
   type ClockSettings,
   type ClockState,
 } from '@/lib/clock'
 import { pushRoute, routeFromLocation } from '@/lib/router'
+import { proveWork } from '@/lib/captcha'
+import {
+  connect,
+  createRoom,
+  writeSeatToken,
+  type Connection,
+  type CreateResult,
+  type ServerMessage,
+} from '@/lib/online'
 
 export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
 export type View = 'play' | 'maker' | 'rulebook'
@@ -53,6 +64,22 @@ export type View = 'play' | 'maker' | 'rulebook'
 /** How the position is analysed. */
 export type AnalysisMode = 'off' | 'engine' | 'computer'
 export type Theme = 'dark' | 'light'
+
+/**
+ * A game played over a link. `seat` is which team this browser holds: null
+ * means it is only watching, and everyone who opens the link without one of the
+ * two saved tokens sees the board but cannot move.
+ */
+export interface OnlineGame {
+  code: string
+  seat: number | null
+  status: 'connecting' | 'waiting' | 'playing' | 'over' | 'spectating'
+  connected: boolean
+  /** Which seats have a browser attached right now. */
+  presence: [boolean, boolean]
+  watchers: number
+  error: string | null
+}
 
 interface AppState {
   variant: Variant
@@ -66,6 +93,9 @@ interface AppState {
   threats: ThreatSettings
   turnView: TurnView
   library: SavedVariant[]
+
+  /** The shared game this tab is in, if any. */
+  online: OnlineGame | null
 
   selected: Vec | null
   legalMoves: Move[]
@@ -95,7 +125,7 @@ interface AppState {
   /* navigation */
   setView: (view: View) => void
   setMakerTab: (tab: MakerTab) => void
-  applyRoute: (route: { view: View; makerTab: MakerTab }) => void
+  applyRoute: (route: { view: View; makerTab: MakerTab; gameCode?: string | null }) => void
   setTheme: (theme: Theme) => void
   setSoundEnabled: (enabled: boolean) => void
   setSoundPack: (pack: string) => void
@@ -149,6 +179,14 @@ interface AppState {
   undo: () => void
   /** Goes back to the position after a given number of moves. */
   jumpToPly: (ply: number) => void
+
+  /* online play */
+  /** Connects to a shared game, claiming a free seat if there is one. */
+  joinOnline: (code: string) => void
+  leaveOnline: () => void
+  /** Creates a room behind the hidden captcha and joins it. */
+  startOnlineGame: () => Promise<CreateResult>
+  resignOnline: () => void
 
   /* bot */
   setBot: (patch: Partial<BotSettings>) => void
@@ -249,6 +287,9 @@ export const useAppStore = create<AppState>((set, get) => {
   const initialRoute = routeFromLocation()
   applyThemeToDom(loadTheme())
 
+  /** The live socket, kept out of the store because it is not renderable. */
+  let room: Connection | null = null
+
   const initialBot = { ...DEFAULT_BOT_SETTINGS, ...loadBotSettings() }
   const initialClock = loadClockSettings()
   const initialPack = loadSoundPack()
@@ -263,6 +304,8 @@ export const useAppStore = create<AppState>((set, get) => {
   }
 
   const commit = (variant: Variant) => {
+    // Editing the variant ends a shared game: the room has its own copy.
+    if (get().online) get().leaveOnline()
     saveVariant(variant)
     const bot = get().bot
     const previous = get().variant
@@ -280,6 +323,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
   /** Sets the variant without touching the undo history. */
   const commitDirect = (variant: Variant, history: Variant[], future: Variant[]) => {
+    if (get().online) get().leaveOnline()
     saveVariant(variant)
     const bot = get().bot
     set({
@@ -291,6 +335,101 @@ export const useAppStore = create<AppState>((set, get) => {
       variantHistory: history,
       variantFuture: future,
       botSide: sideFor(bot, variant, get().botSide),
+    })
+  }
+
+  /** Folds a message from the room into the store. */
+  const receive = (code: string, message: ServerMessage) => {
+    const online = get().online
+    if (!online || online.code !== code) return
+
+    if (message.t === 'hello') {
+      if (message.you.token) writeSeatToken(code, message.you.token)
+      const game = message.game ?? createInitialState(message.variant)
+      set({
+        variant: message.variant,
+        game,
+        undoStack: [game],
+        selected: null,
+        legalMoves: [],
+        pendingPromotion: null,
+        queuedMove: null,
+        reviewingHistory: false,
+        online: {
+          ...online,
+          seat: message.you.seat,
+          status: game.winner
+            ? 'over'
+            : message.you.seat === null
+              ? 'spectating'
+              : message.started
+                ? 'playing'
+                : 'waiting',
+          presence: [!!message.seats[0], !!message.seats[1]],
+          connected: true,
+          error: null,
+        },
+      })
+      return
+    }
+
+    if (message.t === 'presence') {
+      // Both browsers are here: the game started on the server, so the
+      // waiting player is now playing. The server only sends `state` once,
+      // to the player who was already there, so this is where the handoff
+      // from "waiting" to "playing" has to happen.
+      const both = message.presence[0] && message.presence[1]
+      set({
+        online: {
+          ...online,
+          presence: [!!message.presence[0], !!message.presence[1]],
+          watchers: message.watchers,
+          status:
+            online.status === 'waiting' && both
+              ? get().game.winner
+                ? 'over'
+                : 'playing'
+              : online.status,
+        },
+      })
+      return
+    }
+
+    if (message.t === 'error') {
+      set({ online: { ...online, error: message.code } })
+      return
+    }
+
+    // A position from the room. Our own move is already on the board, so an
+    // echo of it changes nothing; anything longer is the opponent's.
+    const local = get().game
+    const next = message.game
+    if (
+      next.moveHistory.length === local.moveHistory.length &&
+      next.winner === local.winner &&
+      next.status === local.status
+    ) {
+      return
+    }
+
+    const fresh = next.moveHistory.length > local.moveHistory.length
+    const last = next.moveHistory[next.moveHistory.length - 1]
+    if (fresh && last) playSound(last.move.capturedId ? 'capture' : 'move')
+
+    set({
+      game: next,
+      undoStack: fresh
+        ? [...get().undoStack.slice(0, local.moveHistory.length + 1), next]
+        : get().undoStack,
+      selected: null,
+      legalMoves: [],
+      pendingPromotion: null,
+      queuedMove: null,
+      reviewingHistory: false,
+      online: {
+        ...online,
+        status: next.winner ? 'over' : online.seat === null ? 'spectating' : 'playing',
+      },
     })
   }
 
@@ -306,6 +445,7 @@ export const useAppStore = create<AppState>((set, get) => {
     threats: loadThreatSettings(),
     turnView: loadTurnView(),
     library: loadLibrary(),
+    online: null,
     bot: initialBot,
     botSide: sideFor(initialBot, initial, null),
     botThinking: false,
@@ -331,13 +471,21 @@ export const useAppStore = create<AppState>((set, get) => {
 
     setView: (view) => {
       set({ view })
-      pushRoute(view, get().makerTab)
+      pushRoute(view, get().makerTab, view === 'play' ? (get().online?.code ?? null) : null)
     },
     setMakerTab: (makerTab) => {
       set({ makerTab })
       if (get().view === 'maker') pushRoute('maker', makerTab)
     },
-    applyRoute: ({ view, makerTab }) => set({ view, makerTab }),
+    applyRoute: ({ view, makerTab, gameCode }) => {
+      // /g/<code> is a live room, not just a view.
+      if (gameCode) {
+        get().joinOnline(gameCode)
+        return
+      }
+      if (get().online) get().leaveOnline()
+      set({ view, makerTab })
+    },
     setTheme: (theme) => {
       saveTheme(theme)
       applyThemeToDom(theme)
@@ -398,6 +546,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // click away for anyone who wants to change it.
       commit(structuredClone(v))
       set({ view: 'play', makerTab: 'board' })
+      pushRoute('play', 'board', null)
     },
 
     resizeBoard: (width, height) => {
@@ -585,6 +734,12 @@ export const useAppStore = create<AppState>((set, get) => {
     selectSquare: (x, y, origin) => {
       const { game, selected, legalMoves, bot, botSide } = get()
       if (game.winner) return
+      // In a shared game only the player whose turn it is may touch the board.
+      const online = get().online
+      if (online) {
+        if (online.seat === null || online.status !== 'playing') return
+        if (game.turn !== game.variant.teams[online.seat]?.id) return
+      }
       // The bot plays its own side — the human cannot touch it.
       if (isBotTeam(bot, game.turn, botSide)) return
       if (selected) {
@@ -639,8 +794,16 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     playMove: (move, origin, promotionTypeId) => {
-      const { game, clock, clockState, boardAnimating } = get()
+      const { game, boardAnimating } = get()
+      // No clock travels with a shared game yet, so the local clock is off.
+      const online = get().online
+      const clock = online ? NO_CLOCK : get().clock
+      const clockState = get().clockState
       if (game.winner) return
+      if (online) {
+        if (online.seat === null || online.status !== 'playing') return
+        if (game.turn !== game.variant.teams[online.seat]?.id) return
+      }
       if (boardAnimating) {
         // A piece is still gliding across the board. The move waits its turn,
         // so an animation is never cut in half.
@@ -700,9 +863,25 @@ export const useAppStore = create<AppState>((set, get) => {
         clockState: clockNext,
         reviewingHistory: false,
       })
+
+      // The board already shows the move; the room validates it and sends the
+      // position back. A rejection arrives as a correction.
+      if (online) {
+        room?.send({
+          t: 'move',
+          from: move.from,
+          to: move.to,
+          finalTo: move.finalTo,
+          roll: move.roll,
+          promotionTypeId,
+          origin,
+        })
+      }
     },
 
     resetGame: () => {
+      // Restarting would leave the other player on a board nobody else has.
+      if (get().online) return
       const variant = get().variant
       // A puzzle is part of the game, so restarting means starting the puzzle
       // over, not going back to the opening position.
@@ -757,7 +936,59 @@ export const useAppStore = create<AppState>((set, get) => {
       })
     },
 
+    joinOnline: (code) => {
+      if (get().online?.code === code) return
+      room?.close()
+      set({
+        view: 'play',
+        makerTab: 'board',
+        online: {
+          code,
+          seat: null,
+          status: 'connecting',
+          connected: false,
+          presence: [false, false],
+          watchers: 0,
+          error: null,
+        },
+        selected: null,
+        legalMoves: [],
+        pendingPromotion: null,
+      })
+      pushRoute('play', 'board', code)
+      room = connect(code, {
+        onOpenChange: (connected) => {
+          const current = get().online
+          if (!current || current.code !== code) return
+          set({ online: { ...current, connected } })
+        },
+        onMessage: (message) => receive(code, message),
+      })
+    },
+
+    leaveOnline: () => {
+      room?.close()
+      room = null
+      if (get().online) set({ online: null })
+    },
+
+    startOnlineGame: async () => {
+      const variant = get().variant
+      if (variant.teams.length !== 2) throw new Error('needs_two_teams')
+      // The proof is the only thing standing between a script and a thousand
+      // rooms, so it is asked for before the request goes out.
+      const proof = await proveWork()
+      const created = await createRoom(variant, proof)
+      writeSeatToken(created.code, created.token)
+      get().joinOnline(created.code)
+      return created
+    },
+
+    resignOnline: () => room?.send({ t: 'resign' }),
+
     undo: () => {
+      // A shared game has no undo: the other player has already seen the move.
+      if (get().online) return
       const { game, undoStack, bot, botSide } = get()
       // The history holds the opening and every position after it, so the one
       // before the position the game is on is in it.
