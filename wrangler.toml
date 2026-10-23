@@ -1,9 +1,25 @@
 name = "goonchess"
 account_id = "bde77f9c2a0a3740e0f502b18fd5c2c6"
 compatibility_date = "2026-10-12"
-assets = { directory = "./dist", not_found_handling = "single-page-application" }
+main = "./worker/index.ts"
+
+# Static assets stay on the asset layer, which is free and unmetered. Only the
+# API goes through the Worker: sending the whole site through it would put every
+# page view against the daily request quota, and the site is far bigger than
+# that quota. `run_worker_first` is the line that keeps this true.
+assets = { directory = "./dist", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/api/*"] }
+
 workers_dev = true
 routes = [
-  { pattern = "chess.coobyk.com", custom_domain = true },
   { pattern = "goonchess.com", custom_domain = true },
 ]
+
+# One Durable Object per game. SQLite-backed, because that is the only kind the
+# Workers Free plan can create.
+[[durable_objects.bindings]]
+name = "GAME"
+class_name = "GameRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]

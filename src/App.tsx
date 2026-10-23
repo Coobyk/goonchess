@@ -30,8 +30,9 @@ export default function App() {
 
     // Unknown or non-canonical paths get rewritten to a real route.
     const route = routeFromLocation()
-    if (window.location.pathname !== pathFor(route.view, route.makerTab)) {
-      replaceRoute(route.view, route.makerTab)
+    useAppStore.getState().applyRoute(route)
+    if (window.location.pathname !== pathFor(route.view, route.makerTab, route.gameCode)) {
+      replaceRoute(route.view, route.makerTab, route.gameCode)
     }
 
     return () => window.removeEventListener('popstate', sync)

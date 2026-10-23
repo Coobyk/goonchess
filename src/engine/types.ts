@@ -265,6 +265,7 @@ export interface GameState {
     | 'points'
     | 'timeout'
     | 'threefold'
+    | 'resign'
   /** Where the rolls of the random pieces stand, so a game can be rebuilt. */
   randomSeed?: number
 }
