@@ -56,8 +56,16 @@ export function ShareDialog({
     setPlayError(null)
     setCreating(true)
     try {
-      await startOnlineGame()
-      toast.success('Game link ready — send it to whoever you want to play.')
+      const created = await startOnlineGame()
+      // The link is the whole invitation, so it goes to the clipboard before
+      // the dialog closes. A browser that refuses still has the copy button on
+      // the bar above the board.
+      try {
+        await navigator.clipboard.writeText(`${window.location.origin}${created.path}`)
+        toast.success('Game link copied — send it to whoever you want to play.')
+      } catch {
+        toast.success('Game link ready — copy it from the bar above the board.')
+      }
       onOpenChange(false)
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : 'unknown'
