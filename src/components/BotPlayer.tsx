@@ -21,6 +21,7 @@ export function BotPlayer() {
   const game = useAppStore((s) => s.game)
   const bot = useAppStore((s) => s.bot)
   const botSide = useAppStore((s) => s.botSide)
+  const undoStack = useAppStore((s) => s.undoStack)
   const opponentOpen = useAppStore((s) => s.opponentOpen)
   const clock = useAppStore((s) => s.clock)
   const clockState = useAppStore((s) => s.clockState)
