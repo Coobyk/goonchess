@@ -65,15 +65,17 @@ export default function App() {
                 </time>
               </span>
               {__BUILD_COMMIT__ !== 'unknown' && (
-                <a
-                  href={`https://github.com/Coobyk/goonchess/commit/${__BUILD_COMMIT__}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline decoration-border underline-offset-4 hover:text-foreground"
-                >
-                  commit {__BUILD_COMMIT__.slice(0, 7)}
-                </a>
-                <span>({ago})</span>
+                <>
+                  <a
+                    href={`https://github.com/Coobyk/goonchess/commit/${__BUILD_COMMIT__}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline decoration-border underline-offset-4 hover:text-foreground"
+                  >
+                    commit {__BUILD_COMMIT__.slice(0, 7)}
+                  </a>
+                  <span>({ago})</span>
+                </>
               )}
             </span>
           </div>
