@@ -81,7 +81,7 @@ export function CartesianRoot<TData extends Row>({
   stackType = "default",
   margins: marginsProp,
   className,
-  animate = true,
+  animate = false,
   animationDuration = 900,
   replayToken = 0,
   interactive = true,
