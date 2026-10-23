@@ -50,7 +50,10 @@ export function AppHeader() {
   const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
     event.preventDefault()
-    useAppStore.getState().applyRoute({ view: 'play', makerTab: 'board', gameCode: null })
+    const store = useAppStore.getState()
+    store.applyRoute({ view: 'play', makerTab: 'board', gameCode: null })
+    // Home is a fresh board, not the position that was being played.
+    store.resetGame()
     window.history.pushState(null, '', '/')
     window.scrollTo({ top: 0 })
   }
