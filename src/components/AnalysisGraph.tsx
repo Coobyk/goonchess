@@ -9,7 +9,6 @@ import { YAxis } from '@/components/dither-kit/y-axis'
 const MARGINS = { top: 8, right: 10, bottom: 18, left: 32 }
 
 /** A score past this is the search saying the game is won, not an advantage. */
-const MATE_SCORE = 90_000
 
 /**
  * The scores, kept inside a window.
@@ -21,11 +20,7 @@ const MATE_SCORE = 90_000
  * which is where a mate belongs.
  */
 function clampScores(scores: number[]) {
-  const widest = scores.reduce(
-    (max, score) => (Math.abs(score) < MATE_SCORE ? Math.max(max, Math.abs(score)) : max),
-    0,
-  )
-  const cap = Math.max(1000, Math.ceil((widest * 1.15) / 100) * 100)
+  const cap = 1000
   return {
     cap,
     values: scores.map((score) => Math.max(-cap, Math.min(cap, score))),
