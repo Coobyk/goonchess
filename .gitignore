@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local secrets for `wrangler dev` (CAPTCHA_SECRET and friends)
+.dev.vars
+
+# Local Wrangler state — D1, Durable Objects and caches, not source
+.wrangler/

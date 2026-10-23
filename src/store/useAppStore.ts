@@ -396,7 +396,27 @@ export const useAppStore = create<AppState>((set, get) => {
     }
 
     if (message.t === 'error') {
-      set({ online: { ...online, error: message.code } })
+      // A refused move comes back with the position the room holds, because the
+      // board moved before the room had agreed to it.
+      const state = message.game
+      if (!state) {
+        set({ online: { ...online, error: message.code } })
+        return
+      }
+      const ply = state.moveHistory.length
+      const history = get().undoStack
+      const stack = history.length >= ply + 1 ? history.slice(0, ply) : []
+      stack.push(state)
+      set({
+        game: state,
+        undoStack: stack,
+        selected: null,
+        legalMoves: [],
+        pendingPromotion: null,
+        queuedMove: null,
+        reviewingHistory: false,
+        online: { ...online, error: message.code },
+      })
       return
     }
 
@@ -429,6 +449,7 @@ export const useAppStore = create<AppState>((set, get) => {
       online: {
         ...online,
         status: next.winner ? 'over' : online.seat === null ? 'spectating' : 'playing',
+        error: null,
       },
     })
   }
@@ -738,6 +759,11 @@ export const useAppStore = create<AppState>((set, get) => {
       const online = get().online
       if (online) {
         if (online.seat === null || online.status !== 'playing') return
+        // A move made while the socket is down would never reach the room.
+        if (!online.connected) {
+          set({ online: { ...online, error: 'offline' } })
+          return
+        }
         if (game.turn !== game.variant.teams[online.seat]?.id) return
       }
       // The bot plays its own side — the human cannot touch it.
@@ -802,8 +828,15 @@ export const useAppStore = create<AppState>((set, get) => {
       if (game.winner) return
       if (online) {
         if (online.seat === null || online.status !== 'playing') return
+        if (!online.connected) {
+          set({ online: { ...online, error: 'offline' } })
+          return
+        }
         if (game.turn !== game.variant.teams[online.seat]?.id) return
       }
+      // What the board looked like before this move, so a move the room never
+      // accepted can be taken back again.
+      const before = { game, undoStack: get().undoStack, clockState }
       if (boardAnimating) {
         // A piece is still gliding across the board. The move waits its turn,
         // so an animation is never cut in half.
@@ -867,15 +900,31 @@ export const useAppStore = create<AppState>((set, get) => {
       // The board already shows the move; the room validates it and sends the
       // position back. A rejection arrives as a correction.
       if (online) {
-        room?.send({
-          t: 'move',
-          from: move.from,
-          to: move.to,
-          finalTo: move.finalTo,
-          roll: move.roll,
-          promotionTypeId,
-          origin,
-        })
+        const sent =
+          room?.send({
+            t: 'move',
+            from: move.from,
+            to: move.to,
+            finalTo: move.finalTo,
+            roll: move.roll,
+            promotionTypeId,
+            origin,
+          }) ?? false
+        if (!sent) {
+          // The socket was down, so the move never left. Put the board back
+          // instead of leaving it ahead of the room.
+          set({
+            game: before.game,
+            undoStack: before.undoStack,
+            clockState: before.clockState,
+            selected: null,
+            legalMoves: [],
+            online: { ...online, error: 'offline' },
+          })
+        } else {
+          const current = get().online
+          if (current?.error) set({ online: { ...current, error: null } })
+        }
       }
     },
 
@@ -960,7 +1009,7 @@ export const useAppStore = create<AppState>((set, get) => {
         onOpenChange: (connected) => {
           const current = get().online
           if (!current || current.code !== code) return
-          set({ online: { ...current, connected } })
+          set({ online: { ...current, connected, error: connected ? null : current.error } })
         },
         onMessage: (message) => receive(code, message),
       })

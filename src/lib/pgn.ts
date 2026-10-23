@@ -14,7 +14,7 @@ export function toPgn(
 ): string {
   const headers = [
     `[Event "${options.event ?? 'Goonchess game'}"]`,
-    `[Site "${options.site ?? 'chess.coobyk.com'}"]`,
+    `[Site "${options.site ?? 'goonchess.com'}"]`,
     `[Date "${options.date ?? new Date().toISOString().slice(0, 10).replace(/-/g, '.')}"]`,
     `[White "${state.variant.teams[0]?.name ?? 'White'}"]`,
     `[Black "${state.variant.teams[1]?.name ?? 'Black'}"]`,

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { ClipboardType, Copy, Download, FileJson, Link2, Upload } from 'lucide-react'
+import { ClipboardType, Copy, Download, FileJson, Link2, Loader2, Upload, Users } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { captchaMessage } from '@/lib/captcha'
 import { variantToHash } from '@/lib/encoding'
 import { fromFen, toFen } from '@/lib/fen'
 import { Button } from './ui/button'
@@ -28,9 +29,13 @@ export function ShareDialog({
   const exportVariant = useAppStore((s) => s.exportVariant)
   const importVariant = useAppStore((s) => s.importVariant)
   const loadVariantIntoMaker = useAppStore((s) => s.loadVariantIntoMaker)
+  const startOnlineGame = useAppStore((s) => s.startOnlineGame)
   const [importText, setImportText] = useState('')
   const [fenText, setFenText] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [playError, setPlayError] = useState<string | null>(null)
+  const twoTeams = variant.teams.length === 2
 
   const json = exportVariant()
   const url = useMemo(
@@ -44,6 +49,25 @@ export function ShareDialog({
       toast.success(`${label} copied`)
     } catch {
       toast.error('Clipboard unavailable — select the text and copy manually.')
+    }
+  }
+
+  const createGame = async () => {
+    setPlayError(null)
+    setCreating(true)
+    try {
+      await startOnlineGame()
+      toast.success('Game link ready — send it to whoever you want to play.')
+      onOpenChange(false)
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : 'unknown'
+      setPlayError(
+        code === 'needs_two_teams'
+          ? 'Online games need exactly two teams. This variant has ' + variant.teams.length + '.'
+          : captchaMessage(code),
+      )
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -72,6 +96,9 @@ export function ShareDialog({
 
         <Tabs defaultValue="link">
           <TabsList className="w-full">
+            <TabsTrigger value="online">
+              <Users /> Play online
+            </TabsTrigger>
             <TabsTrigger value="link">
               <Link2 /> Link
             </TabsTrigger>
@@ -85,6 +112,25 @@ export function ShareDialog({
               <ClipboardType /> FEN
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="online" className="space-y-3 pt-3">
+            <p className="text-sm text-muted-foreground">
+              Play this variant live against whoever opens the link. No account: the link is the
+              invitation, and this browser keeps its side of the board.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              The first person to open it becomes the opponent; everyone after that can watch.
+            </p>
+            {playError && <p className="text-destructive text-sm">{playError}</p>}
+            <Button onClick={createGame} disabled={creating || !twoTeams}>
+              {creating ? <Loader2 className="animate-spin" /> : <Users />}
+              {creating ? 'Making a link…' : 'Create a game link'}
+            </Button>
+            <p className="text-muted-foreground text-xs">
+              A short proof of work runs in this tab before the link is made — invisible, takes
+              about a tenth of a second, and keeps a script from creating games by the thousand.
+            </p>
+          </TabsContent>
 
           <TabsContent value="link" className="space-y-3 pt-3">
             <Label>Shareable link</Label>

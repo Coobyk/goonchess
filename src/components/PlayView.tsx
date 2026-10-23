@@ -17,6 +17,7 @@ import { Label } from './ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { useAppStore } from '@/store/useAppStore'
+import { OnlineBar } from './OnlineBar'
 import { cn } from '@/lib/utils'
 import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
@@ -68,7 +69,9 @@ export function PlayView() {
   const jumpToPly = useAppStore((s) => s.jumpToPly)
   const undoStack = useAppStore((s) => s.undoStack)
   const undo = useAppStore((s) => s.undo)
-  const canUndo = useAppStore((s) => s.undoStack.length > 1)
+  const online = useAppStore((s) => s.online)
+  // A shared game cannot be taken back: the other player already saw the move.
+  const canUndo = useAppStore((s) => s.undoStack.length > 1) && !online
   const turnView = useAppStore((s) => s.turnView)
   const setTurnView = useAppStore((s) => s.setTurnView)
   const bot = useAppStore((s) => s.bot)
@@ -117,6 +120,7 @@ export function PlayView() {
       <BotPlayer />
       <ClockTicker />
       <div className="flex flex-col items-center gap-4">
+        <OnlineBar />
         {pendingPromotion && (
           <div
             role="dialog"
@@ -214,13 +218,18 @@ export function PlayView() {
           )
         })()}
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button variant="outline" size="sm" onClick={resetGame}>
-            <RotateCcw /> Restart
-          </Button>
-          <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo}>
-            <Undo2 /> Undo
-          </Button>
+          {!online && (
+            <>
+              <Button variant="outline" size="sm" onClick={resetGame}>
+                <RotateCcw /> Restart
+              </Button>
+              <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo}>
+                <Undo2 /> Undo
+              </Button>
+            </>
+          )}
 
+          {!online && (
           <Popover onOpenChange={setOpponentOpen}>
             <PopoverTrigger asChild>
               <Button variant={bot.mode === 'off' ? 'outline' : 'secondary'} size="sm">
@@ -339,7 +348,7 @@ export function PlayView() {
               </div>
             </PopoverContent>
           </Popover>
-
+          )}
 
           <Popover>
             <PopoverTrigger asChild>

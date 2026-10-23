@@ -128,9 +128,14 @@ npm run build
 
 ## Cloudflare deployment
 
-Every push to `main` builds and deploys the Worker to `chess.coobyk.com` with
-GitHub Actions. Configure this repository setting once:
+Every push to `main` builds and deploys the Worker to `goonchess.com` with
+GitHub Actions. Configure these once:
 
 - Repository secret `CLOUDFLARE_API_TOKEN` with permission to deploy Workers
+- Worker secret `CAPTCHA_SECRET`, the key that signs the online-game proof of
+  work: `npx wrangler secret put CAPTCHA_SECRET`
 
-The workflow can also be started manually from the Actions tab.
+Without `CAPTCHA_SECRET` the site still plays offline, but creating an online
+game returns 503. The Durable Object and its storage are created by the
+migration in `wrangler.toml` on the first deploy; there is nothing to set up by
+hand. The workflow can also be started manually from the Actions tab.

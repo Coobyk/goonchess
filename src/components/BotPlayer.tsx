@@ -23,6 +23,8 @@ export function BotPlayer() {
   const botSide = useAppStore((s) => s.botSide)
   const undoStack = useAppStore((s) => s.undoStack)
   const opponentOpen = useAppStore((s) => s.opponentOpen)
+  // A shared game has a person on the other side, never a bot.
+  const online = useAppStore((s) => s.online)
   const clock = useAppStore((s) => s.clock)
   const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
@@ -42,7 +44,7 @@ export function BotPlayer() {
   useEffect(() => {
     const team = game.turn
     const isLatest = game.moveHistory.length === (undoStack[undoStack.length-1]?.moveHistory ?? game.moveHistory).length
-    const botTurn = !opponentOpen && isLatest && isBotTeam(bot, team, botSide)
+    const botTurn = !online && !opponentOpen && isLatest && isBotTeam(bot, team, botSide)
     if (!botTurn || game.winner) {
       worker.current?.cancel()
       running.current = false
@@ -91,7 +93,7 @@ export function BotPlayer() {
           useAppStore.getState().playMove(move)
         }, wait)
       })
-  }, [bot, botSide, game, retry, setBotThinking, opponentOpen])
+  }, [bot, botSide, game, retry, setBotThinking, opponentOpen, online])
 
   return null
 }
