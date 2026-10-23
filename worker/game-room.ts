@@ -13,6 +13,13 @@
  */
 import { applyMove, createInitialState, getLegalMoves, rollRandomPieces } from '../src/engine/rules'
 import type { GameState, Variant, Vec } from '../src/engine/types'
+import {
+  clockIsOn,
+  initialClockState,
+  NO_CLOCK,
+  type ClockSettings,
+  type ClockState,
+} from '../src/lib/clock'
 import { hashToken, randomToken } from './ids'
 
 /** A room nobody ever joined is not worth keeping. */
@@ -28,6 +35,14 @@ interface Meta {
   /** sha256 of each seat's secret. Null means the seat is free. */
   seats: (string | null)[]
   startedAt: number | null
+  /** The time control the room enforces, chosen by whoever made the link. */
+  clock: ClockSettings
+}
+
+/** The board and its clock travel in one row, so a move writes one record. */
+interface StoredGame {
+  game: GameState
+  clock: ClockState | null
 }
 
 interface Attachment {
@@ -43,18 +58,33 @@ export class GameRoom {
   private ctx: DurableObjectState
   private meta: Meta | null = null
   private game: GameState | null = null
+  private clock: ClockState | null = null
 
   constructor(ctx: DurableObjectState) {
     this.ctx = ctx
   }
 
-  private async load(): Promise<{ meta: Meta; game: GameState | null } | null> {
+  private async load(): Promise<{
+    meta: Meta
+    game: GameState | null
+    clock: ClockState | null
+  } | null> {
     if (!this.meta) {
       this.meta = (await this.ctx.storage.get<Meta>('meta')) ?? null
-      this.game = (await this.ctx.storage.get<GameState>('game')) ?? null
+      const raw = await this.ctx.storage.get<GameState | StoredGame>('game')
+      // Rooms made before clocks existed stored the game on its own.
+      if (raw && 'game' in raw) {
+        this.game = raw.game
+        this.clock = raw.clock
+      } else {
+        this.game = (raw as GameState | undefined) ?? null
+        this.clock = null
+      }
     }
     if (!this.meta) return null
-    return { meta: this.meta, game: this.game }
+    // Older rooms were made without a time control.
+    if (!this.meta.clock) this.meta.clock = NO_CLOCK
+    return { meta: this.meta, game: this.game, clock: this.clock }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -62,7 +92,12 @@ export class GameRoom {
 
     if (url.pathname.endsWith('/create')) {
       if (request.method !== 'POST') return json({ error: 'method' }, 405)
-      const body = (await request.json()) as { code: string; token: string; variant: Variant }
+      const body = (await request.json()) as {
+        code: string
+        token: string
+        variant: Variant
+        clock?: unknown
+      }
       return this.create(body)
     }
 
@@ -83,7 +118,12 @@ export class GameRoom {
   }
 
   /** Called by the Worker when a game is created. */
-  async create(body: { code: string; token: string; variant: Variant }): Promise<Response> {
+  async create(body: {
+    code: string
+    token: string
+    variant: Variant
+    clock?: unknown
+  }): Promise<Response> {
     if (await this.ctx.storage.get('meta')) return json({ error: 'exists' }, 409)
 
     const meta: Meta = {
@@ -92,6 +132,7 @@ export class GameRoom {
       createdAt: Date.now(),
       seats: [await hashToken(body.token), null],
       startedAt: null,
+      clock: normalizeClock(body.clock),
     }
     await this.ctx.storage.put('meta', meta)
     await this.ctx.storage.setAlarm(Date.now() + EMPTY_ROOM_TTL)
@@ -129,14 +170,22 @@ export class GameRoom {
     if (seat >= 0 && meta.startedAt === null && meta.seats.every((held) => held !== null)) {
       // Both seats are taken: the game begins.
       const fresh = createInitialState(meta.variant)
+      const clock = clockIsOn(meta.clock)
+        ? initialClockState(meta.clock, fresh.variant.teams.map((team) => team.id))
+        : null
       meta.startedAt = Date.now()
       await this.ctx.storage.put('meta', meta)
-      await this.ctx.storage.put('game', fresh)
       this.game = fresh
-      await this.ctx.storage.setAlarm(Date.now() + PLAYED_ROOM_TTL)
+      this.clock = clock
+      await this.save()
+      await this.scheduleAlarm(meta, fresh, clock)
       // The player who was already waiting needs the opening position.
-      this.broadcast({ t: 'state', game: fresh })
+      this.broadcast({ t: 'state', game: fresh, clockState: clock })
     }
+
+    // A room can sit for days. If a flag fell while nobody was here, the game
+    // is already over before the hello goes out.
+    if (this.game) await this.flagIfNeeded(meta, this.game, this.clock)
 
     const pair = new WebSocketPair()
     const client = pair[0]
@@ -150,6 +199,8 @@ export class GameRoom {
         you: { seat: seat >= 0 ? seat : null, token: issued },
         variant: meta.variant,
         game: this.game,
+        clock: meta.clock,
+        clockState: this.displayClock(this.game, this.clock),
         seats: meta.seats.map((held) => held !== null),
         started: meta.startedAt !== null,
         name: meta.variant.name,
@@ -183,6 +234,7 @@ export class GameRoom {
     // The object may have been evicted while the socket was open.
     this.meta = null
     this.game = null
+    this.clock = null
     this.announce()
   }
 
@@ -194,12 +246,27 @@ export class GameRoom {
     if (!loaded?.game) return
     const { meta, game } = loaded
     if (game.winner) return
-    if (game.turn !== meta.variant.teams[seat]?.id) return this.reject(seat, 'not_your_turn', game)
+
+    const now = Date.now()
+    let clock = loaded.clock
+    // The room owns the clock: a move that arrives after the flag fell does
+    // not count, and the game is already lost.
+    if (clock && clockIsOn(meta.clock) && clock.running && clock.lastMoveAt !== null) {
+      if ((clock.times[game.turn] ?? 0) - (now - clock.lastMoveAt) <= 0) {
+        await this.finishTimeout(meta, game, clock)
+        return
+      }
+    }
+
+    const refusedClock = this.displayClock(game, loaded.clock)
+    if (game.turn !== meta.variant.teams[seat]?.id) {
+      return this.reject(seat, 'not_your_turn', game, refusedClock)
+    }
 
     const from = vec(message.from)
     const to = vec(message.to)
     const finalTo = vec(message.finalTo)
-    if (!from || !to || !finalTo) return this.reject(seat, 'bad_move', game)
+    if (!from || !to || !finalTo) return this.reject(seat, 'bad_move', game, refusedClock)
 
     // The die of a piece that rolls to move is part of the position, so the
     // legal moves are worked out with the roll the player saw.
@@ -218,15 +285,29 @@ export class GameRoom {
         candidate.finalTo.x === finalTo.x &&
         candidate.finalTo.y === finalTo.y,
     )
-    if (!move) return this.reject(seat, 'illegal_move', game)
+    if (!move) return this.reject(seat, 'illegal_move', game, refusedClock)
 
     const options = move.promotionOptions ?? []
     let promotionTypeId = message.promotionTypeId
     if (options.length) {
       if (!promotionTypeId) promotionTypeId = options[0]
-      if (!options.includes(promotionTypeId)) return this.reject(seat, 'bad_promotion', game)
+      if (!options.includes(promotionTypeId)) return this.reject(seat, 'bad_promotion', game, refusedClock)
     } else {
       promotionTypeId = undefined
+    }
+
+    if (clock && clockIsOn(meta.clock)) {
+      const times = { ...clock.times }
+      const mover = game.turn
+      if (clock.running && clock.lastMoveAt !== null) {
+        times[mover] =
+          Math.max(0, (times[mover] ?? 0) - (now - clock.lastMoveAt)) +
+          meta.clock.increment * 1000
+      } else {
+        // The first move starts the clock and still earns the increment.
+        times[mover] = (times[mover] ?? 0) + meta.clock.increment * 1000
+      }
+      clock = { times, lastMoveAt: now, running: true }
     }
 
     const origin = message.origin && vec(message.origin) ? message.origin : undefined
@@ -234,10 +315,14 @@ export class GameRoom {
       applyMove(game, { ...move, promotionTypeId }, { origin, san: true }),
       move.pieceId,
     )
+    // A game that ends here stops the clock.
+    if (next.winner && clock) clock = { ...clock, running: false, lastMoveAt: null }
 
-    await this.ctx.storage.put('game', next)
     this.game = next
-    this.broadcast({ t: 'state', game: next })
+    this.clock = clock
+    await this.save()
+    await this.scheduleAlarm(meta, next, clock)
+    this.broadcast({ t: 'state', game: next, clockState: clock })
   }
 
   private async resign(seat: number): Promise<void> {
@@ -248,9 +333,12 @@ export class GameRoom {
     if (!other) return
 
     const next: GameState = { ...game, winner: other, status: 'resign' }
-    await this.ctx.storage.put('game', next)
+    const clock = this.clock ? { ...this.clock, running: false, lastMoveAt: null } : null
     this.game = next
-    this.broadcast({ t: 'state', game: next })
+    this.clock = clock
+    await this.save()
+    await this.scheduleAlarm(meta, next, clock)
+    this.broadcast({ t: 'state', game: next, clockState: clock })
   }
 
   /**
@@ -258,10 +346,17 @@ export class GameRoom {
    * browser applies moves optimistically, so a rejection has to undo the board
    * it is showing rather than only complain about it.
    */
-  private reject(seat: number, code: string, game: GameState | null = null) {
+  private reject(
+    seat: number,
+    code: string,
+    game: GameState | null = null,
+    clockState: ClockState | null = null,
+  ) {
     for (const ws of this.ctx.getWebSockets()) {
       const attachment = ws.deserializeAttachment() as Attachment | null
-      if (attachment?.seat === seat) send(ws, { t: 'error', code, game: game ?? undefined })
+      if (attachment?.seat === seat) {
+        send(ws, { t: 'error', code, game: game ?? undefined, clockState: clockState ?? undefined })
+      }
     }
   }
 
@@ -286,14 +381,102 @@ export class GameRoom {
     })
   }
 
+  /** One row: the board and the clock that goes with it. */
+  private async save(): Promise<void> {
+    if (!this.game) return
+    await this.ctx.storage.put('game', { game: this.game, clock: this.clock } satisfies StoredGame)
+  }
+
+  /**
+   * Wakes the room for the next thing that has to happen by itself: the side
+   * to move running out of time, or the room's own expiry, whichever is first.
+   */
+  private async scheduleAlarm(
+    meta: Meta,
+    game: GameState | null,
+    clock: ClockState | null,
+  ): Promise<void> {
+    const ttl =
+      (meta.startedAt ?? meta.createdAt) +
+      (meta.startedAt !== null ? PLAYED_ROOM_TTL : EMPTY_ROOM_TTL)
+    let at = ttl
+    if (game && !game.winner && clock?.running && clock.lastMoveAt !== null) {
+      const left = Math.max(0, clock.times[game.turn] ?? 0)
+      at = Math.min(at, clock.lastMoveAt + left + 500)
+    }
+    await this.ctx.storage.setAlarm(Math.max(Date.now(), at))
+  }
+
+  /** The clock as the side to move sees it right now, for a fresh connection. */
+  private displayClock(game: GameState | null, clock: ClockState | null): ClockState | null {
+    if (!game || !clock || !clock.running || clock.lastMoveAt === null || game.winner) return clock
+    const left = Math.max(0, (clock.times[game.turn] ?? 0) - (Date.now() - clock.lastMoveAt))
+    return { ...clock, times: { ...clock.times, [game.turn]: left }, lastMoveAt: Date.now() }
+  }
+
+  /** Ends the game if the side to move has run out of time. */
+  private async flagIfNeeded(
+    meta: Meta,
+    game: GameState | null,
+    clock: ClockState | null,
+  ): Promise<boolean> {
+    if (!game || game.winner || !clock || !clock.running || clock.lastMoveAt === null) return false
+    if ((clock.times[game.turn] ?? 0) - (Date.now() - clock.lastMoveAt) > 0) return false
+    await this.finishTimeout(meta, game, clock)
+    return true
+  }
+
+  /** The side to move ran out of time: the other side wins. */
+  private async finishTimeout(meta: Meta, game: GameState, clock: ClockState): Promise<void> {
+    const side = game.turn
+    const order = meta.variant.teams.map((team) => team.id)
+    const index = order.indexOf(side)
+    const next: GameState = { ...game, winner: order[(index + 1) % order.length] ?? null, status: 'timeout' }
+    const nextClock: ClockState = {
+      ...clock,
+      times: { ...clock.times, [side]: 0 },
+      lastMoveAt: null,
+      running: false,
+    }
+    this.game = next
+    this.clock = nextClock
+    await this.save()
+    await this.scheduleAlarm(meta, next, nextClock)
+    this.broadcast({ t: 'state', game: next, clockState: nextClock })
+  }
+
   async alarm(): Promise<void> {
+    const loaded = await this.load()
+    if (!loaded) return
+    const { meta } = loaded
+    // The clock's alarm can come before the room's expiry.
+    if (await this.flagIfNeeded(meta, loaded.game, loaded.clock)) return
+
+    const expiry =
+      (meta.startedAt ?? meta.createdAt) +
+      (meta.startedAt !== null ? PLAYED_ROOM_TTL : EMPTY_ROOM_TTL)
+    if (Date.now() < expiry) {
+      await this.scheduleAlarm(meta, loaded.game, loaded.clock)
+      return
+    }
+
     await this.ctx.storage.deleteAll()
     this.meta = null
     this.game = null
+    this.clock = null
   }
 }
 
 /* ------------------------------------------------------------------ helpers */
+
+function normalizeClock(value: unknown): ClockSettings {
+  if (!value || typeof value !== 'object') return NO_CLOCK
+  const { minutes, increment } = value as Partial<ClockSettings>
+  if (!Number.isInteger(minutes) || !Number.isInteger(increment)) return NO_CLOCK
+  const m = Math.max(0, Math.min(180, minutes!))
+  const i = Math.max(0, Math.min(180, increment!))
+  return m > 0 ? { minutes: m, increment: i } : NO_CLOCK
+}
 
 function vec(value: unknown): Vec | null {
   if (!value || typeof value !== 'object') return null

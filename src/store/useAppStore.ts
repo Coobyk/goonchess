@@ -315,6 +315,7 @@ export const useAppStore = create<AppState>((set, get) => {
       selected: null,
       legalMoves: [],
       undoStack: [createInitialState(variant)],
+      clockState: initialClockState(get().clock, variant.teams.map((team) => team.id)),
       variantHistory: [...get().variantHistory, previous].slice(-60),
       variantFuture: [],
       botSide: sideFor(bot, variant, get().botSide),
@@ -332,11 +333,19 @@ export const useAppStore = create<AppState>((set, get) => {
       selected: null,
       legalMoves: [],
       undoStack: [],
+      clockState: initialClockState(get().clock, variant.teams.map((team) => team.id)),
       variantHistory: history,
       variantFuture: future,
       botSide: sideFor(bot, variant, get().botSide),
     })
   }
+
+  /**
+   * The room's clock is the truth, but its timestamps are the server's clock.
+   * Rebasing to this browser makes the display tick from the moment it arrived.
+   */
+  const rebaseClock = (state: ClockState | null | undefined): ClockState | null =>
+    state ? { ...state, lastMoveAt: state.running ? Date.now() : null } : null
 
   /** Folds a message from the room into the store. */
   const receive = (code: string, message: ServerMessage) => {
@@ -346,9 +355,15 @@ export const useAppStore = create<AppState>((set, get) => {
     if (message.t === 'hello') {
       if (message.you.token) writeSeatToken(code, message.you.token)
       const game = message.game ?? createInitialState(message.variant)
+      const clock = message.clock ?? NO_CLOCK
+      const clockState =
+        rebaseClock(message.clockState) ??
+        initialClockState(clock, message.variant.teams.map((team) => team.id))
       set({
         variant: message.variant,
         game,
+        clock,
+        clockState,
         undoStack: [game],
         selected: null,
         legalMoves: [],
@@ -410,6 +425,7 @@ export const useAppStore = create<AppState>((set, get) => {
       set({
         game: state,
         undoStack: stack,
+        clockState: rebaseClock(message.clockState) ?? get().clockState,
         selected: null,
         legalMoves: [],
         pendingPromotion: null,
@@ -429,6 +445,10 @@ export const useAppStore = create<AppState>((set, get) => {
       next.winner === local.winner &&
       next.status === local.status
     ) {
+      // The move is already on the board; the clock that came with the echo is
+      // still the room's, so it replaces the local countdown.
+      const echoed = rebaseClock(message.clockState)
+      if (echoed) set({ clockState: echoed })
       return
     }
 
@@ -446,6 +466,7 @@ export const useAppStore = create<AppState>((set, get) => {
       pendingPromotion: null,
       queuedMove: null,
       reviewingHistory: false,
+      clockState: rebaseClock(message.clockState) ?? get().clockState,
       online: {
         ...online,
         status: next.winner ? 'over' : online.seat === null ? 'spectating' : 'playing',
@@ -821,9 +842,11 @@ export const useAppStore = create<AppState>((set, get) => {
 
     playMove: (move, origin, promotionTypeId) => {
       const { game, boardAnimating } = get()
-      // No clock travels with a shared game yet, so the local clock is off.
       const online = get().online
-      const clock = online ? NO_CLOCK : get().clock
+      // A shared game's time control came with the room; the move is still
+      // settled locally for an instant display and replaced by the room's own
+      // numbers when the position comes back.
+      const clock = get().clock
       const clockState = get().clockState
       if (game.winner) return
       if (online) {
@@ -850,8 +873,9 @@ export const useAppStore = create<AppState>((set, get) => {
         const mover = game.turn
         const elapsed = now - clockState.lastMoveAt
         const left = Math.max(0, (clockState.times[mover] ?? 0) - elapsed)
-        if (left <= 0) {
-          // The flag fell before the move was made.
+        if (left <= 0 && !online) {
+          // The flag fell before the move was made. Online, the room owns the
+          // flag, so the move is still sent and the room decides.
           const order = game.variant.teams.map((t) => t.id)
           const index = order.indexOf(mover)
           set({
@@ -991,6 +1015,9 @@ export const useAppStore = create<AppState>((set, get) => {
       set({
         view: 'play',
         makerTab: 'board',
+        // The room's own time control arrives with the hello.
+        clock: NO_CLOCK,
+        clockState: initialClockState(NO_CLOCK, get().variant.teams.map((team) => team.id)),
         online: {
           code,
           seat: null,
@@ -1018,7 +1045,14 @@ export const useAppStore = create<AppState>((set, get) => {
     leaveOnline: () => {
       room?.close()
       room = null
-      if (get().online) set({ online: null })
+      if (!get().online) return
+      // Back to this browser's own settings; the room's clock stays with it.
+      const clock = loadClockSettings()
+      set({
+        online: null,
+        clock,
+        clockState: initialClockState(clock, get().variant.teams.map((team) => team.id)),
+      })
     },
 
     startOnlineGame: async () => {
@@ -1027,7 +1061,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // The proof is the only thing standing between a script and a thousand
       // rooms, so it is asked for before the request goes out.
       const proof = await proveWork()
-      const created = await createRoom(variant, proof)
+      const created = await createRoom(variant, proof, get().clock)
       writeSeatToken(created.code, created.token)
       get().joinOnline(created.code)
       return created
@@ -1085,6 +1119,8 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setClock: (settings) => {
+      // An online game's time control came with the link.
+      if (get().online) return
       saveClockSettings(settings)
       set({
         clock: settings,
@@ -1102,6 +1138,14 @@ export const useAppStore = create<AppState>((set, get) => {
       const side = game.turn
       const left = (clockState.times[side] ?? 0) - elapsed
       if (left <= 0) {
+        if (get().online) {
+          // The room calls the flag; the display just holds at zero until it
+          // says so.
+          set({
+            clockState: { ...clockState, times: { ...clockState.times, [side]: 0 }, lastMoveAt: now },
+          })
+          return
+        }
         // The flag fell: the other side wins.
         const order = game.variant.teams.map((t) => t.id)
         const index = order.indexOf(side)

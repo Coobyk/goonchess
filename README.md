@@ -53,7 +53,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
   and lives in the Learn page, next to the guide to the rules.
 - **Chess clocks** — time per side with an increment, from 1+0 to 15+10. The
   clock starts with the first move, and the bot never uses more than a third of
-  its time.
+  its time. In a shared game the room owns the clock: the time control travels
+  with the link, both sides see the same countdown, and a flag falls on its own
+  even when nobody is connected.
 - **Replay and export** — step through any game again, and write it out as a
   picture, an animated GIF or a video (MP4 where the browser can record it).
   Positions also export as PNG, as PGN with algebraic notation, and as FEN,

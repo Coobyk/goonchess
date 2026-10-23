@@ -416,6 +416,7 @@ export function PlayView() {
             </PopoverContent>
           </Popover>
 
+          {!online && (
           <Popover>
             <PopoverTrigger asChild>
               <Button variant={clockIsOn(clock) ? 'secondary' : 'outline'} size="sm">
@@ -453,6 +454,7 @@ export function PlayView() {
               </div>
             </PopoverContent>
           </Popover>
+          )}
 
           <Popover>
             <PopoverTrigger asChild>
