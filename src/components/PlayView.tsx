@@ -397,16 +397,16 @@ export function PlayView() {
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start"
-                  onClick={() => {
-                    const pgn = toPgn(game)
-                    downloadBlob(
-                      new Blob([pgn], { type: 'application/x-chess-pgn' }),
-                      fileNameFor(game.variant.name, 'pgn'),
-                    )
-                    toast.success('Game exported as PGN')
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(toPgn(game))
+                      toast.success('PGN copied')
+                    } catch {
+                      toast.error('Clipboard unavailable.')
+                    }
                   }}
                 >
-                  <FileText /> Export game as PGN
+                  <FileText /> Copy game as PGN
                 </Button>
                 <Button
                   variant="ghost"
