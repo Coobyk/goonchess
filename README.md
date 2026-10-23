@@ -45,9 +45,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
   looks at the position on the board and says what it thinks: a score for the
   first army, with a bar to the left of the board showing the same thing. And
   **Computer**, which looks at the whole game and draws a graph of how it
-  went, in dithered pixels — the graph is drawn by the
-  [Dither Kit](https://tripwire.sh/dither-kit), the same engine behind its
-  area charts and sparklines. The threat visualiser lives in the same card.
+  went — a trace on a hairline grid, with the move the board is on marked in
+  brass. The threat visualiser lives in the same card.
 - **Puzzles** — positions taken from games the bot played against itself, each
   with a capture that cannot be taken back. The panel counts the ones you solve
   and lives in the Learn page, next to the guide to the rules.
