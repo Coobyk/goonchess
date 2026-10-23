@@ -47,10 +47,39 @@ function formatScore(value: number): string {
 }
 
 /**
+ * A curve through the points, as cubic Béziers.
+ *
+ * The control points come from the neighbours either side — a Catmull-Rom
+ * spline — so the line arrives at every score and stays smooth between them,
+ * and each one is held inside the plot band: a free spline can bow out over
+ * the edge of the window where a mate spike meets a flat line.
+ */
+function smoothPath(
+  points: { x: number; y: number }[],
+  top: number,
+  bottom: number,
+): string {
+  if (points.length === 0) return ''
+  const band = (value: number) => Math.max(top, Math.min(bottom, value))
+  let path = `M${points[0].x} ${points[0].y}`
+  for (let i = 0; i < points.length - 1; i++) {
+    const before = points[Math.max(i - 1, 0)]
+    const from = points[i]
+    const to = points[i + 1]
+    const after = points[Math.min(i + 2, points.length - 1)]
+    path +=
+      ` C${from.x + (to.x - before.x) / 6} ${band(from.y + (to.y - before.y) / 6)}` +
+      ` ${to.x - (after.x - from.x) / 6} ${band(to.y - (after.y - from.y) / 6)}` +
+      ` ${to.x} ${to.y}`
+  }
+  return path
+}
+
+/**
  * The graph of a game.
  *
- * It shows how the position stood after every move: a stair-step trace drawn
- * like an instrument readout, on a hairline grid, with level marked heavier
+ * It shows how the position stood after every move: one smooth trace read
+ * like an instrument chart, on a hairline grid, with level marked heavier
  * than the rest. The line is ink rather than a bright colour so it sits beside
  * the board without competing with it, and only the move the game is on gets
  * the brass mark.
@@ -89,10 +118,12 @@ export function AnalysisGraph({
   const x = (i: number) => PAD.left + (i / (n - 1)) * plotW
   const y = (value: number) => PAD.top + plotH * (0.5 - value / (2 * top))
 
-  // One pass out along the values, one step per move: the score holds until
-  // the next move is played, which is what the number actually means.
-  let trace = `M${x(0)} ${y(values[0])}`
-  for (let i = 1; i < n; i++) trace += ` H${x(i)} V${y(values[i])}`
+  // One curve through every score. A score is a position, not a wall: the
+  // line runs from move to move instead of stepping down a square each time,
+  // with the control points held inside the plot so a mate spike cannot throw
+  // the curve out over the axis.
+  const points = values.map((value, i) => ({ x: x(i), y: y(value) }))
+  const trace = smoothPath(points, PAD.top, PAD.top + plotH)
   const area = `${trace} V${y(0)} H${x(0)} Z`
 
   // The gridlines, and the labels at the ends of the window.
@@ -104,10 +135,8 @@ export function AnalysisGraph({
     if (!element) return null
     const rect = element.getBoundingClientRect()
     if (rect.width <= PAD.left + PAD.right) return null
-    // The trace holds its score until the next move, so the move under the
-    // pointer is the one whose step it is standing on, not the nearest one.
     const at = (clientX - rect.left - PAD.left) / plotW
-    return Math.max(0, Math.min(n - 1, Math.floor(at * (n - 1))))
+    return Math.max(0, Math.min(n - 1, Math.round(at * (n - 1))))
   }
 
   const readout = hover ?? current ?? null
@@ -136,7 +165,6 @@ export function AnalysisGraph({
             width={width}
             height={HEIGHT}
             className="pointer-events-none absolute inset-0 overflow-visible"
-            shapeRendering="crispEdges"
           >
             {gridlines.map((value) => (
               <line
@@ -161,7 +189,15 @@ export function AnalysisGraph({
             />
 
             <path d={area} fill="var(--foreground)" fillOpacity={0.06} stroke="none" />
-            <path d={trace} fill="none" stroke="var(--foreground)" strokeOpacity={0.72} strokeWidth={1} />
+            <path
+              d={trace}
+              fill="none"
+              stroke="var(--foreground)"
+              strokeOpacity={0.78}
+              strokeWidth={1.25}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
 
             {/* The move the board is on: a hairline through the plot, and the
                 score itself as a small brass square on the trace. */}
