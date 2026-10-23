@@ -1,4 +1,5 @@
 import type { GameState, Variant, Vec } from '@/engine/types'
+import type { ClockSettings, ClockState } from '@/lib/clock'
 
 /**
  * The HTTP and socket side of a shared game.
@@ -33,15 +34,21 @@ export type ServerMessage =
       you: { seat: number | null; token: string | null }
       variant: Variant
       game: GameState | null
+      /** The time control the room enforces, and where it stands. */
+      clock: ClockSettings
+      clockState: ClockState | null
       seats: boolean[]
       started: boolean
       name: string
       teams: string[]
     }
-  | { t: 'state'; game: GameState }
+  | { t: 'state'; game: GameState; clockState?: ClockState | null }
   | { t: 'presence'; presence: boolean[]; watchers: number }
-  /** A refusal carries the position the room holds, so the board can be put back. */
-  | { t: 'error'; code: string; game?: GameState }
+  /**
+   * A refusal carries the position and clock the room holds, so the board can
+   * be put back.
+   */
+  | { t: 'error'; code: string; game?: GameState; clockState?: ClockState | null }
 
 const seatKey = (code: string) => `goonchess.seat.${code}`
 
@@ -80,11 +87,12 @@ export interface CreateResult {
 export async function createRoom(
   variant: Variant,
   captcha: { challenge: string; solution: string },
+  clock: ClockSettings,
 ): Promise<CreateResult> {
   const response = await fetch('/api/games', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ variant, captcha }),
+    body: JSON.stringify({ variant, captcha, clock }),
   })
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string }
