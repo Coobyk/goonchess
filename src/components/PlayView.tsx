@@ -168,8 +168,12 @@ export function PlayView() {
         )}
         {(() => {
           const team = variant.teams[1]
+          const other = variant.teams[0]
           const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
-          const material = lost.reduce((sum, c) => sum + (variant.pieceTypes.find((p) => p.id === c.typeId)?.value ?? 0), 0)
+          const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
+          const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
+          // The difference, not what each side has taken: equal material shows nothing.
+          const advantage = game.captured.filter((c) => c.team === other.id).reduce((sum, c) => sum + value(c.typeId), 0) - material
           return (
             <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
               <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
@@ -187,15 +191,23 @@ export function PlayView() {
                   )
                 })}
               </div>
-              <span className="text-muted-foreground text-xs tabular-nums">{material} pts</span>
+              {advantage !== 0 && (
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {advantage > 0 ? '+' : ''}{advantage} pts
+                </span>
+              )}
             </div>
           )
         })()}
         <GameBoard />
         {(() => {
           const team = variant.teams[0]
+          const other = variant.teams[1]
           const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
-          const material = lost.reduce((sum, c) => sum + (variant.pieceTypes.find((p) => p.id === c.typeId)?.value ?? 0), 0)
+          const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
+          const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
+          // The difference, not what each side has taken: equal material shows nothing.
+          const advantage = game.captured.filter((c) => c.team === other.id).reduce((sum, c) => sum + value(c.typeId), 0) - material
           return (
             <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
               <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
@@ -213,7 +225,11 @@ export function PlayView() {
                   )
                 })}
               </div>
-              <span className="text-muted-foreground text-xs tabular-nums">{material} pts</span>
+              {advantage !== 0 && (
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {advantage > 0 ? '+' : ''}{advantage} pts
+                </span>
+              )}
             </div>
           )
         })()}
