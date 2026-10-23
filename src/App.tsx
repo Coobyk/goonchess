@@ -73,6 +73,7 @@ export default function App() {
                 >
                   commit {__BUILD_COMMIT__.slice(0, 7)}
                 </a>
+                <span>({ago})</span>
               )}
             </span>
           </div>
