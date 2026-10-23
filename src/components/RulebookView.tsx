@@ -204,7 +204,7 @@ export function RulebookView() {
             <p className="label-mono flex items-center gap-1.5">
               <BookOpen className="size-3" /> Learn
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] sm:text-[2.5rem] sm:leading-[1.05]">
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-[-0.03em] sm:text-[2.5rem] sm:leading-[1.05]">
               {variant.name}
             </h1>
             <p className="text-muted-foreground mt-2.5 text-sm sm:text-base">

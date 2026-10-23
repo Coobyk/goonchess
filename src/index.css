@@ -2,12 +2,16 @@
 @import 'tw-animate-css';
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource-variable/newsreader';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
+  /* The one serif in the system: page and dialog titles only, so the
+     interface keeps its sans and mono voice everywhere else. */
+  --font-display: 'Newsreader Variable', ui-serif, Georgia, serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

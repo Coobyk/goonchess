@@ -64,7 +64,7 @@ export function MakerView() {
         <header className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
           <div className="min-w-0">
             <p className="label-mono">Maker</p>
-            <h1 className="mt-1 truncate text-xl font-semibold tracking-[-0.02em]">
+            <h1 className="font-display mt-1 truncate text-xl font-semibold tracking-[-0.02em]">
               {variant.name}
             </h1>
           </div>
