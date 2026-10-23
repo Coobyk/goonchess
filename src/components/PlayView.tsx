@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from 'sonner'
 import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
@@ -15,6 +15,8 @@ import { Separator } from './ui/separator'
 import { Alert, AlertDescription, AlertTitle } from './ui/alert'
 import { Label } from './ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
+import { Textarea } from './ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { useAppStore } from '@/store/useAppStore'
 import { OnlineBar } from './OnlineBar'
@@ -84,7 +86,9 @@ export function PlayView() {
   const setClock = useAppStore((s) => s.setClock)
   const botThinking = useAppStore((s) => s.botThinking)
   const setOpponentOpen = useAppStore((s) => s.setOpponentOpen)
-
+  const [exportOpen, setExportOpen] = useState(false)
+  const [pgnExport, setPgnExport] = useState<{ text: string; filename: string } | null>(null)
+  const exportTriggerRef = useRef<HTMLButtonElement>(null)
 
   const prevWinner = useRef(game.winner)
 
@@ -119,6 +123,63 @@ export function PlayView() {
       <WinConfetti />
       <BotPlayer />
       <ClockTicker />
+      <Dialog open={pgnExport !== null} onOpenChange={(open) => !open && setPgnExport(null)}>
+        <DialogContent
+          className="sm:max-w-xl [&>[data-slot=dialog-close]]:-m-3.5 [&>[data-slot=dialog-close]]:p-3.5"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            exportTriggerRef.current?.focus()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="size-4" /> Export game as PGN
+            </DialogTitle>
+            <DialogDescription>
+              View the game notation, copy it, or download a .pgn file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-w-0 space-y-3">
+            <Label htmlFor="export-pgn">Game PGN</Label>
+            <Textarea
+              id="export-pgn"
+              readOnly
+              value={pgnExport?.text ?? ''}
+              className="h-64 max-h-[40vh] min-h-24 field-sizing-fixed font-mono text-xs"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="min-h-11"
+                onClick={async () => {
+                  if (!pgnExport) return
+                  try {
+                    await navigator.clipboard.writeText(pgnExport.text)
+                    toast.success('PGN copied')
+                  } catch {
+                    toast.error('Clipboard unavailable. Select the PGN text and copy manually.')
+                  }
+                }}
+              >
+                <ClipboardCopy /> Copy PGN
+              </Button>
+              <Button
+                variant="outline"
+                className="min-h-11"
+                onClick={() => {
+                  if (!pgnExport) return
+                  downloadBlob(
+                    new Blob([pgnExport.text], { type: 'application/x-chess-pgn;charset=utf-8' }),
+                    pgnExport.filename,
+                  )
+                  toast.success('Game saved as PGN')
+                }}
+              >
+                <Download /> Download PGN
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-col items-center gap-4">
         <OnlineBar />
         {pendingPromotion && (
@@ -366,13 +427,19 @@ export function PlayView() {
           </Popover>
           )}
 
-          <Popover>
+          <Popover open={exportOpen} onOpenChange={setExportOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button ref={exportTriggerRef} variant="outline" size="sm">
                 <Download /> Export
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-72" align="center">
+            <PopoverContent
+              className="w-72"
+              align="center"
+              onCloseAutoFocus={(event) => {
+                if (pgnExport) event.preventDefault()
+              }}
+            >
               <div className="space-y-2">
                 <Button
                   variant="ghost"
@@ -397,16 +464,15 @@ export function PlayView() {
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(toPgn(game))
-                      toast.success('PGN copied')
-                    } catch {
-                      toast.error('Clipboard unavailable.')
-                    }
+                  onClick={() => {
+                    setPgnExport({
+                      text: toPgn(game),
+                      filename: fileNameFor(positionName(game), 'pgn'),
+                    })
+                    setExportOpen(false)
                   }}
                 >
-                  <FileText /> Copy game as PGN
+                  <FileText /> View game as PGN
                 </Button>
                 <Button
                   variant="ghost"
