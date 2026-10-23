@@ -28,7 +28,7 @@ export function EvalBar({
   return (
     <div
       className={cn(
-        'relative flex h-full w-5 shrink-0 overflow-hidden rounded-full border bg-zinc-800',
+        'relative flex h-full w-5 shrink-0 overflow-hidden rounded-sm border bg-zinc-800',
         className,
       )}
       title={`${label} for the first army`}
