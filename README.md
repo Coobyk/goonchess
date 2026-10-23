@@ -15,7 +15,7 @@ Deployable to Cloudflare Workers with GitHub Actions.
   The same position three times is a draw, counted with the same rule chess
   uses: the pieces, the side to move, the castles still possible and the en
   passant right all have to match. The board wears the brown of Lichess,
-  `#f0d9b5` and `#b58863`, in light and in dark mode alike.
+  `#eedcb8` and `#b07a4e`, in light and in dark mode alike.
 - **Random pieces** — any piece can be marked random. After every move it is
   given a new kind, drawn at random from the kinds of the variant, and it wears
   the colours of a rainbow so you can see at a glance that it is not what it
@@ -46,7 +46,7 @@ Deployable to Cloudflare Workers with GitHub Actions.
   first army, with a bar to the left of the board showing the same thing. And
   **Computer**, which looks at the whole game and draws a graph of how it
   went — a trace on a hairline grid, with the move the board is on marked in
-  brass. The threat visualiser lives in the same card.
+  brass. The threat visualiser sits below it in the same rail.
 - **Puzzles** — positions taken from games the bot played against itself, each
   with a capture that cannot be taken back. The panel counts the ones you solve
   and lives in the Learn page, next to the guide to the rules.
@@ -119,6 +119,26 @@ Deployable to Cloudflare Workers with GitHub Actions.
   roughly 500 characters instead of several thousand. Links use the `#v2=`
   hash; older `#v=` links still load.
 
+## Design
+
+The interface is built as an instrument panel rather than a dashboard:
+
+- **Hairlines, not shadows.** Sections are divided by single-pixel rules and
+  panels sit at a 2px radius. The board is the only object on the page with a
+  shadow, so it reads as a plate resting on the surface.
+- **One accent.** `--signal`, a brass borrowed from the board (`#c9a469` in
+  dark, `#8a6524` in light), marks only what is live: the side to move, the
+  move the graph is on, an online game. Everything else is ink on paper.
+- **Three typefaces, three jobs.** Geist for the interface, JetBrains Mono
+  for anything that is data or a label — the mono small-caps at `10px` with
+  wide tracking is the label voice of every section — and Newsreader, one
+  serif, for page and dialog titles only.
+- **Dark first, light kept.** The dark theme is `#0b0b0c` with hairline
+  borders; the light theme is the same drawing with warm paper
+  (`#f7f6f2`), and the board keeps its colours in both.
+- A faint drawing-sheet grid sits behind the page and fades out before it
+  reaches the board.
+
 ## Dev
 
 ```bash
@@ -140,3 +160,10 @@ Without `CAPTCHA_SECRET` the site still plays offline, but creating an online
 game returns 503. The Durable Object and its storage are created by the
 migration in `wrangler.toml` on the first deploy; there is nothing to set up by
 hand. The workflow can also be started manually from the Actions tab.
+
+The `revamp` branch has its own Worker of its own and its own hostname: every
+push to it deploys `goonchess-revamp` to `revamp.goonchess.com` through the
+`Deploy revamp` workflow, declared as `[env.revamp]` in `wrangler.toml`. It has
+its own `CAPTCHA_SECRET` (a Worker of its own cannot see the production one),
+and it never touches `goonchess.com` — merging `revamp` into `main` is what
+ships it.
