@@ -500,7 +500,7 @@ export function PlayView() {
           </CardHeader>
           <CardContent className="px-4">
             <Separator className="mb-2" />
-            <ScrollArea className="h-48 pr-2" ref={moveHistoryRef}>
+            <div ref={moveHistoryRef} className="h-48 overflow-y-auto pr-2">
               {fullMoves.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No moves yet.</p>
               ) : (
@@ -545,7 +545,7 @@ export function PlayView() {
                   })}
                 </ol>
               )}
-            </ScrollArea>
+            </div>
           </CardContent>
         </Card>
 
