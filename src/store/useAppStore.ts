@@ -271,13 +271,25 @@ export function normalizeVariant(input: unknown): Variant | null {
 /** Older variants stored a single promotion target. */
 function normalizePromotion(promotion: unknown): { typeIds: string[] } | null {
   if (!promotion) return null
+  const clean = (value: unknown) =>
+    Array.isArray(value)
+      ? value.filter((id): id is string => typeof id === 'string' && !!id)
+      : []
   if (Array.isArray(promotion)) {
-    const typeIds = promotion.filter((id): id is string => typeof id === 'string' && !!id)
+    const typeIds = clean(promotion)
     return typeIds.length ? { typeIds } : null
   }
-  if (typeof promotion === 'object' && 'typeId' in promotion) {
-    const typeId = (promotion as { typeId?: unknown }).typeId
-    return typeof typeId === 'string' && typeId ? { typeIds: [typeId] } : null
+  if (typeof promotion === 'object') {
+    // The current shape: an ordered list of pieces the player may choose.
+    if ('typeIds' in promotion) {
+      const typeIds = clean((promotion as { typeIds?: unknown }).typeIds)
+      return typeIds.length ? { typeIds } : null
+    }
+    // The original shape: a single target.
+    if ('typeId' in promotion) {
+      const typeId = (promotion as { typeId?: unknown }).typeId
+      return typeof typeId === 'string' && typeId ? { typeIds: [typeId] } : null
+    }
   }
   return null
 }
@@ -776,6 +788,9 @@ export const useAppStore = create<AppState>((set, get) => {
     selectSquare: (x, y, origin) => {
       const { game, selected, legalMoves, bot, botSide } = get()
       if (game.winner) return
+      // While the promotion picker is open the board is frozen, so a stray click
+      // cannot steal the choice or start another move.
+      if (get().pendingPromotion) return
       // In a shared game only the player whose turn it is may touch the board.
       const online = get().online
       if (online) {
@@ -906,7 +921,11 @@ export const useAppStore = create<AppState>((set, get) => {
         }
       }
 
-      const next = applyMove(game, { ...move, promotionTypeId }, { origin, san: true })
+      const next = applyMove(
+        game,
+        { ...move, promotionTypeId: promotionTypeId ?? move.promotionTypeId },
+        { origin, san: true },
+      )
       // A piece marked random turns into another kind after every move. The
       // piece that has just moved keeps its kind, so a promotion is seen.
       const settled = rollRandomPieces(next, move.pieceId)

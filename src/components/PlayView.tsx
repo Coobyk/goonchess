@@ -10,6 +10,7 @@ import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
 import { WinConfetti } from './WinConfetti'
 import { Button } from './ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { Separator } from './ui/separator'
 import { Label } from './ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
@@ -161,6 +162,7 @@ export function PlayView() {
   const pendingPromotion = useAppStore((s) => s.pendingPromotion)
   const choosePromotion = useAppStore((s) => s.choosePromotion)
   const cancelPromotion = useAppStore((s) => s.cancelPromotion)
+  const promotionIds = pendingPromotion?.move.promotionOptions ?? []
   const clock = useAppStore((s) => s.clock)
   const setClock = useAppStore((s) => s.setClock)
   const botThinking = useAppStore((s) => s.botThinking)
@@ -184,6 +186,21 @@ export function PlayView() {
     }
   }, [game.winner, game.status])
 
+  // Number keys pick a promotion, the way the board's own shortcuts work.
+  useEffect(() => {
+    const options = pendingPromotion?.move.promotionOptions ?? []
+    if (!options.length) return
+    const onKey = (event: KeyboardEvent) => {
+      const index = Number(event.key) - 1
+      if (Number.isInteger(index) && index >= 0 && index < options.length) {
+        event.preventDefault()
+        choosePromotion(options[index])
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pendingPromotion, choosePromotion])
+
   const teamIndex = (id: string) => variant.teams.findIndex((t) => t.id === id)
   // The moves of the whole game, even when the board has been moved back to an
   // earlier position.
@@ -200,35 +217,54 @@ export function PlayView() {
       <WinConfetti />
       <BotPlayer />
       <ClockTicker />
-      <div className="mx-auto flex w-full max-w-[640px] min-w-0 flex-col items-center gap-3">
-        <OnlineBar />
-        {pendingPromotion && (
+      <Dialog
+        open={!!pendingPromotion}
+        onOpenChange={(open) => {
+          if (!open) cancelPromotion()
+        }}
+      >
+        <DialogContent className="max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Promote</DialogTitle>
+            <DialogDescription>
+              Your piece reached the last rank. Choose what it becomes.
+            </DialogDescription>
+          </DialogHeader>
           <div
-            role="dialog"
-            aria-label="Choose a promotion"
-            className="flex w-full flex-wrap items-center justify-center gap-2 border bg-card p-2.5"
+            className={cn(
+              'grid gap-2',
+              promotionIds.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2',
+            )}
           >
-            <span className="text-muted-foreground mr-1 text-sm">Promote into</span>
-            {(pendingPromotion.move.promotionOptions ?? []).map((typeId) => {
+            {promotionIds.map((typeId, index) => {
               const type = variant.pieceTypes.find((p) => p.id === typeId)
               if (!type) return null
               return (
                 <button
                   key={typeId}
                   type="button"
+                  autoFocus={index === 0}
                   onClick={() => choosePromotion(typeId)}
-                  className="flex items-center gap-2 rounded-[2px] border px-2.5 py-1.5 text-[13px] transition-colors hover:border-foreground/25 hover:bg-accent"
+                  className="group relative flex flex-col items-center gap-2 rounded-[3px] border bg-card px-2 py-4 transition-colors hover:border-foreground/30 hover:bg-accent focus-visible:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <PieceGlyph piece={type} teamIndex={teamIndex(game.turn)} size={22} />
-                  {type.name}
+                  <PieceGlyph piece={type} teamIndex={teamIndex(game.turn)} size={40} />
+                  <span className="text-[13px] leading-none">{type.name}</span>
+                  <kbd className="label-mono absolute top-1.5 right-2 text-[10px] text-muted-foreground">
+                    {index + 1}
+                  </kbd>
                 </button>
               )
             })}
-            <Button variant="ghost" size="sm" onClick={cancelPromotion}>
-              Cancel
-            </Button>
           </div>
-        )}
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={cancelPromotion}>
+              Cancel <kbd className="label-mono ml-1 text-[10px] text-muted-foreground">Esc</kbd>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="mx-auto flex w-full max-w-[640px] min-w-0 flex-col items-center gap-3">
+        <OnlineBar />
         {game.winner && (
           <div className="flex w-full items-center gap-3 border border-foreground/20 bg-secondary px-2.5 py-2">
             <Trophy className="text-signal size-4 shrink-0" />

@@ -1,4 +1,4 @@
-import { Copy, Layers, Plus, Trash2, Wand2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Layers, Plus, Trash2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import type { Effect, MovePattern, PieceArt, PieceIcon, PieceType, Vec } from '@/engine/types'
@@ -94,6 +94,29 @@ export function PiecesTab() {
   const set = (patch: Partial<PieceType>) => updatePieceType(piece.id, patch)
   const setMove = (move: MovePattern[]) => set({ move })
   const setCapture = (capture: MovePattern[]) => set({ capture })
+
+  // Promotion targets are kept in order. The first one is what the piece
+  // becomes when nobody is there to choose (the bot, or a one-option variant).
+  const promoIds = piece.promotion?.typeIds ?? []
+  const promoOthers = variant.pieceTypes.filter((p) => p.id !== piece.id)
+  const setPromotion = (typeIds: string[]) =>
+    set({ promotion: typeIds.length ? { typeIds } : null })
+  const togglePromotion = (typeId: string) =>
+    setPromotion(
+      promoIds.includes(typeId)
+        ? promoIds.filter((id) => id !== typeId)
+        : [...promoIds, typeId],
+    )
+  const movePromotion = (index: number, delta: number) => {
+    const target = index + delta
+    if (target < 0 || target >= promoIds.length) return
+    const next = [...promoIds]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setPromotion(next)
+  }
+  const standardPromotion = (['queen', 'rook', 'bishop', 'knight'] as const)
+    .map((icon) => promoOthers.find((p) => p.icon === icon))
+    .filter((p): p is PieceType => !!p)
 
   const addPattern = (list: 'move' | 'capture', kind: 'leaper' | 'slider') => {
     const pattern: MovePattern = { id: uid(), kind, vectors: [], maxRange: 0 }
@@ -536,24 +559,81 @@ export function PiecesTab() {
               option, or several — the player then chooses when the piece gets there.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {variant.pieceTypes
-                .filter((p) => p.id !== piece.id)
-                .map((p) => {
-                  const on = piece.promotion?.typeIds.includes(p.id) ?? false
+          <CardContent className="space-y-4">
+            {promoIds.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label className="label-mono text-[11px]">Promotion order</Label>
+                  <span className="text-muted-foreground text-[11px]">
+                    No. 1 is the default when nobody can choose
+                  </span>
+                </div>
+                <ol className="space-y-1">
+                  {promoIds.map((typeId, index) => {
+                    const type = variant.pieceTypes.find((p) => p.id === typeId)
+                    if (!type) return null
+                    return (
+                      <li
+                        key={typeId}
+                        className="flex items-center gap-2 rounded-[3px] border bg-card px-2 py-1.5"
+                      >
+                        <span className="label-mono text-muted-foreground w-4 text-center text-[11px]">
+                          {index + 1}
+                        </span>
+                        <PieceGlyph piece={type} teamIndex={0} size={20} />
+                        <span className="min-w-0 flex-1 truncate text-sm">{type.name}</span>
+                        {index === 0 && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Default
+                          </Badge>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-6"
+                          disabled={index === 0}
+                          aria-label={`Make ${type.name} promote sooner`}
+                          onClick={() => movePromotion(index, -1)}
+                        >
+                          <ChevronUp />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-6"
+                          disabled={index === promoIds.length - 1}
+                          aria-label={`Make ${type.name} promote later`}
+                          onClick={() => movePromotion(index, 1)}
+                        >
+                          <ChevronDown />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-6"
+                          aria-label={`Remove ${type.name}`}
+                          onClick={() => togglePromotion(typeId)}
+                        >
+                          <X />
+                        </Button>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="label-mono text-[11px]">Add a target</Label>
+              <div className="flex flex-wrap gap-2">
+                {promoOthers.map((p) => {
+                  const on = promoIds.includes(p.id)
                   return (
                     <button
                       key={p.id}
                       type="button"
                       aria-pressed={on}
-                      onClick={() => {
-                        const current = piece.promotion?.typeIds ?? []
-                        const typeIds = on
-                          ? current.filter((id) => id !== p.id)
-                          : [...current, p.id]
-                        set({ promotion: typeIds.length ? { typeIds } : null })
-                      }}
+                      onClick={() => togglePromotion(p.id)}
                       className={cn(
                         'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors',
                         on
@@ -566,10 +646,36 @@ export function PiecesTab() {
                     </button>
                   )
                 })}
+              </div>
             </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!standardPromotion.length}
+                onClick={() => setPromotion(standardPromotion.map((p) => p.id))}
+              >
+                Standard four
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!promoOthers.length}
+                onClick={() => setPromotion(promoOthers.map((p) => p.id))}
+              >
+                Every piece
+              </Button>
+              {promoIds.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setPromotion([])}>
+                  Clear
+                </Button>
+              )}
+            </div>
+
             <p className="text-muted-foreground text-xs">
-              {piece.promotion?.typeIds.length
-                ? piece.promotion.typeIds.length > 1
+              {promoIds.length
+                ? promoIds.length > 1
                   ? 'The player picks one of these when the piece promotes.'
                   : 'This piece always promotes into the piece above.'
                 : 'This piece never changes.'}

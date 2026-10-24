@@ -100,10 +100,20 @@ export function BotPlayer() {
 
 /** The legal move that matches what the bot wanted to play, if it is legal. */
 function legalMoveFor(state: GameState, wanted: Move): Move | undefined {
-  return getLegalMoves(state, wanted.from.x, wanted.from.y).find(
+  const candidates = getLegalMoves(state, wanted.from.x, wanted.from.y).filter(
     (m) =>
       m.pieceId === wanted.pieceId &&
       m.finalTo.x === wanted.finalTo.x &&
       m.finalTo.y === wanted.finalTo.y,
   )
+  if (!candidates.length) return undefined
+  // A promotion has one legal move per piece it may become. The engine picked
+  // the one it wants, so keep that choice instead of always taking the first.
+  if (wanted.promotionTypeId) {
+    const chosen = candidates.find((m) =>
+      (m.promotionOptions ?? []).includes(wanted.promotionTypeId!),
+    )
+    if (chosen) return { ...chosen, promotionTypeId: wanted.promotionTypeId }
+  }
+  return candidates[0]
 }

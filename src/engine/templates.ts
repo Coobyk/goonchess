@@ -107,7 +107,9 @@ export function classicChess(): Variant {
   const doubleStep = slider([{ x: 0, y: -1 }], 2)
   doubleStep.firstMoveOnly = true
   pawn.move = [...pawn.move, doubleStep]
-  pawn.promotion = { typeIds: [queen.id] }
+  // The player picks the piece: the queen is the default, but a rook, bishop
+  // or knight is just as legal.
+  pawn.promotion = { typeIds: [queen.id, rook.id, bishop.id, knight.id] }
 
   const pieceTypes = [king, queen, rook, bishop, knight, pawn]
   const setup: SetupPiece[] = []
@@ -158,7 +160,8 @@ export function miniChess(): Variant {
   const miniDouble = slider([{ x: 0, y: -1 }], 2)
   miniDouble.firstMoveOnly = true
   pawn.move = [...pawn.move, miniDouble]
-  pawn.promotion = { typeIds: [queen.id] }
+  // Queen, rook or knight — the player chooses on the last rank.
+  pawn.promotion = { typeIds: [queen.id, rook.id, knight.id] }
 
   const pieceTypes = [king, queen, rook, knight, pawn]
   const setup: SetupPiece[] = []
@@ -176,7 +179,7 @@ export function miniChess(): Variant {
     schema: 1,
     id: 'mini',
     name: 'Mini Chess',
-    description: 'A fast 6×6 duel. Pawns get a double step and promote to queens.',
+    description: 'A fast 6×6 duel. Pawns get a double step and promote on the back rank.',
     board: emptyBoard(6, 6),
     teams: [
       { id: 'white', name: 'White', color: '#f4f1ea', forward: 'up' },

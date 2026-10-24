@@ -498,7 +498,10 @@ export function RulebookView() {
                                 {piece.promotion.typeIds
                                   .map((id) => pieceName(id))
                                   .join(' or ')}{' '}
-                                when it reaches the far rank.
+                                when it reaches the far rank
+                                {piece.promotion.typeIds.length > 1
+                                  ? ', and the player chooses which.'
+                                  : '.'}
                               </span>
                             </li>
                           )}
