@@ -155,6 +155,10 @@ export type WinConditionKind =
   | 'kingCapture'
   | 'elimination'
   | 'points'
+  | 'center'
+  | 'threeCheck'
+  | 'antichess'
+  | 'race'
 
 export interface WinCondition {
   id: string
@@ -162,6 +166,20 @@ export interface WinCondition {
   /** points only */
   threshold?: number
 }
+
+/**
+ * Extra rules a variant can be built on, on top of how its pieces move.
+ * They change the way a move is played or judged, not who wins.
+ */
+export type VariantRule =
+  /** Every capture sets off an explosion around the square it landed on. */
+  | 'atomic'
+  /** Captured pieces join a hand and may be dropped back on the board. */
+  | 'crazyhouse'
+  /** Checking the opponent is itself against the rules. */
+  | 'noCheck'
+  /** The king and the rook never swap places. */
+  | 'noCastle'
 
 export interface Variant {
   schema: 1
@@ -173,6 +191,8 @@ export interface Variant {
   pieceTypes: PieceType[]
   setup: SetupPiece[]
   winConditions: WinCondition[]
+  /** The rules this variant plays under, beyond the pieces themselves. */
+  rules?: VariantRule[]
   /**
    * The seed the random pieces are rolled from. The same seed always plays
    * the same game, so a game can be rebuilt and shared.
@@ -268,6 +288,10 @@ export interface GameState {
     | 'timeout'
     | 'threefold'
     | 'resign'
+    | 'center'
+    | 'three-check'
+    | 'antichess'
+    | 'race'
   /** Where the rolls of the random pieces stand, so a game can be rebuilt. */
   randomSeed?: number
 }

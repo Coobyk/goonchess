@@ -14,6 +14,7 @@ import {
   type Terrain,
   type Tile,
   type Variant,
+  type VariantRule,
   type Vec,
   type WinCondition,
   type WinConditionKind,
@@ -30,10 +31,21 @@ import {
  *
  * Bump FORMAT_VERSION whenever the packed shape changes.
  */
-export const FORMAT_VERSION = 5
+export const FORMAT_VERSION = 6
 
 const TERRAINS: Terrain[] = ['normal', 'void', 'wall', 'portal', 'oneway']
-const WIN_KINDS: WinConditionKind[] = ['checkmate', 'kingCapture', 'elimination', 'points']
+const WIN_KINDS: WinConditionKind[] = [
+  'checkmate',
+  'kingCapture',
+  'elimination',
+  'points',
+  'center',
+  'threeCheck',
+  'antichess',
+  'race',
+]
+/** The extra rules a variant can be built on, packed as a bitfield. */
+const RULES: VariantRule[] = ['atomic', 'crazyhouse', 'noCheck', 'noCastle']
 const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
 const SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']
 
@@ -93,7 +105,18 @@ export function packVariant(variant: Variant): unknown {
       w.kind === 'points' ? [WIN_KINDS.indexOf('points'), w.threshold ?? 20] : [WIN_KINDS.indexOf(w.kind)],
     ),
     packRandomSeed(variant),
+    packRules(variant.rules),
   ]
+}
+
+/** The extra rules the variant is built on, as a bitfield. */
+function packRules(rules: VariantRule[] | undefined): number {
+  let bits = 0
+  for (const rule of rules ?? []) {
+    const bit = RULES.indexOf(rule)
+    if (bit >= 0) bits |= 1 << bit
+  }
+  return bits
 }
 
 /** The seed the random pieces are rolled from, if the variant has one. */
@@ -158,6 +181,7 @@ export function unpackVariant(input: unknown): Variant {
   // the random pieces themselves.
   if (
     input[0] !== FORMAT_VERSION &&
+    input[0] !== 5 &&
     input[0] !== 4 &&
     input[0] !== 3 &&
     input[0] !== 2
@@ -165,7 +189,7 @@ export function unpackVariant(input: unknown): Variant {
     throw new Error(`unsupported packed variant version: ${String(input[0])}`)
   }
 
-  const [, name, description, board, teams, pieces, setup, wins, chaos] = input
+  const [, name, description, board, teams, pieces, setup, wins, chaos, packedRules] = input
   if (!Array.isArray(board) || !Array.isArray(pieces)) {
     throw new Error('packed variant is missing required sections')
   }
@@ -291,7 +315,16 @@ export function unpackVariant(input: unknown): Variant {
     setup: setupList,
     winConditions,
     randomSeed: Number.isFinite(chaos) ? (chaos as number) : undefined,
+    rules: unpackRules(packedRules),
   }
+}
+
+/** The extra rules a variant is built on, read back from the bitfield. */
+function unpackRules(bits: unknown): VariantRule[] | undefined {
+  if (!Number.isFinite(bits as number)) return undefined
+  const mask = Number(bits)
+  const rules = RULES.filter((_, i) => (mask & (1 << i)) !== 0)
+  return rules.length ? rules : undefined
 }
 
 const asArray = (input: unknown): unknown[] => (Array.isArray(input) ? input : [])

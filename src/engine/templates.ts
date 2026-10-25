@@ -626,6 +626,27 @@ export function chess960(): Variant {
   }
 }
 
+/* ------------------------------------------------------- king of the hill */
+
+/**
+ * Classic chess with a hill in the middle: checkmate still wins, and so does
+ * walking your own king onto one of the four centre squares.
+ */
+export function kingOfTheHill(): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'king-of-the-hill',
+    name: 'King of the Hill',
+    description: 'Bring your King to the center to win the game.',
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+      { id: uid(), kind: 'center' },
+    ],
+  }
+}
+
 export const TEMPLATES: {
   id: string
   name: string
@@ -647,6 +668,12 @@ export const TEMPLATES: {
     description: 'A shuffled back rank',
     build: chess960,
     freshSetup: reshuffleChess960,
+  },
+  {
+    id: 'king-of-the-hill',
+    name: 'King of the Hill',
+    description: 'The king takes the centre',
+    build: kingOfTheHill,
   },
 ]
 

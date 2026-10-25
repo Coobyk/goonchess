@@ -1,4 +1,4 @@
-import { cloneState, findPiece, isInCheck, movesFor } from '../rules'
+import { centreSquares, cloneState, findPiece, isInCheck, movesFor } from '../rules'
 import type { GameState, Variant, Vec } from '../types'
 
 /**
@@ -39,6 +39,17 @@ function forwardOf(variant: Variant): Record<string, 'up' | 'down'> {
   for (const team of variant.teams) forward[team.id] = team.forward
   forwardCache.set(variant, forward)
   return forward
+}
+
+/** The hill, worked out once per variant — the evaluation asks every leaf. */
+const centreCache = new WeakMap<Variant, Vec[]>()
+
+function centresOf(variant: Variant): Vec[] {
+  const cached = centreCache.get(variant)
+  if (cached) return cached
+  const squares = centreSquares(variant.board)
+  centreCache.set(variant, squares)
+  return squares
 }
 
 /**
@@ -182,6 +193,10 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
   const maxDist = Math.max(1, Math.hypot(centerX, centerY))
   const span = Math.max(1, boardH - 1)
   const forward = forwardOf(variant)
+  // King of the Hill changes what a king is worth: it is the piece that wins.
+  const hillWins = variant.winConditions.some((w) => w.kind === 'center')
+  const hill = hillWins ? centresOf(variant) : []
+  const hillScale = Math.max(1, (boardW + boardH) / 4)
 
   let score = 0
   let royalCount = 0
@@ -200,6 +215,14 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
       score += sign * piece.value * MATERIAL_SCALE
 
       if (piece.flags.royal) {
+        if (hillWins) {
+          // A king in the middle of the board is normally in danger. Here it
+          // is halfway to winning, so the walk up the board is worth paying for.
+          const nearest = Math.min(
+            ...hill.map((c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y))),
+          )
+          score += sign * Math.max(0, 1 - nearest / hillScale) * 90
+        }
         // The royal piece is not measured by how far it has travelled or by
         // the square it holds — a king in the middle of the board is in
         // danger, not in a good place. It is measured by its safety instead.

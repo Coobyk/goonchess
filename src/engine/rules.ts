@@ -376,6 +376,8 @@ function castlingMoves(
   const width = geo.width
   // The king's file and the rook's file both have to exist.
   if (width < 4) return []
+  // Some games have no castling at all.
+  if (state.variant.rules?.includes('noCastle')) return []
   if (geo.tiles[y * width + x]?.terrain !== 'normal') return []
 
   const moves: Move[] = []
@@ -1321,6 +1323,24 @@ function checkSuffix(next: GameState): string {
 
 /* -------------------------------------------------------------- outcome */
 
+/** The squares in the middle of the board — the hill a king climbs. */
+export function centreSquares(board: { width: number; height: number }): Vec[] {
+  const xs = [...new Set([Math.floor((board.width - 1) / 2), Math.ceil((board.width - 1) / 2)])]
+  const ys = [...new Set([Math.floor((board.height - 1) / 2), Math.ceil((board.height - 1) / 2)])]
+  return ys.flatMap((y) => xs.map((x) => ({ x, y })))
+}
+
+/** Whether a team's royal piece is standing on one of those squares. */
+export function royalOnCentre(state: GameState, teamId: string): boolean {
+  for (const square of centreSquares(state.variant.board)) {
+    const id = state.board[square.y]?.[square.x]
+    if (!id) continue
+    const inst = state.pieces[id]
+    if (inst?.team === teamId && state.pieceTypes[inst.typeId]?.flags.royal) return true
+  }
+  return false
+}
+
 export function detectOutcome(
   state: GameState,
   mover: string,
@@ -1331,6 +1351,14 @@ export function detectOutcome(
   if (meta.capturedRoyal && variant.winConditions.some((w) => w.kind === 'kingCapture')) {
     state.winner = mover
     state.status = 'royal-captured'
+    return
+  }
+
+  // King of the Hill: a king that has walked onto the hill wins there and
+  // then — the move had to be legal, so it never stepped into check to do it.
+  if (variant.winConditions.some((w) => w.kind === 'center') && royalOnCentre(state, mover)) {
+    state.winner = mover
+    state.status = 'center'
     return
   }
 

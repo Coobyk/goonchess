@@ -37,6 +37,7 @@ const STATUS_TEXT: Record<string, string> = {
   stalemate: 'Stalemate — draw',
   timeout: 'Time ran out',
   threefold: 'Draw by threefold repetition',
+  center: 'The king took the hill',
 }
 
 /** The three strengths, as a compact row of buttons. */

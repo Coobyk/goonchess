@@ -1,4 +1,4 @@
-import { applyMove, isInCheck, legalMovesForTeam } from '../rules'
+import { applyMove, isInCheck, legalMovesForTeam, royalOnCentre } from '../rules'
 import { evaluate } from './evaluate'
 import { enPassantSensitive, hashPosition, TABLE_SIZE, type Fingerprint } from './hash'
 import type { GameState, Move, Variant } from '../types'
@@ -221,6 +221,7 @@ interface SearchContext {
   checkmateWins: boolean
   eliminationWins: boolean
   kingCaptureWins: boolean
+  centerWins: boolean
   teams: string[]
   /** The best line found, one array per ply. */
   pv: Move[][]
@@ -411,6 +412,14 @@ function sideScore(state: GameState, ctx: SearchContext): number {
 
 /** A finished game, or null while it is still being played. */
 function terminalScore(state: GameState, ply: number, ctx: SearchContext): number | null {
+  // A king has reached the hill: the side that stands there has won, and the
+  // side to move has lost.
+  if (ctx.centerWins) {
+    for (const team of ctx.teams) {
+      if (!royalOnCentre(state, team)) continue
+      return team === state.turn ? MATE - ply : -MATE + ply
+    }
+  }
   // The royal piece is gone: that side has lost.
   if (ctx.kingCaptureWins && !hasRoyal(state, state.turn)) return -MATE + ply
   // Everybody else is wiped out: the side to move has won.
@@ -654,6 +663,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     checkmateWins: false,
     eliminationWins: false,
     kingCaptureWins: false,
+    centerWins: false,
     teams: state.variant.teams.map((t) => t.id),
     pv: [],
     exclude: options.exclude?.length ? new Set(options.exclude) : undefined,
@@ -668,6 +678,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     if (condition.kind === 'checkmate') ctx.checkmateWins = true
     if (condition.kind === 'elimination') ctx.eliminationWins = true
     if (condition.kind === 'kingCapture') ctx.kingCaptureWins = true
+    if (condition.kind === 'center') ctx.centerWins = true
   }
 
   const random = mulberry32(options.seed ?? Math.floor(Math.random() * 1e9))

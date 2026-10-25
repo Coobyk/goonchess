@@ -51,6 +51,22 @@ const WIN_COPY: Record<string, { name: string; hint: string }> = {
     name: 'Point target',
     hint: 'Win by capturing material until you reach the point target.',
   },
+  center: {
+    name: 'King of the Hill',
+    hint: 'Walk your king onto one of the four centre squares and the game is yours at once.',
+  },
+  threeCheck: {
+    name: 'Three checks',
+    hint: 'Give check three times — the third one ends the game.',
+  },
+  antichess: {
+    name: 'Losing chess',
+    hint: 'Lose every piece, or be left with no move at all, and you win.',
+  },
+  race: {
+    name: 'The race',
+    hint: 'The first king to reach the far rank wins the game.',
+  },
 }
 
 const TURN_VIEW_COPY = {
