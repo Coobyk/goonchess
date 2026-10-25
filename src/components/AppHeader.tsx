@@ -3,17 +3,18 @@ import { toast } from 'sonner'
 import {
   BookOpen,
   ChevronDown,
+  ChevronRight,
   FileJson,
   Library,
   Menu,
   Plus,
-  Sparkles,
   Swords,
   Volume2,
   VolumeX,
   Wrench,
 } from 'lucide-react'
 import { TEMPLATES, blankVariant } from '@/engine/templates'
+import type { SavedVariant } from '@/lib/persist'
 import { useAppStore } from '@/store/useAppStore'
 import { SOUND_PACKS, findPack } from '@/lib/soundPacks'
 import { playSound } from '@/lib/sound'
@@ -34,6 +35,105 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { ThemeToggle } from './ThemeToggle'
 import { LibraryDialog } from './LibraryDialog'
 import { ShareDialog } from './ShareDialog'
+
+type Template = (typeof TEMPLATES)[number]
+
+function LibrarySectionLabel({ children, count }: { children: string; count?: number }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 px-2 pb-1 pt-1.5">
+      <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.16em]">
+        {children}
+      </span>
+      {count !== undefined && (
+        <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">{count}</span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The templates and the saved variants, laid out as a scannable menu. Each
+ * entry stacks its description under the name so the copy always lines up,
+ * however long the names are.
+ */
+function LibraryMenuItems({
+  columns = 2,
+  library,
+  onPlayTemplate,
+  onPlaySaved,
+  onManage,
+}: {
+  columns?: 1 | 2
+  library: SavedVariant[]
+  onPlayTemplate: (template: Template) => void
+  onPlaySaved: (entry: SavedVariant) => void
+  onManage: () => void
+}) {
+  const itemClass =
+    'group items-start gap-2 rounded-sm px-2 py-1.5 focus:bg-accent/80'
+
+  return (
+    <>
+      <LibrarySectionLabel count={TEMPLATES.length}>Templates</LibrarySectionLabel>
+      <div className={cn('grid gap-0.5', columns === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
+        {TEMPLATES.map((template) => (
+          <DropdownMenuItem
+            key={template.id}
+            onClick={() => onPlayTemplate(template)}
+            className={itemClass}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium leading-4 decoration-muted-foreground/70 underline-offset-2 group-hover:underline group-focus:underline">
+                {template.name}
+              </span>
+              <span className="text-muted-foreground block truncate text-[11px] leading-4">
+                {template.description}
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </div>
+
+      {library.length > 0 && (
+        <>
+          <DropdownMenuSeparator className="mx-0 my-1.5" />
+          <LibrarySectionLabel count={library.length}>Your variants</LibrarySectionLabel>
+          <div className="grid gap-0.5">
+            {library.map((entry) => (
+              <DropdownMenuItem
+                key={entry.id}
+                onClick={() => onPlaySaved(entry)}
+                className={itemClass}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium leading-4 decoration-muted-foreground/70 underline-offset-2 group-hover:underline group-focus:underline">
+                    {entry.name}
+                  </span>
+                  <span className="text-muted-foreground block truncate text-[11px] leading-4">
+                    {entry.variant.board.width}×{entry.variant.board.height} ·{' '}
+                    {entry.variant.pieceTypes.length} pieces · saved{' '}
+                    {new Date(entry.updatedAt).toLocaleDateString()}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </div>
+        </>
+      )}
+
+      <DropdownMenuSeparator className="mx-0 my-1.5" />
+      <DropdownMenuItem onClick={onManage} className={cn(itemClass, 'items-center')}>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13px] font-medium leading-4">Manage the library</span>
+          <span className="text-muted-foreground block truncate text-[11px] leading-4">
+            Save, load or delete your variants
+          </span>
+        </span>
+        <ChevronRight className="text-muted-foreground size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+      </DropdownMenuItem>
+    </>
+  )
+}
 
 export function AppHeader() {
   const view = useAppStore((s) => s.view)
@@ -80,33 +180,23 @@ export function AppHeader() {
 
   /** The templates and the saved variants, all in one list. */
   const libraryItems = (
-    <>
-      <DropdownMenuLabel>Templates</DropdownMenuLabel>
-      {TEMPLATES.map((t) => (
-        <DropdownMenuItem key={t.id} onClick={() => playTemplate(t.build, t.name)}>
-          <Sparkles className="text-muted-foreground" />
-          <span className="flex-1">{t.name}</span>
-          <span className="text-muted-foreground text-[10px]">{t.description}</span>
-        </DropdownMenuItem>
-      ))}
-      {library.length > 0 && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Your variants</DropdownMenuLabel>
-          {library.map((entry) => (
-            <DropdownMenuItem key={entry.id} onClick={() => playVariant(entry.variant)}>
-              <Library className="text-muted-foreground" />
-              <span className="flex-1">{entry.name}</span>
-            </DropdownMenuItem>
-          ))}
-        </>
-      )}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={() => setLibraryOpen(true)}>
-        <Library className="text-muted-foreground" />
-        Manage the library
-      </DropdownMenuItem>
-    </>
+    <LibraryMenuItems
+      library={library}
+      onPlayTemplate={(template) => playTemplate(template.build, template.name)}
+      onPlaySaved={(entry) => playVariant(entry.variant)}
+      onManage={() => setLibraryOpen(true)}
+    />
+  )
+
+  /** A single-column version for the narrow-screen overflow menu. */
+  const compactLibraryItems = (
+    <LibraryMenuItems
+      columns={1}
+      library={library}
+      onPlayTemplate={(template) => playTemplate(template.build, template.name)}
+      onPlaySaved={(entry) => playVariant(entry.variant)}
+      onManage={() => setLibraryOpen(true)}
+    />
   )
 
   return (
@@ -198,7 +288,7 @@ export function AppHeader() {
                     <ChevronDown className="opacity-60" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuContent align="end" className="w-[27rem] p-1.5">
                   {libraryItems}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -271,8 +361,8 @@ export function AppHeader() {
                   <Menu />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>New</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-[calc(100vw-1.5rem)] max-w-sm p-1.5">
+                <LibrarySectionLabel>New</LibrarySectionLabel>
                 <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}>
                   <Plus className="text-muted-foreground" />
                   Blank 8×8 board
@@ -291,7 +381,7 @@ export function AppHeader() {
                   Open the Maker
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {libraryItems}
+                {compactLibraryItems}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShareOpen(true)}>
                   <FileJson className="text-muted-foreground" />

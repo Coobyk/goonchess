@@ -68,9 +68,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
   capture patterns, flags, effects, promotions and the active display settings.
 - **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
   piece is a horse and every horse jumps), **Bomb Queen** (a queen that steps
-  one square in any direction and detonates on every capture), **Lucky Rollers**
-  (pieces that throw a die to decide how they move), Chaos Lab (portals, walls,
-  uncapturable gems and bombers) and blank boards to start from.
+  one square in any direction and detonates on every capture), Chaos Lab
+  (portals, walls, uncapturable gems and bombers) and blank boards to start
+  from.
 - **Chess variants** — eight of them, each a real ruleset rather than a setup:
   **Chess960** (the home rank is dealt at random, and the New game menu deals
   a fresh one every time), **King of the Hill** (walk your king onto one of
