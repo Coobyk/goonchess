@@ -340,16 +340,29 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     if (enPassant) moves.push(enPassant)
   }
 
-  if (piece.flags.royal) moves.push(...castlingMoves(state, x, y, inst, piece, seen))
+  if (piece.flags.royal) {
+    const castles = castlingMoves(state, x, y, inst, piece)
+    if (castles.length) {
+      // A king that can both walk to the castling square and castle there is
+      // asking to castle: the rook comes with it, and that is the move meant.
+      const landing = new Set(castles.map((c) => `${c.finalTo.x},${c.finalTo.y}`))
+      const rest = moves.filter((m) => !landing.has(`${m.finalTo.x},${m.finalTo.y}`))
+      moves.length = 0
+      moves.push(...rest, ...castles)
+    }
+  }
 
   if (piece.flags.mustCapture) return moves.filter((m) => !!m.capturedId)
   return moves
 }
 
 /**
- * Standard castling: an unmoved royal piece and an unmoved friendly rook on the
- * same rank, with every square between them open. The king travels two squares
- * toward the rook and the rook lands on the square the king crossed.
+ * Castling, in the Chess960 sense: an unmoved royal piece and an unmoved
+ * friendly rook on the same rank, with the squares both of them have to cross
+ * clear apart from the two of them. The king always lands on its own king's
+ * file and the rook on the file beside it — g and f one side, c and d the
+ * other — which is what chess expects and what Chess960 needs when the king
+ * and the rook started somewhere else entirely.
  */
 function castlingMoves(
   state: GameState,
@@ -357,21 +370,24 @@ function castlingMoves(
   y: number,
   inst: GameState['pieces'][string],
   piece: PieceType,
-  seen: Uint8Array,
 ): Move[] {
   if (inst.hasMoved) return []
   const geo = geometryFor(state.variant)
-  if (geo.tiles[y * geo.width + x]?.terrain !== 'normal') return []
+  const width = geo.width
+  // The king's file and the rook's file both have to exist.
+  if (width < 4) return []
+  if (geo.tiles[y * width + x]?.terrain !== 'normal') return []
 
   const moves: Move[] = []
   for (const dir of [-1, 1] as const) {
-    const finalX = x + dir * 2
-    if (finalX < 0 || finalX >= geo.width) continue
+    const kingToX = dir === 1 ? width - 2 : 2
+    const rookToX = dir === 1 ? width - 3 : 3
 
+    // The nearest piece in that direction has to be one of our unmoved rooks.
     let rookId: string | null = null
-    let rookX = x
-    for (let scan = x + dir; scan >= 0 && scan < geo.width; scan += dir) {
-      const tile = geo.tiles[y * geo.width + scan]
+    let rookFromX = x
+    for (let scan = x + dir; scan >= 0 && scan < width; scan += dir) {
+      const tile = geo.tiles[y * width + scan]
       if (tile?.terrain !== 'normal') break
       const occupant = state.board[y][scan]
       if (!occupant) continue
@@ -384,18 +400,18 @@ function castlingMoves(
         rookPiece?.icon === 'rook'
       ) {
         rookId = occupant
-        rookX = scan
+        rookFromX = scan
       }
       break
     }
     if (!rookId) continue
 
-    const rookToX = x + dir
-    if (state.board[y][finalX] !== null || state.board[y][rookToX] !== null) continue
-    const index = y * geo.width + finalX
-    if (seen[index]) continue
-    seen[index] = 1
-    const finalTo = { x: finalX, y }
+    // Every square the king crosses and every square the rook crosses must be
+    // vacant, the king and the rook themselves excepted.
+    if (!spanIsClear(state, y, x, kingToX, inst.id, rookId)) continue
+    if (!spanIsClear(state, y, rookFromX, rookToX, inst.id, rookId)) continue
+
+    const finalTo = { x: kingToX, y }
     moves.push({
       from: { x, y },
       to: finalTo,
@@ -404,12 +420,41 @@ function castlingMoves(
       finalTo,
       castle: {
         rookId,
-        rookFrom: { x: rookX, y },
+        rookFrom: { x: rookFromX, y },
         rookTo: { x: rookToX, y },
+        dir,
       },
     })
   }
   return moves
+}
+
+/**
+ * Whether every square between two files — the origins of both pieces excepted
+ * — is open for castling: normal ground, and empty apart from the king and the
+ * rook.
+ */
+function spanIsClear(
+  state: GameState,
+  y: number,
+  from: number,
+  to: number,
+  kingId: string,
+  rookId: string,
+): boolean {
+  const geo = geometryFor(state.variant)
+  const lo = Math.min(from, to)
+  const hi = Math.max(from, to)
+  for (let scan = lo; scan <= hi; scan++) {
+    if (scan === from) continue
+    const occupant = state.board[y][scan]
+    if (occupant) {
+      if (occupant !== kingId && occupant !== rookId) return false
+      continue
+    }
+    if (geo.tiles[y * geo.width + scan]?.terrain !== 'normal') return false
+  }
+  return true
 }
 
 /**
@@ -612,9 +657,17 @@ export function legalOptions(state: GameState, x: number, y: number): MoveOption
 /** Castling has its own rules on top of the usual "do not stay in check". */
 function castlingIsLegal(state: GameState, move: Move, inst: GameState['pieces'][string]) {
   if (!move.castle) return true
+  // Not out of check.
   if (isInCheck(state, inst.team)) return false
-  const dir = Math.sign(move.finalTo.x - move.from.x)
-  return isRoyalSafeOnSquare(state, move.pieceId, inst.team, move.from.x + dir, move.from.y)
+  const step = Math.sign(move.finalTo.x - move.from.x)
+  // A king that stays where it is has nothing to cross.
+  if (step === 0) return true
+  // Nor through check: every square on the way, the landing square among them.
+  for (let x = move.from.x + step; ; x += step) {
+    if (!isRoyalSafeOnSquare(state, move.pieceId, inst.team, x, move.from.y)) return false
+    if (x === move.finalTo.x) break
+  }
+  return true
 }
 
 /* ------------------------------------------------- fast legality for a team */
@@ -964,6 +1017,11 @@ export function applyMove(
   if (next.board[move.from.y]?.[move.from.x] === move.pieceId) {
     next.board[move.from.y][move.from.x] = null
   }
+  // The castling rook leaves its square first: the king may be landing on it,
+  // or the two may be crossing on their way to their own files.
+  if (move.castle && next.board[move.castle.rookFrom.y]?.[move.castle.rookFrom.x] === move.castle.rookId) {
+    next.board[move.castle.rookFrom.y][move.castle.rookFrom.x] = null
+  }
   if (next.board[fy][fx] && next.board[fy][fx] !== move.pieceId) {
     const leftover = next.board[fy][fx] as string
     const leftoverInst = next.pieces[leftover]
@@ -982,16 +1040,13 @@ export function applyMove(
   touch(move.pieceId)
   next.pieces[move.pieceId].hasMoved = true
 
-  // Castling moves the rook in the same turn.
+  // Castling moves the rook in the same turn, once the king has landed.
   if (move.castle) {
-    const { rookId, rookFrom, rookTo } = move.castle
-    if (next.board[rookFrom.y]?.[rookFrom.x] === rookId) {
-      next.board[rookFrom.y][rookFrom.x] = null
-      next.board[rookTo.y][rookTo.x] = rookId
-      if (next.pieces[rookId]) {
-        touch(rookId)
-        next.pieces[rookId].hasMoved = true
-      }
+    const { rookId, rookTo } = move.castle
+    next.board[rookTo.y][rookTo.x] = rookId
+    if (next.pieces[rookId]) {
+      touch(rookId)
+      next.pieces[rookId].hasMoved = true
     }
   }
 
@@ -1130,14 +1185,21 @@ export function applyMove(
   return next
 }
 
+/** Whether the castle ran toward the h-file — 0-0 rather than 0-0-0. */
+function castleSide(move: Move): boolean {
+  if (!move.castle) return true
+  if (move.castle.dir !== undefined) return move.castle.dir === 1
+  // Moves stored before the direction was recorded went by where the king ended.
+  return move.finalTo.x > move.from.x
+}
+
 function notationFor(
   state: GameState,
   move: Move,
   piece: PieceType,
   capturedPiece?: PieceType,
   promotionName?: string,
-) {
-  if (move.castle) return move.finalTo.x > move.from.x ? 'O-O' : 'O-O-O'
+) {  if (move.castle) return castleSide(move) ? 'O-O' : 'O-O-O'
   const from = squareName(state.variant, move.from.x, move.from.y)
   const to = squareName(state.variant, move.finalTo.x, move.finalTo.y)
   const cap = move.capturedId ? 'x' : '-'
@@ -1167,7 +1229,7 @@ const SAN_LETTERS: Record<string, string> = {
  */
 export function sanFor(state: GameState, move: Move, next: GameState): string {
   if (move.castle) {
-    return (move.finalTo.x > move.from.x ? 'O-O' : 'O-O-O') + checkSuffix(next)
+    return (castleSide(move) ? 'O-O' : 'O-O-O') + checkSuffix(next)
   }
   const inst = state.pieces[move.pieceId]
   const piece = inst ? state.pieceTypes[inst.typeId] : undefined

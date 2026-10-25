@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine/types'
 import { applyMove, createInitialState, getLegalMoves, rollRandomPieces, uid } from '@/engine/rules'
-import { defaultVariant } from '@/engine/templates'
+import { defaultVariant, TEMPLATES } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
 import {
   DEFAULT_BOT_SETTINGS,
@@ -969,11 +969,19 @@ export const useAppStore = create<AppState>((set, get) => {
     resetGame: () => {
       // Restarting would leave the other player on a board nobody else has.
       if (get().online) return
-      const variant = get().variant
+      const current = get().variant
       // A puzzle is part of the game, so restarting means starting the puzzle
       // over, not going back to the opening position.
       const puzzle = get().puzzleStart
+      // A game that is dealt afresh every time — Chess960 — gets a new board
+      // when it is played again, and keeps everything else about the variant.
+      const dealt =
+        puzzle || !TEMPLATES.some((t) => t.id === current.id && t.freshSetup)
+          ? current
+          : TEMPLATES.find((t) => t.id === current.id)!.freshSetup!(current)
+      const variant = dealt
       set({
+        variant,
         game: puzzle ?? createInitialState(variant),
         selected: null,
         legalMoves: [],

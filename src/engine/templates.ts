@@ -546,7 +546,94 @@ export function randomChess(seed = Math.floor(Math.random() * 2 ** 31)): Variant
   }
 }
 
-export const TEMPLATES: { id: string; name: string; description: string; build: () => Variant }[] = [
+/* -------------------------------------------------------------- chess960 */
+
+/** A plain shuffle, so every game is dealt a different back rank. */
+function shuffle<T>(list: T[]): T[] {
+  const out = list.slice()
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
+/**
+ * One of the 960 back ranks: the bishops on squares of opposite colour and the
+ * king somewhere between the rooks. Once the two bishops and the queen are
+ * down, two of the five squares left are the knights' — and the last three
+ * are filled rook, king, rook, which is exactly what leaves the king in
+ * between them.
+ */
+function randomBackRank(): string[] {
+  const rank: (string | null)[] = Array(8).fill(null)
+  const free = () => [0, 1, 2, 3, 4, 5, 6, 7].filter((x) => rank[x] === null)
+  const pick = (list: number[]) => list[Math.floor(Math.random() * list.length)]
+  rank[pick([0, 2, 4, 6])] = 'B'
+  rank[pick([1, 3, 5, 7])] = 'B'
+  const afterBishops = free()
+  rank[pick(afterBishops)] = 'Q'
+  const knights = shuffle(free()).slice(0, 2)
+  for (const x of knights) rank[x] = 'N'
+  const last = free().sort((a, b) => a - b)
+  rank[last[0]] = 'R'
+  rank[last[1]] = 'K'
+  rank[last[2]] = 'R'
+  return rank as string[]
+}
+
+/**
+ * Deals a fresh back rank over the one a variant already has, using that
+ * variant's own pieces — so a Chess960 game can be played again without
+ * losing anything else about it. Black is set up on the same files as White,
+ * which is how Chess960 puts the two armies opposite each other.
+ */
+export function reshuffleChess960(variant: Variant): Variant {
+  const names: Record<string, string> = {
+    K: 'King',
+    Q: 'Queen',
+    R: 'Rook',
+    B: 'Bishop',
+    N: 'Knight',
+  }
+  const ids = new Map(variant.pieceTypes.map((p) => [p.name.toLowerCase(), p.id]))
+  const order = randomBackRank()
+  const wanted = order.map((letter) => ids.get(names[letter].toLowerCase()))
+  // A variant whose pieces have been renamed or removed cannot be dealt again.
+  if (wanted.some((id) => !id)) return variant
+
+  const height = variant.board.height
+  const home = (team: string) => (team === variant.teams[0]?.id ? height - 1 : 0)
+  const setup = variant.setup.filter((s) => s.y !== home(s.team))
+  for (const team of variant.teams) {
+    const y = home(team.id)
+    wanted.forEach((typeId, x) => {
+      if (typeId) setup.push({ typeId, team: team.id, x, y })
+    })
+  }
+  return { ...variant, setup }
+}
+
+export function chess960(): Variant {
+  const base = classicChess()
+  const dealt = reshuffleChess960(base)
+  return {
+    ...base,
+    id: 'chess960',
+    name: 'Chess960',
+    description: 'The starting position of the home rank pieces is randomized.',
+    setup: dealt.setup,
+  }
+}
+
+export const TEMPLATES: {
+  id: string
+  name: string
+  description: string
+  build: () => Variant
+  /** Lays a fresh board for the same variant — used to deal a new game. */
+  freshSetup?: (variant: Variant) => Variant
+}[] = [
   { id: 'classic', name: 'Classic Chess', description: 'Standard 8×8', build: classicChess },
   { id: 'mini', name: 'Mini Chess', description: 'Fast 6×6', build: miniChess },
   { id: 'horses', name: 'Only Horses', description: 'Every piece jumps', build: onlyHorses },
@@ -554,6 +641,13 @@ export const TEMPLATES: { id: string; name: string; description: string; build: 
   { id: 'bomb-queen', name: 'Bomb Queen', description: 'A queen that detonates', build: bombQueen },
   { id: 'rollers', name: 'Lucky Rollers', description: 'They roll to move', build: luckyRollers },
   { id: 'chaos', name: 'Chaos Lab', description: 'Portals and bombers', build: chaosLab },
+  {
+    id: 'chess960',
+    name: 'Chess960',
+    description: 'A shuffled back rank',
+    build: chess960,
+    freshSetup: reshuffleChess960,
+  },
 ]
 
 export function defaultVariant(): Variant {

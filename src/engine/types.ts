@@ -187,6 +187,8 @@ export interface CastleInfo {
   rookId: string
   rookFrom: Vec
   rookTo: Vec
+  /** Which way the king travels: 1 is toward the h-file, -1 toward the a-file. */
+  dir?: 1 | -1
 }
 
 export interface Move {
