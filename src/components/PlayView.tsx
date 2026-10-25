@@ -40,6 +40,7 @@ const STATUS_TEXT: Record<string, string> = {
   center: 'The king took the hill',
   'three-check': 'The third check',
   antichess: 'No pieces, or no move to make',
+  race: 'The king reached the far rank',
 }
 
 /** The three strengths, as a compact row of buttons. */

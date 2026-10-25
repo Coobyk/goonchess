@@ -677,11 +677,15 @@ export function legalOptions(state: GameState, x: number, y: number): MoveOption
   if (!inst) return []
   const options: MoveOption[] = []
   const forced = captureIsForced(state, inst.team)
+  // Racing Kings: a move that checks the opponent is against the rules as
+  // much as one that leaves your own king in check.
+  const noCheck = state.variant.rules?.includes('noCheck')
   for (const move of movesFor(state, x, y)) {
     if (forced && !move.capturedId) continue
     if (!castlingIsLegal(state, move, inst)) continue
     const next = applyMove(state, move, { compute: false })
     if (isInCheck(next, inst.team)) continue
+    if (noCheck && isInCheck(next, next.turn)) continue
     options.push({ move, next })
   }
   return options
@@ -910,13 +914,16 @@ function collectTeamMoves(
   const size = state.variant.board.width * state.variant.board.height
   // Losing chess: with a capture on the board, only captures are allowed.
   const forced = captureIsForced(state, teamId)
+  // Racing Kings: every move has to be checked both ways around — giving
+  // check is forbidden, so there is no fast path to skip the question with.
+  const noCheck = state.variant.rules?.includes('noCheck')
   const attacked = takeScratch(size)
   if (enemyTeams.size) fillAttackedSquares(state, enemyTeams, attacked)
   const royalIds = new Set(royals.map((r) => r.id))
   const inCheck = royals.some((r) => attacked[r.at.y * state.variant.board.width + r.at.x] > 0)
   giveScratch()
   // With several royal pieces it is not worth guessing — check every move.
-  const exposed = inCheck || royals.length !== 1 ? null : takeScratch(size)
+  const exposed = inCheck || noCheck || royals.length !== 1 ? null : takeScratch(size)
   if (exposed) exposedSquares(state, royals[0].at, teamId, enemyTeams, exposed)
 
   for (let y = 0; y < state.board.length; y++) {
@@ -946,6 +953,7 @@ function collectTeamMoves(
         // This move has to be looked at properly, so the state is built now.
         const next = applyMove(state, move, { compute: false, search })
         if (isInCheck(next, inst.team)) continue
+        if (noCheck && isInCheck(next, next.turn)) continue
         moves.push(move)
         states.push(next)
       }
@@ -1383,6 +1391,25 @@ export function royalOnCentre(state: GameState, teamId: string): boolean {
   return false
 }
 
+/**
+ * Whether a team's royal piece is standing on the rank that ends the race.
+ *
+ * Racing Kings runs both sides the same way, so the rank is the one a team
+ * advancing upwards calls home ground: the eighth, at the top.
+ */
+export function royalOnFarRank(state: GameState, teamId: string): boolean {
+  const team = teamById(state.variant, teamId)
+  const y = team?.forward === 'down' ? state.variant.board.height - 1 : 0
+  const row = state.board[y]
+  if (!row) return false
+  for (const id of row) {
+    if (!id) continue
+    const inst = state.pieces[id]
+    if (inst?.team === teamId && state.pieceTypes[inst.typeId]?.flags.royal) return true
+  }
+  return false
+}
+
 export function detectOutcome(
   state: GameState,
   mover: string,
@@ -1435,6 +1462,39 @@ export function detectOutcome(
     }
   }
 
+  // Racing Kings: the first king onto the far rank settles the game — except
+  // that when the side moving first lands there, the other side is owed the
+  // one reply the rules allow, and reaching the far rank with it is a draw.
+  if (variant.winConditions.some((w) => w.kind === 'race')) {
+    const [first, second] = variant.teams
+    if (first && second) {
+      const firstOn = royalOnFarRank(state, first.id)
+      const secondOn = royalOnFarRank(state, second.id)
+      if (mover === second.id) {
+        // The side moving second has just played its move.
+        if (firstOn) {
+          // White was already standing there: this was the reply, and it
+          // either matched it or it did not.
+          state.winner = secondOn ? 'draw' : first.id
+          state.status = 'race'
+          return
+        }
+        if (secondOn) {
+          state.winner = second.id
+          state.status = 'race'
+          return
+        }
+      } else if (secondOn) {
+        // Black would have won the moment it landed; do not let it pass.
+        state.winner = second.id
+        state.status = 'race'
+        return
+      }
+      // The side moving first has just played — perhaps onto the far rank,
+      // in which case the game goes on for exactly one more move.
+    }
+  }
+
   const opponent = state.turn
   if (!hasAnyLegalMove(state, opponent)) {
     // Losing chess: whoever cannot move — or has nothing left to move — has
@@ -1452,6 +1512,18 @@ export function detectOutcome(
         return
       }
     } else {
+      // In the race, running out of moves while another king stands on the
+      // far rank is not a stalemate but a failure to answer.
+      if (variant.winConditions.some((w) => w.kind === 'race')) {
+        const there = variant.teams.find(
+          (t) => t.id !== opponent && royalOnFarRank(state, t.id),
+        )
+        if (there) {
+          state.winner = there.id
+          state.status = 'race'
+          return
+        }
+      }
       state.winner = 'draw'
       state.status = 'stalemate'
       return

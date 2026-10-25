@@ -702,6 +702,81 @@ export function antichess(): Variant {
   }
 }
 
+/* ----------------------------------------------------------------- horde */
+
+/**
+ * One side is a tide of pawns and nothing else — thirty-six of them, ranks
+ * one to four with four more squares reaching out at the front. The usual
+ * army plays against it: the horde wins by checkmate, the army by wiping the
+ * tide off the board, promoted pieces and all.
+ */
+export function horde(): Variant {
+  const base = classicChess()
+  const pawn = base.pieceTypes.find((p) => p.name === 'Pawn')!
+  const setup = base.setup.filter((s) => s.team !== 'white')
+  for (let y = 4; y <= 7; y++) {
+    for (let x = 0; x < 8; x++) setup.push({ typeId: pawn.id, team: 'white', x, y })
+  }
+  for (const x of [1, 2, 5, 6]) setup.push({ typeId: pawn.id, team: 'white', x, y: 3 })
+  return {
+    ...base,
+    id: 'horde',
+    name: 'Horde',
+    description: 'One side has a large number of pawns, the other has a normal army.',
+    setup,
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'elimination' },
+    ],
+  }
+}
+
+/* --------------------------------------------------------- racing kings */
+
+/**
+ * A sprint, not a fight. Both sides start with the usual army minus the
+ * pawns and both of them run the same way — up the board — because the goal
+ * is the eighth rank, not the enemy's back rank.
+ *
+ * Checks are against the rules here: giving one is as illegal as standing in
+ * one, which is what makes the race fair. The first king onto the eighth
+ * rank wins, except that when White lands first Black gets the one reply the
+ * rules allow, and landing on the eighth rank with it is a draw.
+ */
+export function racingKings(): Variant {
+  const base = classicChess()
+  const ids = new Map(base.pieceTypes.map((p) => [p.name, p.id]))
+  const byLetter: Record<string, string> = {
+    k: 'King', q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight',
+    K: 'King', Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight',
+  }
+  // The starting FEN, rank by rank: 8/8/8/8/8/8/krbnNBRK/qrbnNBRQ.
+  const rows: [string, number][] = [
+    ['krbnNBRK', 6],
+    ['qrbnNBRQ', 7],
+  ]
+  const setup: SetupPiece[] = []
+  for (const [row, y] of rows) {
+    row.split('').forEach((ch, x) => {
+      const typeId = ids.get(byLetter[ch])
+      if (!typeId) return
+      const team = ch === ch.toLowerCase() ? 'black' : 'white'
+      setup.push({ typeId, team, x, y })
+    })
+  }
+  return {
+    ...base,
+    id: 'racing-kings',
+    name: 'Racing Kings',
+    description: 'Get your king to the other side of the board to win.',
+    // Both armies advance the same way: the eighth rank is the goal for each.
+    teams: base.teams.map((t) => ({ ...t, forward: 'up' as const })),
+    setup,
+    rules: ['noCheck', 'noCastle'],
+    winConditions: [{ id: uid(), kind: 'race' }],
+  }
+}
+
 export const TEMPLATES: {
   id: string
   name: string
@@ -741,6 +816,18 @@ export const TEMPLATES: {
     name: 'Antichess',
     description: 'Lose everything to win',
     build: antichess,
+  },
+  {
+    id: 'horde',
+    name: 'Horde',
+    description: '36 pawns against an army',
+    build: horde,
+  },
+  {
+    id: 'racing-kings',
+    name: 'Racing Kings',
+    description: 'First king to the far rank',
+    build: racingKings,
   },
 ]
 

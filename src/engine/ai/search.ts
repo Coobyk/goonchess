@@ -1,4 +1,4 @@
-import { applyMove, isInCheck, legalMovesForTeam, royalOnCentre } from '../rules'
+import { applyMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank } from '../rules'
 import { evaluate } from './evaluate'
 import { enPassantSensitive, hashPosition, TABLE_SIZE, type Fingerprint } from './hash'
 import type { GameState, Move, Variant } from '../types'
@@ -224,6 +224,7 @@ interface SearchContext {
   centerWins: boolean
   threeCheckWins: boolean
   antichessWins: boolean
+  raceWins: boolean
   teams: string[]
   /** The best line found, one array per ply. */
   pv: Move[][]
@@ -441,6 +442,16 @@ function terminalScore(state: GameState, ply: number, ctx: SearchContext): numbe
       if (!hasTeam(state, team)) return MATE - ply
     }
   }
+  // Racing Kings: a king on the far rank. The side moving second answers it,
+  // so the race is only settled once that reply has been played.
+  if (ctx.raceWins) {
+    const [first, second] = ctx.teams
+    const firstOn = !!first && royalOnFarRank(state, first)
+    const secondOn = !!second && royalOnFarRank(state, second)
+    if (firstOn && secondOn) return 0
+    if (secondOn) return second === state.turn ? MATE - ply : -MATE + ply
+    if (firstOn && state.turn === first) return MATE - ply
+  }
   return null
 }
 
@@ -541,6 +552,16 @@ function negamax(
   if (moves.length === 0) {
     // Losing chess: being stalemated is the win, not the draw.
     if (ctx.antichessWins) return MATE - ply
+    // Racing Kings: no move left while a king is already on the far rank is
+    // a failure to answer the race.
+    if (ctx.raceWins) {
+      const [first, second] = ctx.teams
+      const firstOn = !!first && royalOnFarRank(state, first)
+      const secondOn = !!second && royalOnFarRank(state, second)
+      if (firstOn && secondOn) return 0
+      if (secondOn) return second === state.turn ? MATE - ply : -MATE + ply
+      if (firstOn && state.turn !== first) return -MATE + ply
+    }
     // No move left: checkmate if the royal piece is attacked, else a draw.
     if (ctx.checkmateWins && isInCheck(state, state.turn)) return -MATE + ply
     return 0
@@ -680,6 +701,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     centerWins: false,
     threeCheckWins: false,
     antichessWins: false,
+    raceWins: false,
     teams: state.variant.teams.map((t) => t.id),
     pv: [],
     exclude: options.exclude?.length ? new Set(options.exclude) : undefined,
@@ -697,6 +719,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     if (condition.kind === 'center') ctx.centerWins = true
     if (condition.kind === 'threeCheck') ctx.threeCheckWins = true
     if (condition.kind === 'antichess') ctx.antichessWins = true
+    if (condition.kind === 'race') ctx.raceWins = true
   }
 
   const random = mulberry32(options.seed ?? Math.floor(Math.random() * 1e9))

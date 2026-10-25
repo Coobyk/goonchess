@@ -65,7 +65,7 @@ const WIN_COPY: Record<string, { name: string; hint: string }> = {
   },
   race: {
     name: 'The race',
-    hint: 'The first king to reach the far rank wins the game.',
+    hint: 'The first king to reach the far rank wins the game. If White lands there first, Black gets one reply — reaching the far rank with it is a draw.',
   },
 }
 

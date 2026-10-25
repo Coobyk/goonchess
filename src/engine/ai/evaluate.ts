@@ -199,6 +199,9 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
   const hillScale = Math.max(1, (boardW + boardH) / 4)
   // Three-Check counts the checks each side has banked.
   const threeCheck = variant.winConditions.some((w) => w.kind === 'threeCheck')
+  // Racing Kings: the king is the piece that wins, so its walk up the board
+  // is the whole point of the position.
+  const raceWins = variant.winConditions.some((w) => w.kind === 'race')
   // Losing chess turns the board upside down: fewer pieces, fewer options and
   // a man about to be taken are all things to aim for, not to avoid.
   const inverted = variant.winConditions.some((w) => w.kind === 'antichess')
@@ -227,6 +230,12 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
             ...hill.map((c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y))),
           )
           score += sign * Math.max(0, 1 - nearest / hillScale) * 90
+        }
+        if (raceWins) {
+          // Every square the king covers towards the far rank is a square
+          // from winning the game outright.
+          const progress = forward[inst.team] === 'down' ? y / span : (span - y) / span
+          score += sign * progress * 300
         }
         // The royal piece is not measured by how far it has travelled or by
         // the square it holds — a king in the middle of the board is in
