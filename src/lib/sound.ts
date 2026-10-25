@@ -1,5 +1,5 @@
 import { loadSoundEnabled, saveSoundEnabled } from './persist'
-import { DEFAULT_PACK, findPack } from './soundPacks'
+import { DEFAULT_PACK, findPack, SOUND_PACKS } from './soundPacks'
 
 export type SoundName =
   | 'move'
@@ -22,34 +22,45 @@ const VOLUME: Record<SoundName, number> = {
 
 let enabled = loadSoundEnabled()
 let packId = DEFAULT_PACK
-const elements = new Map<SoundName, HTMLAudioElement>()
+/** Keyed by pack and sound, so every pack stays downloaded across a switch. */
+const elements = new Map<string, HTMLAudioElement>()
 
-function source(name: SoundName) {
-  let audio = elements.get(name)
+function elementFor(pack: string, name: SoundName) {
+  const key = `${pack}/${name}`
+  let audio = elements.get(key)
   if (!audio) {
-    audio = new Audio(`${findPack(packId).dir}/${name}.mp3`)
+    audio = new Audio()
     audio.preload = 'auto'
-    elements.set(name, audio)
+    audio.src = `${findPack(pack).dir}/${name}.mp3`
+    elements.set(key, audio)
   }
   return audio
 }
 
-/** Swaps the sound pack. The cached files belong to the old one. */
+function source(name: SoundName) {
+  return elementFor(packId, name)
+}
+
+/** Swaps the sound pack. Every pack is already downloaded, so this is instant. */
 export function setSoundPack(id: string) {
   if (id === packId) return
   packId = id
-  elements.clear()
-  if (enabled) preloadSounds()
+  preloadSounds()
 }
 
 export function currentSoundPack() {
   return packId
 }
 
-/** Warm the cache once, after the first interaction. */
+/**
+ * Download every sound of every pack. Called once when the app opens, so a
+ * fresh session with an empty cache still plays the very first move at once.
+ */
 export function preloadSounds() {
   if (typeof window === 'undefined') return
-  for (const name of Object.keys(VOLUME) as SoundName[]) source(name)
+  for (const pack of SOUND_PACKS) {
+    for (const name of Object.keys(VOLUME) as SoundName[]) elementFor(pack.id, name)
+  }
 }
 
 export function isSoundEnabled() {

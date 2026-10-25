@@ -295,6 +295,9 @@ export const useAppStore = create<AppState>((set, get) => {
   const initialPack = loadSoundPack()
   // The sound module keeps the pack it plays from, so it has to start there.
   applySoundPack(initialPack)
+  // Download every sound right away: the first move must play instantly even
+  // in a fresh session with an empty cache.
+  preloadSounds()
 
   /** The side the bot plays right now — rolled for every new game. */
   const sideFor = (bot: BotSettings, variant: Variant, previous: string | null) => {
