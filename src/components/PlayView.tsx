@@ -39,6 +39,7 @@ const STATUS_TEXT: Record<string, string> = {
   threefold: 'Draw by threefold repetition',
   center: 'The king took the hill',
   'three-check': 'The third check',
+  antichess: 'No pieces, or no move to make',
 }
 
 /** The three strengths, as a compact row of buttons. */

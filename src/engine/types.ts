@@ -176,6 +176,8 @@ export type VariantRule =
   | 'atomic'
   /** Captured pieces join a hand and may be dropped back on the board. */
   | 'crazyhouse'
+  /** When a capture is on the board, taking it is the only move allowed. */
+  | 'forcedCapture'
   /** Checking the opponent is itself against the rules. */
   | 'noCheck'
   /** The king and the rook never swap places. */

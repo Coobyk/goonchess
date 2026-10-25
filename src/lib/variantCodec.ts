@@ -45,7 +45,7 @@ const WIN_KINDS: WinConditionKind[] = [
   'race',
 ]
 /** The extra rules a variant can be built on, packed as a bitfield. */
-const RULES: VariantRule[] = ['atomic', 'crazyhouse', 'noCheck', 'noCastle']
+const RULES: VariantRule[] = ['atomic', 'crazyhouse', 'forcedCapture', 'noCheck', 'noCastle']
 const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
 const SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']
 

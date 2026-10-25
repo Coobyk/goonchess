@@ -199,6 +199,9 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
   const hillScale = Math.max(1, (boardW + boardH) / 4)
   // Three-Check counts the checks each side has banked.
   const threeCheck = variant.winConditions.some((w) => w.kind === 'threeCheck')
+  // Losing chess turns the board upside down: fewer pieces, fewer options and
+  // a man about to be taken are all things to aim for, not to avoid.
+  const inverted = variant.winConditions.some((w) => w.kind === 'antichess')
 
   let score = 0
   let royalCount = 0
@@ -268,7 +271,7 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
     // At the horizon only the check status of the side to move matters; the
     // rest of the analysis is too slow to run on every leaf.
     if (isInCheck(state, state.turn)) score += state.turn === teamId ? -90 : 90
-    return score
+    return inverted ? -score : score
   }
 
   const scans = new Map<string, SideScan>()
@@ -303,5 +306,5 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
     }
     score += threatScore(state, teamId, myScan, enemyScan)
   }
-  return score
+  return inverted ? -score : score
 }

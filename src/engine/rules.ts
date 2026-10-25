@@ -557,6 +557,29 @@ export function findPiece(state: GameState, pieceId: string): Vec | null {
 }
 
 /**
+ * Whether a side has to take.
+ *
+ * In Losing chess, a capture sitting on the board takes every other move off
+ * the table: the choice is which capture to make, not whether to make one.
+ * Both the single-piece path and the whole-team path ask this same question
+ * the same way, so they can never disagree about what is on offer.
+ */
+function captureIsForced(state: GameState, teamId: string): boolean {
+  if (!state.variant.rules?.includes('forcedCapture')) return false
+  for (let y = 0; y < state.board.length; y++) {
+    const row = state.board[y]
+    for (let x = 0; x < row.length; x++) {
+      const id = row[x]
+      if (!id) continue
+      const inst = state.pieces[id]
+      if (!inst || inst.team !== teamId) continue
+      if (movesFor(state, x, y).some((m) => !!m.capturedId)) return true
+    }
+  }
+  return false
+}
+
+/**
  * Copies the mutable parts of a game state.
  *
  * The variant and the piece type table are shared by reference: nothing in the
@@ -653,7 +676,9 @@ export function legalOptions(state: GameState, x: number, y: number): MoveOption
   const inst = state.pieces[pieceId]
   if (!inst) return []
   const options: MoveOption[] = []
+  const forced = captureIsForced(state, inst.team)
   for (const move of movesFor(state, x, y)) {
+    if (forced && !move.capturedId) continue
     if (!castlingIsLegal(state, move, inst)) continue
     const next = applyMove(state, move, { compute: false })
     if (isInCheck(next, inst.team)) continue
@@ -883,6 +908,8 @@ function collectTeamMoves(
     }
   }
   const size = state.variant.board.width * state.variant.board.height
+  // Losing chess: with a capture on the board, only captures are allowed.
+  const forced = captureIsForced(state, teamId)
   const attacked = takeScratch(size)
   if (enemyTeams.size) fillAttackedSquares(state, enemyTeams, attacked)
   const royalIds = new Set(royals.map((r) => r.id))
@@ -900,6 +927,7 @@ function collectTeamMoves(
       const inst = state.pieces[pieceId]
       if (!inst || inst.team !== teamId) continue
       for (const move of movesFor(state, x, y)) {
+        if (forced && !move.capturedId) continue
         if (!castlingIsLegal(state, move, inst)) continue
         const fast =
           !inCheck &&
@@ -1409,6 +1437,13 @@ export function detectOutcome(
 
   const opponent = state.turn
   if (!hasAnyLegalMove(state, opponent)) {
+    // Losing chess: whoever cannot move — or has nothing left to move — has
+    // won, so the stalemate the rules of chess call a draw is the goal here.
+    if (variant.winConditions.some((w) => w.kind === 'antichess')) {
+      state.winner = opponent
+      state.status = 'antichess'
+      return
+    }
     const checked = isInCheck(state, opponent)
     if (checked) {
       if (variant.winConditions.some((w) => w.kind === 'checkmate')) {

@@ -668,6 +668,40 @@ export function threeCheck(): Variant {
   }
 }
 
+/* ------------------------------------------------------------ antichess */
+
+/**
+ * Losing chess: take when a take is on the board, give every piece away, and
+ * walk the king about as freely as anything else — there is no check to
+ * escape and no castle to keep. Being left with nothing, or with no move to
+ * make, is how you win.
+ */
+export function antichess(): Variant {
+  const base = classicChess()
+  const pieceTypes = base.pieceTypes.map((piece) => {
+    if (piece.name === 'King') {
+      // The king is a piece like any other: it can be taken, and taking it
+      // ends nothing.
+      return { ...piece, flags: { ...piece.flags, royal: false } }
+    }
+    if (piece.name === 'Pawn') {
+      // Anything at all, the king among them — it is just a piece here.
+      const targets = base.pieceTypes.filter((p) => p.name !== 'Pawn').map((p) => p.id)
+      return { ...piece, promotion: { typeIds: targets } }
+    }
+    return piece
+  })
+  return {
+    ...base,
+    id: 'antichess',
+    name: 'Antichess',
+    description: 'Lose all your pieces (or get stalemated) to win the game.',
+    pieceTypes,
+    rules: ['forcedCapture'],
+    winConditions: [{ id: uid(), kind: 'antichess' }],
+  }
+}
+
 export const TEMPLATES: {
   id: string
   name: string
@@ -701,6 +735,12 @@ export const TEMPLATES: {
     name: 'Three-Check',
     description: 'Three checks win',
     build: threeCheck,
+  },
+  {
+    id: 'antichess',
+    name: 'Antichess',
+    description: 'Lose everything to win',
+    build: antichess,
   },
 ]
 

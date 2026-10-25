@@ -223,6 +223,7 @@ interface SearchContext {
   kingCaptureWins: boolean
   centerWins: boolean
   threeCheckWins: boolean
+  antichessWins: boolean
   teams: string[]
   /** The best line found, one array per ply. */
   pv: Move[][]
@@ -430,6 +431,9 @@ function terminalScore(state: GameState, ply: number, ctx: SearchContext): numbe
       return team === state.turn ? MATE - ply : -MATE + ply
     }
   }
+  // Losing chess: the side with nothing left on the board has won — it is
+  // the side to move that has just run out.
+  if (ctx.antichessWins && !hasTeam(state, state.turn)) return MATE - ply
   // Everybody else is wiped out: the side to move has won.
   if (ctx.eliminationWins) {
     for (const team of ctx.teams) {
@@ -535,6 +539,8 @@ function negamax(
 
   const moves = allLegalMoves(state)
   if (moves.length === 0) {
+    // Losing chess: being stalemated is the win, not the draw.
+    if (ctx.antichessWins) return MATE - ply
     // No move left: checkmate if the royal piece is attacked, else a draw.
     if (ctx.checkmateWins && isInCheck(state, state.turn)) return -MATE + ply
     return 0
@@ -673,6 +679,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     kingCaptureWins: false,
     centerWins: false,
     threeCheckWins: false,
+    antichessWins: false,
     teams: state.variant.teams.map((t) => t.id),
     pv: [],
     exclude: options.exclude?.length ? new Set(options.exclude) : undefined,
@@ -689,6 +696,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     if (condition.kind === 'kingCapture') ctx.kingCaptureWins = true
     if (condition.kind === 'center') ctx.centerWins = true
     if (condition.kind === 'threeCheck') ctx.threeCheckWins = true
+    if (condition.kind === 'antichess') ctx.antichessWins = true
   }
 
   const random = mulberry32(options.seed ?? Math.floor(Math.random() * 1e9))
