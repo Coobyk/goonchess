@@ -166,6 +166,11 @@ export function createInitialState(variant: Variant): GameState {
     // game can be rebuilt and played out the same way.
     randomSeed: variant.randomSeed ?? 1,
   }
+  // Three-Check starts every side off with nothing in the bank.
+  if (variant.winConditions.some((w) => w.kind === 'threeCheck')) {
+    state.checks = {}
+    for (const team of variant.teams) state.checks[team.id] = 0
+  }
   // The opening position counts towards a repetition.
   state.startKey = positionKey(state)
   return state
@@ -623,6 +628,7 @@ export function cloneState(state: GameState): GameState {
     moveHistory: state.moveHistory.slice(),
     captured: state.captured.slice(),
     scores: { ...state.scores },
+    checks: state.checks ? { ...state.checks } : state.checks,
   }
 }
 
@@ -1167,6 +1173,14 @@ export function applyMove(
   next.turn = order[(idx + 1) % order.length]
   next.moveHistory = [...next.moveHistory, record]
 
+  // Three-Check: the check this move gives is put in the bank. It is counted
+  // in a search too, so the bot knows how close the third one is.
+  if (next.variant.winConditions.some((w) => w.kind === 'threeCheck') && isInCheck(next, next.turn)) {
+    const counts = { ...(next.checks ?? {}) }
+    counts[inst.team] = (counts[inst.team] ?? 0) + 1
+    next.checks = counts
+  }
+
   // A real move notes which position it left behind, so a repetition can be
   // spotted later. It has to come after the turn has changed hands and after
   // the move is in the history — the position depends on both.
@@ -1359,6 +1373,16 @@ export function detectOutcome(
   if (variant.winConditions.some((w) => w.kind === 'center') && royalOnCentre(state, mover)) {
     state.winner = mover
     state.status = 'center'
+    return
+  }
+
+  // Three-Check: the third check is as good as a checkmate.
+  if (
+    variant.winConditions.some((w) => w.kind === 'threeCheck') &&
+    (state.checks?.[mover] ?? 0) >= 3
+  ) {
+    state.winner = mover
+    state.status = 'three-check'
     return
   }
 

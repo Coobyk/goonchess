@@ -32,9 +32,19 @@ export function positionKey(state: GameState): string {
     rows.push(row)
   }
 
-  return [rows.join('/'), teamIndex.get(state.turn) ?? 0, castlingRights(state), enPassantRight(state)].join(
-    '|',
-  )
+  const parts: (string | number)[] = [
+    rows.join('/'),
+    teamIndex.get(state.turn) ?? 0,
+    castlingRights(state),
+    enPassantRight(state),
+  ]
+  // Three-Check: two positions with the same pieces are different games when
+  // the checks have been counted differently. Every other game keeps the
+  // keys it has always had.
+  if (state.checks) {
+    parts.push(variant.teams.map((team) => state.checks?.[team.id] ?? 0).join(','))
+  }
+  return parts.join('|')
 }
 
 /** Which castles are still possible. */

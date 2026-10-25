@@ -197,6 +197,8 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
   const hillWins = variant.winConditions.some((w) => w.kind === 'center')
   const hill = hillWins ? centresOf(variant) : []
   const hillScale = Math.max(1, (boardW + boardH) / 4)
+  // Three-Check counts the checks each side has banked.
+  const threeCheck = variant.winConditions.some((w) => w.kind === 'threeCheck')
 
   let score = 0
   let royalCount = 0
@@ -252,6 +254,14 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
     const nearest = Math.min(4, nearestEnemy(state, royalX[i], royalY[i], royalTeam[i]))
     const sign = royalTeam[i] === teamId ? -1 : 1
     score += sign * (4 - nearest) * 30
+  }
+
+  // Two checks already banked are worth more than a pawn: one more wins.
+  if (threeCheck && state.checks) {
+    for (const team of variant.teams) {
+      const given = (state.checks[team.id] ?? 0) * 60
+      score += team.id === teamId ? given : -given
+    }
   }
 
   if (options.fast) {

@@ -222,6 +222,7 @@ interface SearchContext {
   eliminationWins: boolean
   kingCaptureWins: boolean
   centerWins: boolean
+  threeCheckWins: boolean
   teams: string[]
   /** The best line found, one array per ply. */
   pv: Move[][]
@@ -422,6 +423,13 @@ function terminalScore(state: GameState, ply: number, ctx: SearchContext): numbe
   }
   // The royal piece is gone: that side has lost.
   if (ctx.kingCaptureWins && !hasRoyal(state, state.turn)) return -MATE + ply
+  // The third check has been given: whoever gave it has won.
+  if (ctx.threeCheckWins && state.checks) {
+    for (const team of ctx.teams) {
+      if ((state.checks[team] ?? 0) < 3) continue
+      return team === state.turn ? MATE - ply : -MATE + ply
+    }
+  }
   // Everybody else is wiped out: the side to move has won.
   if (ctx.eliminationWins) {
     for (const team of ctx.teams) {
@@ -664,6 +672,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     eliminationWins: false,
     kingCaptureWins: false,
     centerWins: false,
+    threeCheckWins: false,
     teams: state.variant.teams.map((t) => t.id),
     pv: [],
     exclude: options.exclude?.length ? new Set(options.exclude) : undefined,
@@ -679,6 +688,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     if (condition.kind === 'elimination') ctx.eliminationWins = true
     if (condition.kind === 'kingCapture') ctx.kingCaptureWins = true
     if (condition.kind === 'center') ctx.centerWins = true
+    if (condition.kind === 'threeCheck') ctx.threeCheckWins = true
   }
 
   const random = mulberry32(options.seed ?? Math.floor(Math.random() * 1e9))

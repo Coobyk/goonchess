@@ -647,6 +647,27 @@ export function kingOfTheHill(): Variant {
   }
 }
 
+/* ------------------------------------------------------------ three check */
+
+/**
+ * Classic chess with a counter over the board: every check you give is banked,
+ * and the third one wins the game as surely as a checkmate would.
+ */
+export function threeCheck(): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'three-check',
+    name: 'Three-Check',
+    description: 'Check your opponent 3 times to win the game.',
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+      { id: uid(), kind: 'threeCheck' },
+    ],
+  }
+}
+
 export const TEMPLATES: {
   id: string
   name: string
@@ -674,6 +695,12 @@ export const TEMPLATES: {
     name: 'King of the Hill',
     description: 'The king takes the centre',
     build: kingOfTheHill,
+  },
+  {
+    id: 'three-check',
+    name: 'Three-Check',
+    description: 'Three checks win',
+    build: threeCheck,
   },
 ]
 

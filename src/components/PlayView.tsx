@@ -38,6 +38,7 @@ const STATUS_TEXT: Record<string, string> = {
   timeout: 'Time ran out',
   threefold: 'Draw by threefold repetition',
   center: 'The king took the hill',
+  'three-check': 'The third check',
 }
 
 /** The three strengths, as a compact row of buttons. */
@@ -68,6 +69,7 @@ export function PlayView() {
   const game = useAppStore((s) => s.game)
   const theme = useAppStore((s) => s.theme)
   const variant = useAppStore((s) => s.variant)
+  const threeCheck = variant.winConditions.some((w) => w.kind === 'threeCheck')
   const resetGame = useAppStore((s) => s.resetGame)
   const jumpToPly = useAppStore((s) => s.jumpToPly)
   const undoStack = useAppStore((s) => s.undoStack)
@@ -209,6 +211,11 @@ export function PlayView() {
             <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
               <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
               <span className="text-sm font-medium">{team.name}</span>
+              {threeCheck && (
+                <span className="text-muted-foreground text-xs tabular-nums" title="Checks given">
+                  {game.checks?.[team.id] ?? 0}/3 checks
+                </span>
+              )}
               <ClockFor team={team.id} />
               <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
                 {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
@@ -243,6 +250,11 @@ export function PlayView() {
             <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
               <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
               <span className="text-sm font-medium">{team.name}</span>
+              {threeCheck && (
+                <span className="text-muted-foreground text-xs tabular-nums" title="Checks given">
+                  {game.checks?.[team.id] ?? 0}/3 checks
+                </span>
+              )}
               <ClockFor team={team.id} />
               <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
                 {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {

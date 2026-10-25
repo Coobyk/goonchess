@@ -164,6 +164,16 @@ export function hashPosition(state: GameState, out: Fingerprint): void {
     h2 = mix(h2, (state.scores[team.id] ?? 0) | 0)
   }
 
+  // The checks each side has given. Only a game of Three-Check keeps them,
+  // but there two positions with the same pieces are not the same position.
+  if (state.checks) {
+    for (const team of variant.teams) {
+      const given = state.checks[team.id] ?? 0
+      h1 = mix(h1, given * 7 + 0x51ed)
+      h2 = mix(h2, given)
+    }
+  }
+
   // The last move, which may have left a capture en passant open.
   const last = state.moveHistory[state.moveHistory.length - 1]
   if (last) {

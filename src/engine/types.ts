@@ -274,6 +274,8 @@ export interface GameState {
   captured: { team: string; typeId: string; by: string }[]
   winner: string | 'draw' | null
   scores: Record<string, number>
+  /** How many checks each team has given, in a game of Three-Check. */
+  checks?: Record<string, number>
   /** The die a piece rolled to pick its move, while it is being chosen. */
   roll?: { pieceId: string; value: number }
   /** What identifies the position the game started from, for repetition. */
