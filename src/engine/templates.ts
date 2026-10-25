@@ -777,6 +777,30 @@ export function racingKings(): Variant {
   }
 }
 
+/* ---------------------------------------------------------------- atomic */
+
+/**
+ * Ordinary chess until something blows up. A capture goes off where it
+ * landed: the square is cleared, everything around it goes up too — friendly
+ * and enemy alike, pawns excepted — and the game is won by exploding the
+ * enemy king. So no king ever takes anything, and the threat of a blast
+ * beside your own king matters more than any check.
+ */
+export function atomic(): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'atomic',
+    name: 'Atomic',
+    description: "Nuke your opponent's king to win.",
+    rules: ['atomic'],
+    winConditions: [
+      { id: uid(), kind: 'kingCapture' },
+      { id: uid(), kind: 'checkmate' },
+    ],
+  }
+}
+
 export const TEMPLATES: {
   id: string
   name: string
@@ -828,6 +852,12 @@ export const TEMPLATES: {
     name: 'Racing Kings',
     description: 'First king to the far rank',
     build: racingKings,
+  },
+  {
+    id: 'atomic',
+    name: 'Atomic',
+    description: 'Captures explode',
+    build: atomic,
   },
 ]
 

@@ -226,6 +226,8 @@ interface SearchContext {
   antichessWins: boolean
   raceWins: boolean
   teams: string[]
+  /** The teams that started with a royal piece. */
+  royalTeams: string[]
   /** The best line found, one array per ply. */
   pv: Move[][]
   /** Moves the search must not play. */
@@ -267,6 +269,14 @@ function hasRoyal(state: GameState, teamId: string) {
     if (state.pieceTypes[inst.typeId]?.flags.royal) return true
   }
   return false
+}
+
+/** Which teams start the game with a royal piece of their own. */
+function royalTeamsOf(variant: Variant): string[] {
+  const royalIds = new Set(variant.pieceTypes.filter((p) => p.flags.royal).map((p) => p.id))
+  return variant.teams
+    .filter((t) => variant.setup.some((s) => s.team === t.id && royalIds.has(s.typeId)))
+    .map((t) => t.id)
 }
 
 /**
@@ -423,8 +433,15 @@ function terminalScore(state: GameState, ply: number, ctx: SearchContext): numbe
       return team === state.turn ? MATE - ply : -MATE + ply
     }
   }
-  // The royal piece is gone: that side has lost.
-  if (ctx.kingCaptureWins && !hasRoyal(state, state.turn)) return -MATE + ply
+  // The royal piece is gone: that side has lost. In atomic a blast that
+  // takes the mover's own king loses the game the same way.
+  if (ctx.kingCaptureWins) {
+    if (ctx.royalTeams.includes(state.turn) && !hasRoyal(state, state.turn)) return -MATE + ply
+    for (const team of ctx.teams) {
+      if (team === state.turn || !ctx.royalTeams.includes(team)) continue
+      if (!hasRoyal(state, team)) return MATE - ply
+    }
+  }
   // The third check has been given: whoever gave it has won.
   if (ctx.threeCheckWins && state.checks) {
     for (const team of ctx.teams) {
@@ -703,6 +720,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     antichessWins: false,
     raceWins: false,
     teams: state.variant.teams.map((t) => t.id),
+    royalTeams: royalTeamsOf(state.variant),
     pv: [],
     exclude: options.exclude?.length ? new Set(options.exclude) : undefined,
     tt: table,

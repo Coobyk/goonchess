@@ -222,6 +222,7 @@ export function movesFor(state: GameState, x: number, y: number): Move[] {
 function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array): Move[] {
   const { variant } = state
   const geo = geometryFor(variant)
+  const atomic = variant.rules?.includes('atomic')
   const pieceId = state.board[y]?.[x]
   if (!pieceId) return []
   const inst = state.pieces[pieceId]
@@ -280,6 +281,9 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     if (!allowCapture && mode === 'move') return
     const occPiece = state.pieceTypes[occInst.typeId]
     if (occPiece?.flags.uncapturable) return
+    // Atomic: a king's capture would set off the blast on top of the king
+    // itself, so no king ever takes anything.
+    if (atomic && piece.flags.royal) return
     seen[finalIndex] = 1
     const finalTo = { x: fx, y: fy }
     moves.push({
@@ -556,6 +560,30 @@ export function findPiece(state: GameState, pieceId: string): Vec | null {
   return null
 }
 
+/** Whether a team still has a royal piece standing. */
+function teamHasRoyal(state: GameState, teamId: string): boolean {
+  for (const id in state.pieces) {
+    const inst = state.pieces[id]
+    if (inst.team !== teamId) continue
+    if (state.pieceTypes[inst.typeId]?.flags.royal) return true
+  }
+  return false
+}
+
+/**
+ * Whether a move has just blown up every enemy king.
+ *
+ * In atomic chess that ends the game on the spot, so being left in check
+ * behind it is no reason for the rules to refuse the move.
+ */
+function wonByBlast(before: GameState, after: GameState, mover: string): boolean {
+  for (const team of before.variant.teams) {
+    if (team.id === mover) continue
+    if (teamHasRoyal(before, team.id) && !teamHasRoyal(after, team.id)) return true
+  }
+  return false
+}
+
 /**
  * Whether a side has to take.
  *
@@ -680,11 +708,14 @@ export function legalOptions(state: GameState, x: number, y: number): MoveOption
   // Racing Kings: a move that checks the opponent is against the rules as
   // much as one that leaves your own king in check.
   const noCheck = state.variant.rules?.includes('noCheck')
+  // Atomic: a blast can remove a blocker as well as a king, so every move is
+  // put through the proper check rather than the fast one.
+  const atomic = state.variant.rules?.includes('atomic')
   for (const move of movesFor(state, x, y)) {
     if (forced && !move.capturedId) continue
     if (!castlingIsLegal(state, move, inst)) continue
     const next = applyMove(state, move, { compute: false })
-    if (isInCheck(next, inst.team)) continue
+    if (isInCheck(next, inst.team) && !(atomic && wonByBlast(state, next, inst.team))) continue
     if (noCheck && isInCheck(next, next.turn)) continue
     options.push({ move, next })
   }
@@ -917,13 +948,16 @@ function collectTeamMoves(
   // Racing Kings: every move has to be checked both ways around — giving
   // check is forbidden, so there is no fast path to skip the question with.
   const noCheck = state.variant.rules?.includes('noCheck')
+  // Atomic: a blast can remove a blocker as well as a king, so the fast path
+  // cannot follow what a capture does to the board.
+  const atomic = state.variant.rules?.includes('atomic')
   const attacked = takeScratch(size)
   if (enemyTeams.size) fillAttackedSquares(state, enemyTeams, attacked)
   const royalIds = new Set(royals.map((r) => r.id))
   const inCheck = royals.some((r) => attacked[r.at.y * state.variant.board.width + r.at.x] > 0)
   giveScratch()
   // With several royal pieces it is not worth guessing — check every move.
-  const exposed = inCheck || noCheck || royals.length !== 1 ? null : takeScratch(size)
+  const exposed = inCheck || noCheck || atomic || royals.length !== 1 ? null : takeScratch(size)
   if (exposed) exposedSquares(state, royals[0].at, teamId, enemyTeams, exposed)
 
   for (let y = 0; y < state.board.length; y++) {
@@ -952,7 +986,7 @@ function collectTeamMoves(
         }
         // This move has to be looked at properly, so the state is built now.
         const next = applyMove(state, move, { compute: false, search })
-        if (isInCheck(next, inst.team)) continue
+        if (isInCheck(next, inst.team) && !(atomic && wonByBlast(state, next, teamId))) continue
         if (noCheck && isInCheck(next, next.turn)) continue
         moves.push(move)
         states.push(next)
@@ -1031,6 +1065,9 @@ export function applyMove(
   const hasSwap = move.effects.some((e) => e.kind === 'swap')
   const capturedInst = move.capturedId ? next.pieces[move.capturedId] : undefined
   const capturedPiece = capturedInst ? next.pieceTypes[capturedInst.typeId] : undefined
+  // Whose royal piece has just been destroyed, if any. A blast can take a
+  // king that never stood on the square anyone aimed at.
+  const royalTeams = new Set<string>()
 
   const fx = move.finalTo.x
   const fy = move.finalTo.y
@@ -1053,6 +1090,7 @@ export function applyMove(
       }
       if (capturedPiece) {
         next.scores[inst.team] = (next.scores[inst.team] ?? 0) + capturedPiece.value
+        if (capturedPiece.flags.royal) royalTeams.add(capturedInst.team)
       }
     }
   }
@@ -1098,9 +1136,49 @@ export function applyMove(
     next.board[move.from.y][move.from.x] = move.capturedId
   }
 
-  // Effects
-  let blastRoyal = false
+  // Every blast this move caused, for the animation to draw.
   const blasts: Blast[] = []
+
+  // Atomic: a capture sets off a blast where it landed. The square itself is
+  // cleared — the capturer is at the centre of it and goes up with it — and
+  // everything around it goes up too, friendly and enemy alike, except the
+  // pawns, which the blast does not harm.
+  const atomic = next.variant.rules?.includes('atomic')
+  if (atomic && move.capturedId && !hasSwap) {
+    const victims: Vec[] = []
+    if (next.board[fy][fx] === move.pieceId) next.board[fy][fx] = null
+    delete next.pieces[move.pieceId]
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue
+        const ex = fx + dx
+        const ey = fy + dy
+        if (!inBounds(next.variant.board, ex, ey)) continue
+        const occ = next.board[ey][ex]
+        if (!occ) continue
+        const oInst = next.pieces[occ]
+        if (!oInst) continue
+        const oPiece = next.pieceTypes[oInst.typeId]
+        // Pawns shrug off the blast; everything else is destroyed.
+        if (oPiece?.name === 'Pawn') continue
+        if (oPiece?.flags.royal) royalTeams.add(oInst.team)
+        if (oInst.team !== inst.team) {
+          if (!options.search) {
+            next.captured.push({ team: oInst.team, typeId: oInst.typeId, by: inst.team })
+          }
+          if (oPiece) {
+            next.scores[inst.team] = (next.scores[inst.team] ?? 0) + oPiece.value
+          }
+        }
+        delete next.pieces[occ]
+        next.board[ey][ex] = null
+        victims.push({ x: ex, y: ey })
+      }
+    }
+    blasts.push({ x: fx, y: fy, radius: 1, victims })
+  }
+
+  // Effects
   for (const eff of move.effects) {
     if (eff.kind === 'explosion') {
       const { radius } = eff
@@ -1123,7 +1201,7 @@ export function applyMove(
           }
           if (oPiece) {
             next.scores[inst.team] = (next.scores[inst.team] ?? 0) + oPiece.value
-            if (oPiece.flags.royal) blastRoyal = true
+            if (oPiece.flags.royal) royalTeams.add(oInst.team)
           }
           delete next.pieces[occ]
           next.board[ey][ex] = null
@@ -1154,7 +1232,7 @@ export function applyMove(
 
   // Promotion
   let promotionTypeId: string | undefined
-  if (piece.promotion) {
+  if (piece.promotion && next.pieces[move.pieceId]) {
     const team = teamById(next.variant, inst.team)
     const farRank = team?.forward === 'down' ? next.variant.board.height - 1 : 0
     if (fy === farRank) {
@@ -1232,7 +1310,10 @@ export function applyMove(
   }
 
   if (compute) {
-    detectOutcome(next, inst.team, { capturedRoyal: !!capturedPiece?.flags.royal || blastRoyal })
+    detectOutcome(next, inst.team, {
+      capturedRoyal: !!capturedPiece?.flags.royal,
+      royalTeams: [...royalTeams],
+    })
   }
   return next
 }
@@ -1413,14 +1494,36 @@ export function royalOnFarRank(state: GameState, teamId: string): boolean {
 export function detectOutcome(
   state: GameState,
   mover: string,
-  meta: { capturedRoyal?: boolean } = {},
+  meta: { capturedRoyal?: boolean; royalTeams?: string[] } = {},
 ) {
   const { variant } = state
 
-  if (meta.capturedRoyal && variant.winConditions.some((w) => w.kind === 'kingCapture')) {
-    state.winner = mover
-    state.status = 'royal-captured'
-    return
+  if (variant.winConditions.some((w) => w.kind === 'kingCapture')) {
+    const dead = new Set(meta.royalTeams ?? [])
+    if (dead.size > 1) {
+      // The blast took a king from each side at once: nobody won it.
+      state.winner = 'draw'
+      state.status = 'royal-captured'
+      return
+    }
+    if (dead.size === 1) {
+      const gone = [...dead][0]
+      if (gone === mover) {
+        // Atomic: the explosion that took the king took it on the mover's own
+        // move, so the mover is the one that lost.
+        state.winner = variant.teams.find((t) => t.id !== mover)?.id ?? 'draw'
+        state.status = 'royal-captured'
+        return
+      }
+      state.winner = mover
+      state.status = 'royal-captured'
+      return
+    }
+    if (meta.capturedRoyal) {
+      state.winner = mover
+      state.status = 'royal-captured'
+      return
+    }
   }
 
   // King of the Hill: a king that has walked onto the hill wins there and

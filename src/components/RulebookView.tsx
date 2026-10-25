@@ -12,7 +12,7 @@ import {
   VolumeX,
   Wrench,
 } from 'lucide-react'
-import type { Effect, MovePattern, PieceType, TeamConfig, Terrain, Vec } from '@/engine/types'
+import type { Effect, MovePattern, PieceType, TeamConfig, Terrain, Vec, VariantRule } from '@/engine/types'
 import type { ThreatSettings } from '@/engine/threats'
 import { useAppStore } from '@/store/useAppStore'
 import { findPack } from '@/lib/soundPacks'
@@ -66,6 +66,30 @@ const WIN_COPY: Record<string, { name: string; hint: string }> = {
   race: {
     name: 'The race',
     hint: 'The first king to reach the far rank wins the game. If White lands there first, Black gets one reply — reaching the far rank with it is a draw.',
+  },
+}
+
+/** The rules a variant can be played under, beyond how its pieces move. */
+const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
+  atomic: {
+    name: 'Atomic',
+    hint: 'A capture explodes. The square it landed on is cleared, and everything around it goes up too — friendly and enemy alike — except pawns, which shrug the blast off. No king ever takes anything, and a blast that catches a king ends the game at once.',
+  },
+  crazyhouse: {
+    name: 'Pockets',
+    hint: 'Every piece you capture changes sides into your pocket. On your turn you may drop one of them onto an empty square instead of moving a piece. A captured pawn comes back as a pawn, and a pawn may never be dropped on the back rank.',
+  },
+  forcedCapture: {
+    name: 'Capture is compulsory',
+    hint: 'When a capture is on the board, taking it is the only move allowed.',
+  },
+  noCheck: {
+    name: 'Checks are forbidden',
+    hint: 'Giving check is against the rules as much as standing in one: a move may not leave the enemy king attacked, and may not attack it either.',
+  },
+  noCastle: {
+    name: 'No castling',
+    hint: 'The king and the rook never swap places.',
   },
 }
 
@@ -167,7 +191,8 @@ export function RulebookView() {
   const variant = useAppStore((s) => s.variant)
   const canCastle =
     variant.pieceTypes.some((p) => p.flags.royal) &&
-    variant.pieceTypes.some((p) => p.icon === 'rook')
+    variant.pieceTypes.some((p) => p.icon === 'rook') &&
+    !variant.rules?.includes('noCastle')
   const setView = useAppStore((s) => s.setView)
   const setMakerTab = useAppStore((s) => s.setMakerTab)
   const threats = useAppStore((s) => s.threats)
@@ -396,6 +421,38 @@ export function RulebookView() {
               )}
             </CardContent>
           </Card>
+
+          {(variant.rules?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Bomb className="text-muted-foreground size-4" /> The extra rules
+                </CardTitle>
+                <CardDescription>
+                  On top of how the pieces move, this game is played under the rules below.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {variant.rules?.map((rule) => {
+                  const copy = RULE_COPY[rule]
+                  return (
+                    <div
+                      key={rule}
+                      className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
+                    >
+                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-sky-500/15 text-sky-500">
+                        <ArrowRight className="size-3.5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{copy?.name ?? rule}</p>
+                        <p className="text-muted-foreground text-sm">{copy?.hint ?? 'A custom rule of this variant.'}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
