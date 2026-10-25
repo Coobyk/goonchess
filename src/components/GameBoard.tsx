@@ -141,8 +141,6 @@ function PromotionPicker({
     Math.max((dx + 0.5) * cell, width / 2 + 4),
     cols * cell - width / 2 - 4,
   )
-  // The tail stays on the promotion square even when the line had to shift.
-  const tail = Math.min(Math.max((dx + 0.5) * cell - (center - width / 2), 14), width - 14)
   // White pieces sit on a dark bed and black pieces on a light one, so the
   // icons keep their contrast in either theme.
   const chipTone =
@@ -169,12 +167,6 @@ function PromotionPicker({
         padding: linePad,
       }}
     >
-      {/* A tail pointing at the square, so the line reads as belonging to it. */}
-      <span
-        aria-hidden
-        className="bg-popover border-border absolute -bottom-1 size-2 border-r border-b"
-        style={{ left: tail, transform: 'translateX(-50%) rotate(45deg)' }}
-      />
       {options.map((typeId) => {
         const type = pieceTypes[typeId]
         return (
