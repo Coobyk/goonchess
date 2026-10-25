@@ -13,8 +13,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
   and checkmate detection, castling, promotion, en passant, undo and move
   history. A piece may promote into a choice of pieces, and the player picks.
   The same position three times is a draw, counted with the same rule chess
-  uses: the pieces, the side to move, the castles still possible and the en
-  passant right all have to match. The board wears the brown of Lichess,
+  uses: the  pieces, the side to move, the castles still possible and the en
+  passant right all have to match — and in Three-Check, the checks banked as
+  well. The board wears the brown of Lichess,
   `#f0d9b5` and `#b58863`, in light and in dark mode alike.
 - **Random pieces** — any piece can be marked random. After every move it is
   given a new kind, drawn at random from the kinds of the variant, and it wears
@@ -70,6 +71,22 @@ Deployable to Cloudflare Workers with GitHub Actions.
   one square in any direction and detonates on every capture), **Lucky Rollers**
   (pieces that throw a die to decide how they move), Chaos Lab (portals, walls,
   uncapturable gems and bombers) and blank boards to start from.
+- **Chess variants** — eight of them, each a real ruleset rather than a setup:
+  **Chess960** (the home rank is dealt at random, and the New game menu deals
+  a fresh one every time), **King of the Hill** (walk your king onto one of
+  the four centre squares to win), **Three-Check** (every check is banked; the
+  third one wins), **Antichess** (captures are forced, the king is an ordinary
+  piece, there is no check and no castling, and being left with nothing — or
+  with no move — wins the game), **Horde** (thirty-six pawns against a full
+  army: checkmate wins for the horde, wiping it out wins for the army),
+  **Racing Kings** (no pawns, both armies run the same way at the eighth rank,
+  checks are illegal for both sides, and White's arrival gives Black one reply
+  to answer it), **Atomic** (a capture detonates: the square and its neighbours
+  go up — kings among them — so exploding the enemy king wins and no king ever
+  takes anything), and **Crazyhouse** (everything you capture changes sides
+  into yours and can be dropped back onto an empty square instead of moving).
+  They are in the Library menu and the New game menu like any other variant,
+  they search with the same engine, and a share link carries the whole ruleset.
 - **Sound** — a bundled CC0 sound set for moves, captures, checks, promotions,
   explosions and game endings, with a mute toggle. It comes in **packs**: real
   wooden pieces, chiptune **8-bit** blips, and a **meme** pack with vine booms
