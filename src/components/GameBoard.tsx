@@ -7,8 +7,8 @@ import { ThreatArrows } from './ThreatArrows'
 import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
 import { computeThreats, mergeThreats } from '@/engine/threats'
-import type { Move, Vec } from '@/engine/types'
-import { BLAST_STAGGER, useMoveAnimation } from '@/lib/moveAnimation'
+import type { Move, PieceType, Vec } from '@/engine/types'
+import { BLAST_STAGGER, travelMs, useMoveAnimation } from '@/lib/moveAnimation'
 import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 
@@ -87,11 +87,214 @@ function BlastOverlay({
   )
 }
 
+/**
+ * The promotion choice, opened as a short line of icons right above the piece
+ * that is promoting. The pieces are shown, not named, so it reads in one look.
+ */
+function PromotionPicker({
+  move,
+  cell,
+  cols,
+  rows,
+  flipBoard,
+  teamIndex,
+  pieceTypes,
+  onChoose,
+  onCancel,
+}: {
+  move: Move
+  cell: number
+  cols: number
+  rows: number
+  flipBoard: boolean
+  teamIndex: number
+  pieceTypes: Record<string, PieceType>
+  onChoose: (typeId: string) => void
+  onCancel: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const options = (move.promotionOptions ?? []).filter((id) => pieceTypes[id])
+
+  // Opened away from the board squares, so it takes the keyboard with it.
+  useEffect(() => {
+    ref.current?.querySelector<HTMLButtonElement>('button')?.focus()
+  }, [])
+
+  if (!options.length) return null
+
+  // Sized off the square, so the pieces stay readable at any board size.
+  const glyph = Math.max(16, Math.min(44, Math.round(cell * 0.6)))
+  const chipPad = Math.max(2, Math.round(cell * 0.035))
+  const linePad = Math.max(3, Math.round(cell * 0.05))
+  const gap = Math.max(2, Math.round(cell * 0.045))
+  // Each button is the glyph plus its padding and border; the line adds the
+  // gaps, its own padding and its border. The sum keeps the line on the board.
+  const chip = glyph + chipPad * 2 + 2
+  const width = options.length * chip + (options.length - 1) * gap + linePad * 2 + 2
+  const lift = Math.max(6, Math.round(cell * 0.1))
+  // The piece has already walked to the promotion square, so the line opens
+  // above that square.
+  const dx = flipBoard ? cols - 1 - move.finalTo.x : move.finalTo.x
+  const dy = flipBoard ? rows - 1 - move.finalTo.y : move.finalTo.y
+  // Keep the line on the board when the piece stands on an edge file.
+  const center = Math.min(
+    Math.max((dx + 0.5) * cell, width / 2 + 4),
+    cols * cell - width / 2 - 4,
+  )
+  // The tail stays on the promotion square even when the line had to shift.
+  const tail = Math.min(Math.max((dx + 0.5) * cell - (center - width / 2), 14), width - 14)
+  // White pieces sit on a dark bed and black pieces on a light one, so the
+  // icons keep their contrast in either theme.
+  const chipTone =
+    teamIndex === 0
+      ? 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700'
+      : 'border-neutral-300 bg-neutral-200 hover:bg-neutral-300'
+
+  return (
+    <div
+      ref={ref}
+      role="group"
+      aria-label="Choose a piece to promote to"
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        onCancel()
+      }}
+      className="border-border bg-popover text-popover-foreground pointer-events-auto absolute z-30 flex items-center rounded-lg border shadow-lg"
+      style={{
+        left: center,
+        top: dy * cell - lift,
+        transform: 'translate(-50%, -100%)',
+        gap,
+        padding: linePad,
+      }}
+    >
+      {/* A tail pointing at the square, so the line reads as belonging to it. */}
+      <span
+        aria-hidden
+        className="bg-popover border-border absolute -bottom-1 size-2 border-r border-b"
+        style={{ left: tail, transform: 'translateX(-50%) rotate(45deg)' }}
+      />
+      {options.map((typeId) => {
+        const type = pieceTypes[typeId]
+        return (
+          <button
+            key={typeId}
+            type="button"
+            aria-label={`Promote to ${type.name}`}
+            title={type.name}
+            onClick={() => onChoose(typeId)}
+            className={cn(
+              'grid place-items-center rounded-[3px] border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              chipTone,
+            )}
+            style={{ padding: chipPad }}
+          >
+            <PieceGlyph piece={type} teamIndex={teamIndex} size={glyph} />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * A pawn walks to the promotion square first. Only once it has landed does the
+ * choice open, above it: the board never shows the piece turning into
+ * something at a square it has not reached yet.
+ */
+function PendingPromotion({
+  move,
+  origin,
+  cell,
+  cols,
+  rows,
+  flipBoard,
+  teamIndex,
+  pieceType,
+  pieceTypes,
+  rotatePieces,
+  onChoose,
+  onCancel,
+}: {
+  move: Move
+  origin?: Vec
+  cell: number
+  cols: number
+  rows: number
+  flipBoard: boolean
+  teamIndex: number
+  pieceType: PieceType
+  pieceTypes: Record<string, PieceType>
+  rotatePieces: boolean
+  onChoose: (typeId: string) => void
+  onCancel: () => void
+}) {
+  const start = origin ?? move.from
+  const travel = travelMs(start, move.finalTo)
+  const [landed, setLanded] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLanded(true), travel)
+    return () => window.clearTimeout(timer)
+  }, [travel])
+
+  const size = Math.round(cell * 0.78)
+  const left = (flipBoard ? cols - 1 - start.x : start.x) * cell
+  const top = (flipBoard ? rows - 1 - start.y : start.y) * cell
+  const dx = (move.finalTo.x - start.x) * cell * (flipBoard ? -1 : 1)
+  const dy = (move.finalTo.y - start.y) * cell * (flipBoard ? -1 : 1)
+
+  return (
+    <>
+      <span
+        className="piece-fly absolute z-20"
+        style={
+          {
+            left,
+            top,
+            width: cell,
+            height: cell,
+            '--fly-dx': `${dx}px`,
+            '--fly-dy': `${dy}px`,
+            '--fly-duration': `${travel}ms`,
+          } as CSSProperties
+        }
+      >
+        <span className="piece-lift flex h-full w-full items-center justify-center">
+          <span
+            className="inline-flex"
+            style={{ transform: rotatePieces ? 'rotate(180deg)' : undefined }}
+          >
+            <PieceGlyph piece={pieceType} teamIndex={teamIndex} size={size} />
+          </span>
+        </span>
+      </span>
+      {landed && (
+        <PromotionPicker
+          move={move}
+          cell={cell}
+          cols={cols}
+          rows={rows}
+          flipBoard={flipBoard}
+          teamIndex={teamIndex}
+          pieceTypes={pieceTypes}
+          onChoose={onChoose}
+          onCancel={onCancel}
+        />
+      )}
+    </>
+  )
+}
+
 export function GameBoard() {
   const game = useAppStore((s) => s.game)
   const selected = useAppStore((s) => s.selected)
   const legalMoves = useAppStore((s) => s.legalMoves)
   const selectSquare = useAppStore((s) => s.selectSquare)
+  const pendingPromotion = useAppStore((s) => s.pendingPromotion)
+  const choosePromotion = useAppStore((s) => s.choosePromotion)
+  const cancelPromotion = useAppStore((s) => s.cancelPromotion)
   const analysisMode = useAppStore((s) => s.analysisMode)
   const analysisResult = useAppStore((s) => s.analysisResult)
   const threatSettings = useAppStore((s) => s.threats)
@@ -202,12 +405,17 @@ export function GameBoard() {
   // Pieces glide from where they were to where they landed. A drag records its
   // release point on the move, so the glide starts under the cursor.
   const { anim, duration: moveDuration } = useMoveAnimation(game)
+  const pendingMoverId = pendingPromotion?.move.pieceId
+  const pendingMover = pendingMoverId ? game.pieces[pendingMoverId] : null
+  const pendingType = pendingMover ? (pieceTypes[pendingMover.typeId] ?? null) : null
   const hiddenPieces = useMemo(() => {
     const ids = new Set<string>()
     for (const f of anim?.flights ?? []) ids.add(f.pieceId)
     for (const p of anim?.pops ?? []) ids.add(p.pieceId)
+    // A pawn waiting on its promotion square is drawn travelling to it instead.
+    if (pendingMoverId) ids.add(pendingMoverId)
     return ids
-  }, [anim])
+  }, [anim, pendingMoverId])
 
   // Flip the view or rotate the pieces only after the move animation lands.
   const sideIndex = variant.teams.findIndex((team) => team.id === turn)
@@ -375,6 +583,22 @@ export function GameBoard() {
               pieceTypes={pieceTypes}
               teamIndex={teamIndex}
             />
+            {pendingPromotion && pendingType && (
+              <PendingPromotion
+                move={pendingPromotion.move}
+                origin={pendingPromotion.origin}
+                cell={cell}
+                cols={cols}
+                rows={rows}
+                flipBoard={flipBoard}
+                teamIndex={teamIndex(game.turn)}
+                pieceType={pendingType}
+                pieceTypes={pieceTypes}
+                rotatePieces={rotatePieces}
+                onChoose={choosePromotion}
+                onCancel={cancelPromotion}
+              />
+            )}
           </>
         }
       >

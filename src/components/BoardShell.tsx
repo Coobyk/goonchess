@@ -45,17 +45,26 @@ export function BoardShell({
             ))}
           </div>
         )}
+        {/* The squares are clipped to the rounded board; the overlay is not,
+            so a piece of UI opened above the far rank can leave the board. */}
         <div
-          className="board-grid-shadow grid relative overflow-hidden rounded-lg"
-          role="grid"
-          aria-label={ariaLabel}
-          style={{
-            gridTemplateColumns: `repeat(${width}, ${cellSize}px)`,
-            gridTemplateRows: `repeat(${height}, ${cellSize}px)`,
-          }}
+          className="relative"
+          style={{ width: width * cellSize, height: height * cellSize }}
         >
-          {children}
-          {overlay}
+          <div
+            className="board-grid-shadow grid absolute inset-0 overflow-hidden rounded-lg"
+            role="grid"
+            aria-label={ariaLabel}
+            style={{
+              gridTemplateColumns: `repeat(${width}, ${cellSize}px)`,
+              gridTemplateRows: `repeat(${height}, ${cellSize}px)`,
+            }}
+          >
+            {children}
+          </div>
+          {overlay && (
+            <div className="pointer-events-none absolute inset-0 z-40">{overlay}</div>
+          )}
         </div>
         {showLabels && (
           <div

@@ -70,6 +70,11 @@ function span(a: Vec, b: Vec) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
 }
 
+/** How long a piece takes to walk from one square to another. */
+export function travelMs(from: Vec, to: Vec) {
+  return Math.min(MAX_MS, BASE_MS + PER_SQUARE_MS * span(from, to))
+}
+
 /** Builds the animation for the move that was just played. */
 export function planMove(prev: GameState, game: GameState): MoveAnim | null {
   if (game.moveHistory.length <= prev.moveHistory.length) return null
@@ -99,10 +104,26 @@ export function planMove(prev: GameState, game: GameState): MoveAnim | null {
   // A dragged piece is already under the cursor, so its flight starts there
   // instead of snapping back to the square it came from.
   const start = record.origin ?? move.from
-  const travel = Math.min(MAX_MS, BASE_MS + PER_SQUARE_MS * span(start, move.to))
+  const travel = travelMs(start, move.to)
+  // A promotion chosen after the piece has already walked to the far rank only
+  // has to change kind where it stands, so it pops instead of flying.
+  const inPlace = !throughPortal && span(start, move.finalTo) === 0
   let landing: number
 
-  if (throughPortal) {
+  if (inPlace) {
+    const changed = game.pieces[move.pieceId]?.typeId
+    if (changed && changed !== mover.typeId) {
+      pops.push({
+        key: 'promote',
+        pieceId: move.pieceId,
+        typeId: changed,
+        team: mover.team,
+        at: move.finalTo,
+        delay: 0,
+      })
+    }
+    landing = 0
+  } else if (throughPortal) {
     // The piece sinks into the portal and grows back out of the exit.
     flights.push(flight('mover-in', move.pieceId, mover.typeId, mover.team, start, move.to, 'vanish', travel, 0))
     flights.push(flight('mover-out', move.pieceId, mover.typeId, mover.team, move.finalTo, move.finalTo, 'emerge', EMERGE_MS, travel))

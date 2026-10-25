@@ -268,18 +268,18 @@ export function normalizeVariant(input: unknown): Variant | null {
   }
 }
 
-/** Older variants stored a single promotion target. */
+/** Accepts every shape a promotion target has been stored in over time. */
 function normalizePromotion(promotion: unknown): { typeIds: string[] } | null {
-  if (!promotion) return null
-  if (Array.isArray(promotion)) {
-    const typeIds = promotion.filter((id): id is string => typeof id === 'string' && !!id)
-    return typeIds.length ? { typeIds } : null
-  }
-  if (typeof promotion === 'object' && 'typeId' in promotion) {
-    const typeId = (promotion as { typeId?: unknown }).typeId
-    return typeof typeId === 'string' && typeId ? { typeIds: [typeId] } : null
-  }
-  return null
+  if (!promotion || typeof promotion !== 'object') return null
+  const raw = Array.isArray(promotion)
+    ? promotion
+    : 'typeIds' in promotion
+      ? (promotion as { typeIds?: unknown }).typeIds
+      : // Older variants stored the single target as `typeId`.
+        (promotion as { typeId?: unknown }).typeId
+  const list = Array.isArray(raw) ? raw : [raw]
+  const typeIds = list.filter((id): id is string => typeof id === 'string' && !!id)
+  return typeIds.length ? { typeIds } : null
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -797,8 +797,9 @@ export const useAppStore = create<AppState>((set, get) => {
         if (move) {
           const options = move.promotionOptions ?? []
           if (options.length > 1) {
-            // The player picks what the piece turns into.
-            set({ pendingPromotion: { move, origin } })
+            // The pawn is on its way to the promotion square; the choice opens
+            // once it lands, so the square is not left picked up.
+            set({ pendingPromotion: { move, origin }, selected: null, legalMoves: [] })
             return
           }
           get().playMove(move, origin, options[0])
@@ -817,18 +818,26 @@ export const useAppStore = create<AppState>((set, get) => {
             position = { ...game, roll: { pieceId, value } }
             set({ game: position })
           }
-          set({ selected: { x, y }, legalMoves: getLegalMoves(position, x, y) })
+          set({
+            selected: { x, y },
+            legalMoves: getLegalMoves(position, x, y),
+            // Touching the board again abandons a promotion that was left
+            // waiting, rather than playing it later by surprise.
+            pendingPromotion: null,
+          })
           return
         }
       }
-      set({ selected: null, legalMoves: [] })
+      set({ selected: null, legalMoves: [], pendingPromotion: null })
     },
 
     choosePromotion: (typeId) => {
       const pending = get().pendingPromotion
       if (!pending) return
       set({ pendingPromotion: null })
-      get().playMove(pending.move, pending.origin, typeId)
+      // The pawn is already standing on the promotion square, so the move is
+      // played from there: the piece turns into the chosen one in place.
+      get().playMove(pending.move, pending.move.finalTo, typeId)
     },
 
     cancelPromotion: () => set({ pendingPromotion: null }),
@@ -891,6 +900,7 @@ export const useAppStore = create<AppState>((set, get) => {
             },
             selected: null,
             legalMoves: [],
+            pendingPromotion: null,
           })
           return
         }
@@ -917,6 +927,7 @@ export const useAppStore = create<AppState>((set, get) => {
         game: settled,
         selected: null,
         legalMoves: [],
+        pendingPromotion: null,
         // The position the move leads to joins the history. A move made
         // after the game was moved back replaces what came after it.
         undoStack: [...get().undoStack.slice(0, game.moveHistory.length + 1), next],
@@ -968,6 +979,7 @@ export const useAppStore = create<AppState>((set, get) => {
         legalMoves: [],
         undoStack: [],
         queuedMove: null,
+        pendingPromotion: null,
         clockState: initialClockState(get().clock, variant.teams.map((t) => t.id)),
         // A new game means a new side for a bot that plays at random.
         botSide: sideFor(get().bot, variant, get().botSide),
@@ -1093,6 +1105,7 @@ export const useAppStore = create<AppState>((set, get) => {
         selected: null,
         legalMoves: [],
         queuedMove: null,
+        pendingPromotion: null,
         reviewingHistory: false,
       })
     },

@@ -107,7 +107,8 @@ export function classicChess(): Variant {
   const doubleStep = slider([{ x: 0, y: -1 }], 2)
   doubleStep.firstMoveOnly = true
   pawn.move = [...pawn.move, doubleStep]
-  pawn.promotion = { typeIds: [queen.id] }
+  // As in chess: the player picks what the pawn becomes on the far rank.
+  pawn.promotion = { typeIds: [queen.id, rook.id, bishop.id, knight.id] }
 
   const pieceTypes = [king, queen, rook, bishop, knight, pawn]
   const setup: SetupPiece[] = []
@@ -158,7 +159,8 @@ export function miniChess(): Variant {
   const miniDouble = slider([{ x: 0, y: -1 }], 2)
   miniDouble.firstMoveOnly = true
   pawn.move = [...pawn.move, miniDouble]
-  pawn.promotion = { typeIds: [queen.id] }
+  // The small army has no bishop, so a pawn may become a queen, rook or knight.
+  pawn.promotion = { typeIds: [queen.id, rook.id, knight.id] }
 
   const pieceTypes = [king, queen, rook, knight, pawn]
   const setup: SetupPiece[] = []
@@ -176,7 +178,7 @@ export function miniChess(): Variant {
     schema: 1,
     id: 'mini',
     name: 'Mini Chess',
-    description: 'A fast 6×6 duel. Pawns get a double step and promote to queens.',
+    description: 'A fast 6×6 duel. Pawns get a double step and promote to a piece of your choice.',
     board: emptyBoard(6, 6),
     teams: [
       { id: 'white', name: 'White', color: '#f4f1ea', forward: 'up' },
@@ -273,7 +275,8 @@ export function bombQueen(): Variant {
     effects: [{ kind: 'explosion', radius: 1 }],
     promotion: { typeIds: [pawn.id] },
   })
-  pawn.promotion = { typeIds: [queen.id] }
+  // The bomb queen is one of the choices, so a pawn can still become a bomb.
+  pawn.promotion = { typeIds: [queen.id, rook.id, bishop.id, knight.id] }
   const doubleStep = slider([{ x: 0, y: -1 }], 2)
   doubleStep.firstMoveOnly = true
   pawn.move = [...pawn.move, doubleStep]
