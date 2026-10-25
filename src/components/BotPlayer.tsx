@@ -6,7 +6,7 @@ import { botLevelFor, isBotTeam } from '@/engine/ai/botSettings'
 import { clockIsOn } from '@/lib/clock'
 import { wouldRepeat } from '@/lib/repetition'
 import { moveKey } from '@/engine/repetition'
-import { getLegalMoves, legalOptionsForTeam } from '@/engine/rules'
+import { dropOptions, getLegalMoves, legalOptionsForTeam } from '@/engine/rules'
 import type { GameState, Move } from '@/engine/types'
 
 /**
@@ -100,7 +100,11 @@ export function BotPlayer() {
 
 /** The legal move that matches what the bot wanted to play, if it is legal. */
 function legalMoveFor(state: GameState, wanted: Move): Move | undefined {
-  return getLegalMoves(state, wanted.from.x, wanted.from.y).find(
+  // A drop has no piece to look up under its square: it comes from the pocket.
+  const pool: Move[] = wanted.drop
+    ? dropOptions(state, state.turn).map((option) => option.move)
+    : getLegalMoves(state, wanted.from.x, wanted.from.y)
+  return pool.find(
     (m) =>
       m.pieceId === wanted.pieceId &&
       m.finalTo.x === wanted.finalTo.x &&

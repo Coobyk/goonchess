@@ -44,6 +44,24 @@ export function positionKey(state: GameState): string {
   if (state.checks) {
     parts.push(variant.teams.map((team) => state.checks?.[team.id] ?? 0).join(','))
   }
+  // Crazyhouse: two positions with the same pieces on the board are different
+  // games when the pockets hold different things. The kinds are listed in the
+  // variant's own order, so the same pockets always spell the same string.
+  if (state.hands) {
+    parts.push(
+      variant.teams
+        .map((team) => {
+          const hand = state.hands?.[team.id]
+          if (!hand) return ''
+          return variant.pieceTypes
+            .map((piece, i) => ({ i, count: hand[piece.id] ?? 0 }))
+            .filter((entry) => entry.count > 0)
+            .map((entry) => `${entry.i.toString(36)}x${entry.count.toString(36)}`)
+            .join(',')
+        })
+        .join('/'),
+    )
+  }
   return parts.join('|')
 }
 

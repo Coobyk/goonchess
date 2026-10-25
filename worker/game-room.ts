@@ -11,7 +11,7 @@
  * Everything is stored in two keys, one row each, because the number of rows
  * written is the tightest part of the free plan.
  */
-import { applyMove, createInitialState, getLegalMoves, rollRandomPieces } from '../src/engine/rules'
+import { applyMove, createInitialState, dropOptions, getLegalMoves, rollRandomPieces } from '../src/engine/rules'
 import type { GameState, Variant, Vec } from '../src/engine/types'
 import {
   clockIsOn,
@@ -51,7 +51,7 @@ interface Attachment {
 }
 
 type Message =
-  | { t: 'move'; from: Vec; to: Vec; finalTo: Vec; roll?: number; promotionTypeId?: string; origin?: Vec }
+  | { t: 'move'; from: Vec; to: Vec; finalTo: Vec; roll?: number; promotionTypeId?: string; origin?: Vec; drop?: { typeId: string } }
   | { t: 'resign' }
 
 export class GameRoom {
@@ -277,13 +277,18 @@ export class GameRoom {
         : undefined
 
     const position = roll ? { ...game, roll } : game
-    const legal = getLegalMoves(position, from.x, from.y)
+    // A drop comes out of the pocket, so there is no piece under `from` to
+    // ask — the legal drops are worked out instead.
+    const legal = message.drop
+      ? dropOptions(position, game.turn).map((option) => option.move)
+      : getLegalMoves(position, from.x, from.y)
     const move = legal.find(
       (candidate) =>
         candidate.to.x === to.x &&
         candidate.to.y === to.y &&
         candidate.finalTo.x === finalTo.x &&
-        candidate.finalTo.y === finalTo.y,
+        candidate.finalTo.y === finalTo.y &&
+        candidate.drop?.typeId === message.drop?.typeId,
     )
     if (!move) return this.reject(seat, 'illegal_move', game, refusedClock)
 

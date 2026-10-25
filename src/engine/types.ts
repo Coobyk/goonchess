@@ -230,6 +230,8 @@ export interface Move {
   promotionOptions?: string[]
   /** Set when this move is a king-side or queen-side castle. */
   castle?: CastleInfo
+  /** Set when the piece comes out of a pocket instead of off the board. */
+  drop?: { typeId: string }
 }
 
 /** Visual record of an explosion that happened during a move. */
@@ -263,6 +265,8 @@ export interface PieceInstance {
   typeId: string
   team: string
   hasMoved: boolean
+  /** What this piece was before it promoted — a captured one returns to a pocket as it. */
+  promotedFrom?: string
 }
 
 export interface GameState {
@@ -278,6 +282,8 @@ export interface GameState {
   scores: Record<string, number>
   /** How many checks each team has given, in a game of Three-Check. */
   checks?: Record<string, number>
+  /** What each team holds in its pocket, in a game of Crazyhouse. */
+  hands?: Record<string, Record<string, number>>
   /** The die a piece rolled to pick its move, while it is being chosen. */
   roll?: { pieceId: string; value: number }
   /** What identifies the position the game started from, for repetition. */

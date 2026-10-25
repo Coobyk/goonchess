@@ -174,6 +174,22 @@ export function hashPosition(state: GameState, out: Fingerprint): void {
     }
   }
 
+  // What each pocket holds. In Crazyhouse a drop can come out of it, so two
+  // positions with the same pieces are different games again.
+  if (state.hands) {
+    for (const team of variant.teams) {
+      const hand = state.hands[team.id]
+      if (!hand) continue
+      for (const piece of variant.pieceTypes) {
+        const count = hand[piece.id] ?? 0
+        if (!count) continue
+        const type = (indices.types.get(piece.id) ?? 0) * 8 + 1
+        h1 = mix(h1, type * 16 + count)
+        h2 = mix(h2, count * 131 + type)
+      }
+    }
+  }
+
   // The last move, which may have left a capture en passant open.
   const last = state.moveHistory[state.moveHistory.length - 1]
   if (last) {

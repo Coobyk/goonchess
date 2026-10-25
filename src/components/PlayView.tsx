@@ -72,6 +72,18 @@ export function PlayView() {
   const theme = useAppStore((s) => s.theme)
   const variant = useAppStore((s) => s.variant)
   const threeCheck = variant.winConditions.some((w) => w.kind === 'threeCheck')
+  const crazyhouse = !!variant.rules?.includes('crazyhouse')
+  const selected = useAppStore((s) => s.selected)
+  const legalMoves = useAppStore((s) => s.legalMoves)
+  const selectPocket = useAppStore((s) => s.selectPocket)
+  // A drop waits on the off-board square: no real square is ever selected.
+  const pocketPick =
+    selected && selected.x === -1 && selected.y === -1
+      ? legalMoves[0]?.drop?.typeId ?? null
+      : null
+  /** What a side holds in its pocket, as [typeId, count] pairs. */
+  const pocketOf = (teamId: string) =>
+    Object.entries(game.hands?.[teamId] ?? {}).filter(([, count]) => count > 0)
   const resetGame = useAppStore((s) => s.resetGame)
   const jumpToPly = useAppStore((s) => s.jumpToPly)
   const undoStack = useAppStore((s) => s.undoStack)
@@ -220,16 +232,51 @@ export function PlayView() {
               )}
               <ClockFor team={team.id} />
               <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
-                {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
-                  const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                  return (
-                    <div key={typeId} className="flex -space-x-2">
-                      {grp.map((_c, i) => (
-                        <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
-                      ))}
-                    </div>
+                {crazyhouse ? (
+                  pocketOf(team.id).length === 0 ? (
+                    <span className="text-muted-foreground text-xs">Pocket empty</span>
+                  ) : (
+                    pocketOf(team.id).map(([typeId, count]) => {
+                      const pt = variant.pieceTypes.find((p) => p.id === typeId)
+                      const held = pocketPick === typeId
+                      const canDrop = !game.winner && game.turn === team.id
+                      return (
+                        <button
+                          key={typeId}
+                          type="button"
+                          title={`${pt?.name ?? 'Piece'} in the pocket — tap to pick it up`}
+                          aria-label={`Drop ${pt?.name ?? 'piece'} (${count} in pocket)`}
+                          aria-pressed={held}
+                          onClick={() => selectPocket(typeId)}
+                          disabled={!canDrop}
+                          className={cn(
+                            'flex items-center gap-0.5 rounded-md border px-1 py-0.5 transition-colors',
+                            held ? 'border-foreground bg-secondary' : 'border-transparent hover:bg-muted',
+                            !canDrop && 'opacity-60',
+                          )}
+                        >
+                          <PieceGlyph
+                            piece={pt}
+                            teamIndex={variant.teams.findIndex((t) => t.id === team.id)}
+                            size={18}
+                          />
+                          <span className="text-xs tabular-nums">×{count}</span>
+                        </button>
+                      )
+                    })
                   )
-                })}
+                ) : (
+                  Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
+                    const pt = variant.pieceTypes.find((p) => p.id === typeId)
+                    return (
+                      <div key={typeId} className="flex -space-x-2">
+                        {grp.map((_c, i) => (
+                          <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
+                        ))}
+                      </div>
+                    )
+                  })
+                )}
               </div>
               {advantage !== 0 && (
                 <span className="text-muted-foreground text-xs tabular-nums">
@@ -259,16 +306,51 @@ export function PlayView() {
               )}
               <ClockFor team={team.id} />
               <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
-                {Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
-                  const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                  return (
-                    <div key={typeId} className="flex -space-x-2">
-                      {grp.map((_c, i) => (
-                        <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
-                      ))}
-                    </div>
+                {crazyhouse ? (
+                  pocketOf(team.id).length === 0 ? (
+                    <span className="text-muted-foreground text-xs">Pocket empty</span>
+                  ) : (
+                    pocketOf(team.id).map(([typeId, count]) => {
+                      const pt = variant.pieceTypes.find((p) => p.id === typeId)
+                      const held = pocketPick === typeId
+                      const canDrop = !game.winner && game.turn === team.id
+                      return (
+                        <button
+                          key={typeId}
+                          type="button"
+                          title={`${pt?.name ?? 'Piece'} in the pocket — tap to pick it up`}
+                          aria-label={`Drop ${pt?.name ?? 'piece'} (${count} in pocket)`}
+                          aria-pressed={held}
+                          onClick={() => selectPocket(typeId)}
+                          disabled={!canDrop}
+                          className={cn(
+                            'flex items-center gap-0.5 rounded-md border px-1 py-0.5 transition-colors',
+                            held ? 'border-foreground bg-secondary' : 'border-transparent hover:bg-muted',
+                            !canDrop && 'opacity-60',
+                          )}
+                        >
+                          <PieceGlyph
+                            piece={pt}
+                            teamIndex={variant.teams.findIndex((t) => t.id === team.id)}
+                            size={18}
+                          />
+                          <span className="text-xs tabular-nums">×{count}</span>
+                        </button>
+                      )
+                    })
                   )
-                })}
+                ) : (
+                  Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
+                    const pt = variant.pieceTypes.find((p) => p.id === typeId)
+                    return (
+                      <div key={typeId} className="flex -space-x-2">
+                        {grp.map((_c, i) => (
+                          <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
+                        ))}
+                      </div>
+                    )
+                  })
+                )}
               </div>
               {advantage !== 0 && (
                 <span className="text-muted-foreground text-xs tabular-nums">

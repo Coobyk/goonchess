@@ -171,6 +171,11 @@ export function createInitialState(variant: Variant): GameState {
     state.checks = {}
     for (const team of variant.teams) state.checks[team.id] = 0
   }
+  // Crazyhouse starts every pocket empty.
+  if (variant.rules?.includes('crazyhouse')) {
+    state.hands = {}
+    for (const team of variant.teams) state.hands[team.id] = {}
+  }
   // The opening position counts towards a repetition.
   state.startKey = positionKey(state)
   return state
@@ -680,6 +685,9 @@ export function cloneState(state: GameState): GameState {
     captured: state.captured.slice(),
     scores: { ...state.scores },
     checks: state.checks ? { ...state.checks } : state.checks,
+    hands: state.hands
+      ? Object.fromEntries(Object.entries(state.hands).map(([team, hand]) => [team, { ...hand }]))
+      : state.hands,
   }
 }
 
@@ -878,6 +886,76 @@ function needsSlowCheck(move: Move) {
 }
 
 /**
+ * The moves that begin in a pocket rather than on the board.
+ *
+ * A drop is judged by the same questions as any other move: it needs an empty
+ * square that will hold it, and it has to leave the king standing. It cannot
+ * take anything off the board, so when the king was safe before the drop it
+ * is still safe after it — that is asked once, not for every square.
+ */
+function collectDrops(
+  state: GameState,
+  teamId: string,
+  wantStates: boolean,
+  search: boolean,
+): { moves: Move[]; states: (GameState | null)[] } {
+  const moves: Move[] = []
+  const states: (GameState | null)[] = []
+  if (!state.variant.rules?.includes('crazyhouse')) return { moves, states }
+  // Losing chess keeps its compulsory capture: a drop is not a capture.
+  if (captureIsForced(state, teamId)) return { moves, states }
+  const hand = state.hands?.[teamId]
+  if (!hand) return { moves, states }
+  const width = state.variant.board.width
+  const height = state.variant.board.height
+  const noCheck = state.variant.rules?.includes('noCheck')
+  const checked = isInCheck(state, teamId)
+  const build = (move: Move) =>
+    wantStates ? applyMove(state, move, { compute: false, search }) : null
+
+  for (const typeId in hand) {
+    if ((hand[typeId] ?? 0) <= 0) continue
+    const type = state.pieceTypes[typeId]
+    if (!type) continue
+    const pawn = type.name === 'Pawn'
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (state.board[y][x] !== null) continue
+        // A pawn may never be dropped on a back rank.
+        if (pawn && (y === 0 || y === height - 1)) continue
+        const tile = tileAt(state.variant, x, y)
+        if (tile?.terrain === 'void' || tile?.terrain === 'wall') continue
+        const move: Move = {
+          from: { x, y },
+          to: { x, y },
+          pieceId: `drop|${state.moveHistory.length}|${typeId}|${teamId}|${x},${y}`,
+          drop: { typeId },
+          effects: [],
+          finalTo: { x, y },
+        }
+        if (!checked && !noCheck) {
+          moves.push(move)
+          states.push(build(move))
+          continue
+        }
+        const next = applyMove(state, move, { compute: false, search })
+        if (isInCheck(next, teamId)) continue
+        if (noCheck && isInCheck(next, next.turn)) continue
+        moves.push(move)
+        states.push(wantStates ? next : null)
+      }
+    }
+  }
+  return { moves, states }
+}
+
+/** The legal drops a team has in hand, each with the state it leads to. */
+export function dropOptions(state: GameState, teamId: string): MoveOption[] {
+  const { moves, states } = collectDrops(state, teamId, true, false)
+  return moves.map((move, i) => ({ move, next: states[i] as GameState }))
+}
+
+/**
  * Every legal move of a whole team, with the state it leads to.
  *
  * Asking "is the royal piece still safe?" is the expensive part of a legal
@@ -994,6 +1072,12 @@ function collectTeamMoves(
     }
   }
   if (exposed) giveScratch()
+  // What a pocket can put back on the board joins the moves on it.
+  const drops = collectDrops(state, teamId, wantStates, search)
+  for (let i = 0; i < drops.moves.length; i++) {
+    moves.push(drops.moves[i])
+    states.push(drops.states[i])
+  }
   return { moves, states }
 }
 
@@ -1014,6 +1098,7 @@ function isRoyalSafeOnSquare(
 }
 
 export function hasAnyLegalMove(state: GameState, teamId: string): boolean {
+  if (collectDrops(state, teamId, false, false).moves.length > 0) return true
   for (let y = 0; y < state.board.length; y++) {
     for (let x = 0; x < state.board[y].length; x++) {
       const id = state.board[y][x]
@@ -1051,6 +1136,20 @@ export function applyMove(
   const next: GameState = cloneState(state)
   // The die has been used; the next piece rolls its own.
   next.roll = undefined
+
+  // A drop arrives from the pocket, so the piece does not exist until now —
+  // and what it cost comes out of the pocket as it lands.
+  if (move.drop && !next.pieces[move.pieceId]) {
+    const held = next.hands?.[state.turn]
+    if (held) held[move.drop.typeId] = Math.max(0, (held[move.drop.typeId] ?? 0) - 1)
+    next.pieces[move.pieceId] = {
+      id: move.pieceId,
+      typeId: move.drop.typeId,
+      team: state.turn,
+      hasMoved: false,
+    }
+  }
+
   const inst = next.pieces[move.pieceId]
   if (!inst) return next
   const piece = next.pieceTypes[inst.typeId]
@@ -1092,6 +1191,13 @@ export function applyMove(
         next.scores[inst.team] = (next.scores[inst.team] ?? 0) + capturedPiece.value
         if (capturedPiece.flags.royal) royalTeams.add(capturedInst.team)
       }
+      // Crazyhouse: the captured piece changes sides into the pocket of
+      // whoever took it. A piece that promoted goes back as what it was.
+      if (next.hands) {
+        const pocket = next.hands[inst.team] ?? (next.hands[inst.team] = {})
+        const held = capturedInst.promotedFrom ?? capturedInst.typeId
+        pocket[held] = (pocket[held] ?? 0) + 1
+      }
     }
   }
 
@@ -1120,7 +1226,16 @@ export function applyMove(
   }
   next.board[fy][fx] = move.pieceId
   touch(move.pieceId)
-  next.pieces[move.pieceId].hasMoved = true
+  if (move.drop) {
+    // A pawn dropped on its own second rank still has the two-square step in
+    // front of it; anything dropped anywhere else has already used its first
+    // move — a dropped rook, among them, never castles.
+    const forward = teamById(next.variant, inst.team)?.forward ?? 'up'
+    const secondRank = forward === 'down' ? 1 : next.variant.board.height - 2
+    next.pieces[move.pieceId].hasMoved = !(piece.name === 'Pawn' && fy === secondRank)
+  } else {
+    next.pieces[move.pieceId].hasMoved = true
+  }
 
   // Castling moves the rook in the same turn, once the king has landed.
   if (move.castle) {
@@ -1245,6 +1360,8 @@ export function applyMove(
       const target = chosen ? next.pieceTypes[chosen] : undefined
       if (target) {
         touch(move.pieceId)
+        // A piece that promotes goes back to a pocket as what it was before.
+        next.pieces[move.pieceId].promotedFrom ??= piece.id
         if (piece.flags.random && !target.flags.random) {
           // A random piece keeps its random mark when it promotes: it borrows
           // the way of the piece it turned into, and goes on changing.
@@ -1332,9 +1449,12 @@ function notationFor(
   piece: PieceType,
   capturedPiece?: PieceType,
   promotionName?: string,
-) {  if (move.castle) return castleSide(move) ? 'O-O' : 'O-O-O'
+) {
+  if (move.castle) return castleSide(move) ? 'O-O' : 'O-O-O'
   const from = squareName(state.variant, move.from.x, move.from.y)
   const to = squareName(state.variant, move.finalTo.x, move.finalTo.y)
+  // A drop is written as it lands: N@f3, or just @e4 for a pawn.
+  if (move.drop) return `${piece.name} @${to}`
   const cap = move.capturedId ? 'x' : '-'
   const suffix = capturedPiece ? ` (${capturedPiece.name})` : ''
   const enPassant = move.capturedAt ? ' e.p.' : ''
@@ -1362,7 +1482,13 @@ const SAN_LETTERS: Record<string, string> = {
  */
 export function sanFor(state: GameState, move: Move, next: GameState): string {
   if (move.castle) {
-    return (castleSide(move) ? 'O-O' : 'O-O-O') + checkSuffix(next)
+    return (castleSide(move) ? 'O-O' : 'O-O-O') + checkSuffix(next, state.turn)
+  }
+  if (move.drop) {
+    const dropped = state.pieceTypes[move.drop.typeId]
+    const letter = dropped && dropped.icon !== 'pawn' ? SAN_LETTERS[dropped.icon] ?? '' : ''
+    const target = squareName(state.variant, move.finalTo.x, move.finalTo.y)
+    return `${letter}@${target}${checkSuffix(next, state.turn)}`
   }
   const inst = state.pieces[move.pieceId]
   const piece = inst ? state.pieceTypes[inst.typeId] : undefined
@@ -1370,8 +1496,9 @@ export function sanFor(state: GameState, move: Move, next: GameState): string {
   const letter = piece && piece.icon !== 'pawn' ? SAN_LETTERS[piece.icon] ?? '' : ''
   const target = squareName(state.variant, move.finalTo.x, move.finalTo.y)
 
-  if (move.capturedId && !letter) {    const from = squareName(state.variant, move.from.x, move.from.y)
-    return `${from[0]}x${target}${promotionSuffix(state, move)}${checkSuffix(next)}`
+  if (move.capturedId && !letter) {
+    const from = squareName(state.variant, move.from.x, move.from.y)
+    return `${from[0]}x${target}${promotionSuffix(state, move)}${checkSuffix(next, state.turn)}`
   }
 
   let hint = ''
@@ -1386,7 +1513,7 @@ export function sanFor(state: GameState, move: Move, next: GameState): string {
     }
   }
   const capture = move.capturedId ? 'x' : ''
-  return `${letter}${hint}${capture}${target}${promotionSuffix(state, move)}${checkSuffix(next)}`
+  return `${letter}${hint}${capture}${target}${promotionSuffix(state, move)}${checkSuffix(next, state.turn)}`
 }
 
 /** Other pieces of the same kind that could also reach the same square. */
@@ -1419,37 +1546,20 @@ function promotionSuffix(state: GameState, move: Move): string {
   return letter ? `=${letter}` : ''
 }
 
-/** "+" when the opponent is in check, "#" when it is checkmate. */
-function checkSuffix(next: GameState): string {
-  const opponent = next.turn
-  let inCheck = false
-  for (const id in next.pieces) {
-    const inst = next.pieces[id]
-    if (inst.team !== opponent) continue
-    if (!next.pieceTypes[inst.typeId]?.flags.royal) continue
-    const at = findPiece(next, id)
-    if (!at) continue
-    for (let y = 0; y < next.board.length; y++) {
-      for (let x = 0; x < next.board[y].length; x++) {
-        const attacker = next.board[y][x]
-        if (!attacker) continue
-        const attackerInst = next.pieces[attacker]
-        if (attackerInst.team === opponent) continue
-        if (movesFor(next, x, y).some((m) => m.capturedId === id)) inCheck = true
-      }
-    }
-  }
-  if (!inCheck) return ''
-  let anyMove = false
-  for (let y = 0; y < next.board.length; y++) {
-    for (let x = 0; x < next.board[y].length; x++) {
-      const id = next.board[y][x]
-      if (!id) continue
-      if (next.pieces[id].team !== opponent) continue
-      if (getLegalMoves(next, x, y).length > 0) anyMove = true
-    }
-  }
-  return anyMove ? '+' : '#'
+/**
+ * "+" when the opponent is in check, "#" when it is checkmate.
+ *
+ * The notation is written before the turn has changed hands, so the side that
+ * has to answer is every team but the mover.
+ */
+function checkSuffix(next: GameState, mover: string): string {
+  const checked = next.variant.teams.find(
+    (team) => team.id !== mover && isInCheck(next, team.id),
+  )
+  if (!checked) return ''
+  // A pocket can answer a check too, so a mate is only a mate with nothing
+  // left to drop either.
+  return hasAnyLegalMove(next, checked.id) ? '+' : '#'
 }
 
 /* -------------------------------------------------------------- outcome */

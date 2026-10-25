@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine/types'
-import { applyMove, createInitialState, getLegalMoves, rollRandomPieces, uid } from '@/engine/rules'
+import { applyMove, createInitialState, dropOptions, getLegalMoves, rollRandomPieces, uid } from '@/engine/rules'
 import { defaultVariant, TEMPLATES } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
 import {
@@ -161,6 +161,8 @@ interface AppState {
 
   /* game */
   selectSquare: (x: number, y: number, origin?: Vec) => void
+  /** Picks a piece up out of the pocket, ready to drop it on the board. */
+  selectPocket: (typeId: string) => void
   playMove: (move: Move, origin?: Vec, promotionTypeId?: string) => void
   pendingPromotion: { move: Move; origin?: Vec } | null
   choosePromotion: (typeId: string) => void
@@ -831,6 +833,36 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ selected: null, legalMoves: [], pendingPromotion: null })
     },
 
+    selectPocket: (typeId) => {
+      const { game, bot, botSide, selected, legalMoves } = get()
+      if (game.winner) return
+      // The same gates as touching the board: your turn, your side, connected.
+      const online = get().online
+      if (online) {
+        if (online.seat === null || online.status !== 'playing') return
+        if (!online.connected) {
+          set({ online: { ...online, error: 'offline' } })
+          return
+        }
+        if (game.turn !== game.variant.teams[online.seat]?.id) return
+      }
+      if (isBotTeam(bot, game.turn, botSide)) return
+      // The pocket piece picked up by the off-board square — no real square is
+      // ever selected while a drop is being lined up.
+      const holding = selected && selected.x === -1 && selected.y === -1
+      if (holding && (legalMoves[0]?.drop?.typeId ?? null) === typeId) {
+        set({ selected: null, legalMoves: [], pendingPromotion: null })
+        return
+      }
+      set({
+        selected: { x: -1, y: -1 },
+        legalMoves: dropOptions(game, game.turn)
+          .filter((option) => option.move.drop?.typeId === typeId)
+          .map((option) => option.move),
+        pendingPromotion: null,
+      })
+    },
+
     choosePromotion: (typeId) => {
       const pending = get().pendingPromotion
       if (!pending) return
@@ -947,6 +979,7 @@ export const useAppStore = create<AppState>((set, get) => {
             roll: move.roll,
             promotionTypeId,
             origin,
+            drop: move.drop,
           }) ?? false
         if (!sent) {
           // The socket was down, so the move never left. Put the board back

@@ -261,6 +261,23 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
     }
   }
 
+  // In Crazyhouse the pocket is material too: what a side holds, it can put
+  // straight back on the board.
+  if (state.hands) {
+    for (const team of variant.teams) {
+      const hand = state.hands[team.id]
+      if (!hand) continue
+      const sign = team.id === teamId ? 1 : -1
+      for (const typeId in hand) {
+        const count = hand[typeId] ?? 0
+        if (!count) continue
+        const piece = state.pieceTypes[typeId]
+        if (!piece) continue
+        score += sign * count * piece.value * MATERIAL_SCALE
+      }
+    }
+  }
+
   // Royal safety.
   for (let i = 0; i < royalCount; i++) {
     const nearest = Math.min(4, nearestEnemy(state, royalX[i], royalY[i], royalTeam[i]))

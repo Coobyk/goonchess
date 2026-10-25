@@ -81,11 +81,32 @@ export function planMove(prev: GameState, game: GameState): MoveAnim | null {
   const record = game.moveHistory[game.moveHistory.length - 1]
   const move = record.move
   const mover = prev.pieces[move.pieceId]
-  if (!mover) return null
+  if (!mover && !move.drop) return null
 
   const flights: Flight[] = []
   const dissolves: Dissolve[] = []
   const pops: Pop[] = []
+
+  // A drop has no square to fly from: the piece grows out of the one it
+  // lands on. Reaching here without a mover means the move was a drop.
+  if (!mover) {
+    pops.push({
+      key: 'drop',
+      pieceId: move.pieceId,
+      typeId: move.drop?.typeId ?? '',
+      team: record.team,
+      at: move.finalTo,
+      delay: 0,
+    })
+    return {
+      id: game.moveHistory.length,
+      flights,
+      dissolves,
+      pops,
+      duration: 0,
+      total: POP_MS,
+    }
+  }
 
   const flight = (key: string, pieceId: string, typeId: string, team: string, from: Vec, to: Vec, kind: FlightKind, duration: number, delay: number): Flight => ({
     key,

@@ -801,6 +801,31 @@ export function atomic(): Variant {
   }
 }
 
+/* ----------------------------------------------------------- crazyhouse */
+
+/**
+ * Standard chess with pockets. Everything you take changes sides into yours,
+ * and on your turn you may put one of them back on an empty square instead of
+ * moving a piece at all — a dropped pawn comes back as a pawn, and never on a
+ * back rank. The rules of chess are otherwise untouched: a drop may answer a
+ * check, a dropped rook never castles, and a pawn dropped on its own second
+ * rank still has its two-square step in front of it.
+ */
+export function crazyhouse(): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'crazyhouse',
+    name: 'Crazyhouse',
+    description: 'Captured pieces can be dropped back on the board instead of moving a piece.',
+    rules: ['crazyhouse'],
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+    ],
+  }
+}
+
 export const TEMPLATES: {
   id: string
   name: string
@@ -858,6 +883,12 @@ export const TEMPLATES: {
     name: 'Atomic',
     description: 'Captures explode',
     build: atomic,
+  },
+  {
+    id: 'crazyhouse',
+    name: 'Crazyhouse',
+    description: 'Captured pieces come back',
+    build: crazyhouse,
   },
 ]
 
