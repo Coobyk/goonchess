@@ -30,6 +30,8 @@ export interface BotRequest {
 
 export interface BotReply {
   id: number
+  /** A reply in progress: the search has finished another depth. */
+  kind?: 'progress'
   move: Move | null
   score: number
   depth: number
@@ -39,6 +41,8 @@ export interface BotReply {
   line: string[]
   /** The score of every position, when a whole game was analysed. */
   scores?: number[] | null
+  /** The move came out of the opening book. */
+  book?: boolean
   /** A puzzle, when one was asked for. */
   puzzle?: {
     state: GameState
@@ -118,7 +122,19 @@ scope.onmessage = (event) => {
       })
       return
     }
-    const result = searchBestMove(state, { team, level, seed, timeBudgetMs, analyze, exclude })
+    const result = searchBestMove(state, {
+      team,
+      level,
+      seed,
+      timeBudgetMs,
+      analyze,
+      exclude,
+      onProgress: (info) => {
+        // Halfway through the search: the board is told what the bot thinks
+        // so far, and keeps thinking.
+        scope.postMessage({ id, kind: 'progress', move: null, line: [], scores: null, puzzle: null, ...info })
+      },
+    })
     scope.postMessage({
       id,
       move: result.move,
@@ -129,6 +145,7 @@ scope.onmessage = (event) => {
       line: wantLine ? describeLine(state, result.line) : [],
       scores: null,
       puzzle: null,
+      book: result.book,
     })
   } catch (error) {
     scope.postMessage({

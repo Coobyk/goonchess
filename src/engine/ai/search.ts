@@ -1,5 +1,6 @@
 import { applyMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank } from '../rules'
 import { evaluate } from './evaluate'
+import { bookMove } from './book'
 import { enPassantSensitive, hashPosition, TABLE_SIZE, type Fingerprint } from './hash'
 import type { GameState, Move, Variant } from '../types'
 
@@ -83,6 +84,11 @@ export interface SearchOptions {
    * a repetition, which would be a draw.
    */
   exclude?: string[]
+  /**
+   * Told how the deepening is coming along, once per finished depth. The
+   * worker forwards it so the board can show what the bot is thinking.
+   */
+  onProgress?: (info: { depth: number; score: number; nodes: number; elapsedMs: number }) => void
 }
 
 export interface SearchResult {
@@ -95,6 +101,8 @@ export interface SearchResult {
   depth: number
   nodes: number
   elapsedMs: number
+  /** The move came out of the opening book, not out of a search. */
+  book?: boolean
 }
 
 const MATE = 1_000_000
@@ -744,12 +752,35 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   let rootResults: RootMove[] = []
   let depth = 0
 
+  // The first few moves come out of the book when there is one for this
+  // position, so the openings are not all the same and not all bad.
+  if (!options.analyze) {
+    const fromBook = bookMove(state, options.seed ?? 0)
+    if (fromBook && !options.exclude?.includes(moveName(fromBook))) {
+      return {
+        move: fromBook,
+        score: 0,
+        line: [fromBook],
+        depth: 0,
+        nodes: 0,
+        elapsedMs: performance.now() - started,
+        book: true,
+      }
+    }
+  }
+
   ctx.tt.beginRound()
   for (let d = 1; d <= profile.maxDepth; d++) {
     const results = searchRoot(state, d, ctx)
     if (ctx.aborted || !results.length) break
     rootResults = results
     depth = d
+    options.onProgress?.({
+      depth,
+      score: results.reduce((best, entry) => Math.max(best, entry.score), -Infinity),
+      nodes: ctx.nodes,
+      elapsedMs: performance.now() - started,
+    })
     if (performance.now() >= ctx.deadline) break
   }
 

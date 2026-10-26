@@ -99,6 +99,7 @@ export function PlayView() {
   const clock = useAppStore((s) => s.clock)
   const setClock = useAppStore((s) => s.setClock)
   const botThinking = useAppStore((s) => s.botThinking)
+  const botProgress = useAppStore((s) => s.botProgress)
   const setOpponentOpen = useAppStore((s) => s.setOpponentOpen)
   const [exportOpen, setExportOpen] = useState(false)
   const [pgnExport, setPgnExport] = useState<{ text: string; filename: string } | null>(null)
@@ -381,13 +382,15 @@ export function PlayView() {
                 ) : (
                   <Bot />
                 )}
-                {bot.mode === 'all'
-                  ? 'Bot vs Bot'
-                  : bot.mode === 'one'
-                    ? bot.side === 'random'
-                      ? 'Bot · Random'
-                      : `Bot · ${variant.teams.find((t) => t.id === bot.side)?.name ?? ''}`
-                    : 'Opponent'}
+                {botThinking && botProgress
+                  ? `thinking · depth ${botProgress.depth} · ${botProgress.score >= 0 ? '+' : '−'}${(Math.abs(botProgress.score) / 100).toFixed(1)}`
+                  : bot.mode === 'all'
+                    ? 'Bot vs Bot'
+                    : bot.mode === 'one'
+                      ? bot.side === 'random'
+                        ? 'Bot · Random'
+                        : `Bot · ${variant.teams.find((t) => t.id === bot.side)?.name ?? ''}`
+                      : 'Opponent'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80" align="center">
