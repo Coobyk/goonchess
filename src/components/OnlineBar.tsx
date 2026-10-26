@@ -1,22 +1,31 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { AlertTriangle, Check, Copy, Eye, Flag, Loader2, Radio, WifiOff } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Eye, Flag, Loader2, MessageCircle, Radio, Send, Undo2, WifiOff, X } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { cn } from '@/lib/utils'
 
 /**
  * The strip above a shared board: which side you are, whether the other player
  * is here, and the one thing the person who made the link needs — a way to send
- * it.
+ * it. Offers to take a move back or to play again are answered here, and so is
+ * the chat.
  */
 export function OnlineBar() {
   const online = useAppStore((s) => s.online)
   const variant = useAppStore((s) => s.variant)
   const game = useAppStore((s) => s.game)
   const resign = useAppStore((s) => s.resignOnline)
+  const offerUndo = useAppStore((s) => s.offerOnlineUndo)
+  const offerRematch = useAppStore((s) => s.offerOnlineRematch)
+  const respondOffer = useAppStore((s) => s.respondOnlineOffer)
+  const sendChat = useAppStore((s) => s.sendOnlineChat)
   const [copied, setCopied] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [draft, setDraft] = useState('')
 
   useEffect(() => {
     if (!confirming) return
@@ -30,6 +39,7 @@ export function OnlineBar() {
   const myTeam = online.seat === null ? null : variant.teams[online.seat]?.id
   const turnTeam = game.turn
   const myTurn = !!myTeam && turnTeam === myTeam
+  const nameOf = (seat: number) => variant.teams[seat]?.name ?? `team ${seat + 1}`
 
   const copy = async () => {
     try {
@@ -78,7 +88,7 @@ export function OnlineBar() {
 
       {online.seat !== null && (
         <span className="text-muted-foreground">
-          You are {variant.teams[online.seat]?.name ?? `team ${online.seat + 1}`}
+          You are {nameOf(online.seat)}
         </span>
       )}
 
@@ -103,11 +113,87 @@ export function OnlineBar() {
         </span>
       )}
 
+      {/* An offer from the other seat, answered where it arrived. */}
+      {online.offer && (
+        <span className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-2 py-1">
+          <span className="text-xs">
+            {online.offer.from === online.seat
+              ? `You offered ${online.offer.kind === 'undo' ? 'a take-back' : 'a rematch'} — waiting for an answer.`
+              : online.offer.kind === 'undo'
+                ? 'Take the last move back?'
+                : 'Play the game again?'}
+          </span>
+          {online.offer.from !== online.seat && (
+            <>
+              <Button size="sm" variant="secondary" className="h-6 px-2 text-xs" onClick={() => respondOffer(true)}>
+                <Check /> Accept
+              </Button>
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => respondOffer(false)}>
+                <X /> Decline
+              </Button>
+            </>
+          )}
+        </span>
+      )}
+
       <span className="ml-auto flex items-center gap-2">
         <span className="text-muted-foreground hidden font-mono text-xs sm:inline">/g/{online.code}</span>
         <Button size="sm" variant="outline" onClick={copy}>
           {copied ? <Check /> : <Copy />} Copy link
         </Button>
+        {/* A take-back needs the other player to agree; so does a rematch. */}
+        {online.status === 'playing' && !online.offer && game.moveHistory.length > 0 && (
+          <Button size="sm" variant="ghost" onClick={offerUndo}>
+            <Undo2 /> Take back
+          </Button>
+        )}
+        {online.status === 'over' && !online.offer && (
+          <Button size="sm" variant="ghost" onClick={offerRematch}>
+            <Undo2 /> Rematch
+          </Button>
+        )}
+        <Popover open={chatOpen} onOpenChange={setChatOpen}>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="ghost" aria-label="Chat">
+              <MessageCircle /> Chat
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-3" align="end">
+            <div className="mb-2 max-h-56 space-y-1.5 overflow-y-auto" aria-live="polite">
+              {online.chat.length === 0 && (
+                <p className="text-muted-foreground text-xs">Nothing said yet. Say hello.</p>
+              )}
+              {online.chat.map((line, index) => (
+                <p key={index} className="text-xs leading-snug">
+                  <span className={cn('font-medium', line.from === online.seat && 'text-primary')}>
+                    {line.from === online.seat ? 'You' : nameOf(line.from)}
+                  </span>{' '}
+                  {line.text}
+                </p>
+              ))}
+            </div>
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                sendChat(draft)
+                setDraft('')
+              }}
+            >
+              <Input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={280}
+                placeholder="Say something…"
+                className="h-8 text-xs"
+                aria-label="Chat message"
+              />
+              <Button type="submit" size="sm" variant="secondary" className="h-8 px-2" disabled={!draft.trim()}>
+                <Send />
+              </Button>
+            </form>
+          </PopoverContent>
+        </Popover>
         {online.status === 'playing' && (
           <Button
             size="sm"

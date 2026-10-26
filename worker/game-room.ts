@@ -53,12 +53,28 @@ interface Attachment {
 type Message =
   | { t: 'move'; from: Vec; to: Vec; finalTo: Vec; roll?: number; promotionTypeId?: string; origin?: Vec; drop?: { typeId: string } }
   | { t: 'resign' }
+  /** An offer to take the last move back, or to play the whole game again. */
+  | { t: 'offer'; kind: OfferKind }
+  | { t: 'offer-response'; kind: OfferKind; accept: boolean }
+  | { t: 'chat'; text: string }
+
+type OfferKind = 'undo' | 'rematch'
+
+interface ChatLine {
+  from: number
+  text: string
+  at: number
+}
 
 export class GameRoom {
   private ctx: DurableObjectState
   private meta: Meta | null = null
   private game: GameState | null = null
   private clock: ClockState | null = null
+  /** Who is offering an undo or a rematch, per kind. One live offer per kind. */
+  private offers = new Map<OfferKind, number>()
+  /** The last few chat lines. They live in memory: a restart loses them. */
+  private chat: ChatLine[] = []
 
   constructor(ctx: DurableObjectState) {
     this.ctx = ctx
@@ -205,6 +221,7 @@ export class GameRoom {
         started: meta.startedAt !== null,
         name: meta.variant.name,
         teams: meta.variant.teams.map((team) => team.id),
+        chat: this.chat,
       }),
     )
     this.announce()
@@ -228,6 +245,9 @@ export class GameRoom {
 
     if (message.t === 'resign') return this.resign(seat)
     if (message.t === 'move') return this.move(seat, message)
+    if (message.t === 'offer') return this.offer(seat, message.kind)
+    if (message.t === 'offer-response') return this.offerResponse(seat, message.kind, message.accept)
+    if (message.t === 'chat') return this.chatLine(seat, message.text)
   }
 
   async webSocketClose(): Promise<void> {
@@ -344,6 +364,95 @@ export class GameRoom {
     await this.save()
     await this.scheduleAlarm(meta, next, clock)
     this.broadcast({ t: 'state', game: next, clockState: clock })
+  }
+
+  /**
+   * An offer to take the last move back, or to play the whole game again.
+   * It stands until the other seat answers it or replaces it.
+   */
+  private async offer(seat: number, kind: OfferKind): Promise<void> {
+    const loaded = await this.load()
+    const game = loaded?.game
+    if (!game) return
+    // An undo asks for a move that exists; a rematch asks for a game that is
+    // over. The two never apply at the same time.
+    if (kind === 'undo' && (game.winner || !game.moveHistory.length)) return
+    if (kind === 'rematch' && !game.winner) return
+    // Offering to yourself is only possible with two browsers in one seat,
+    // and it would answer itself.
+    if (this.offers.get(kind) === seat) return
+    this.offers.set(kind, seat)
+    this.broadcast({ t: 'offer', kind, seat })
+  }
+
+  private async offerResponse(
+    seat: number,
+    kind: OfferKind,
+    accept: boolean,
+  ): Promise<void> {
+    const from = this.offers.get(kind)
+    if (from === undefined || from === seat) return
+    this.offers.delete(kind)
+    if (!accept) {
+      this.broadcast({ t: 'offer-declined', kind })
+      return
+    }
+    if (kind === 'undo') await this.undo(from)
+    else await this.rematch()
+    this.broadcast({ t: 'offer-accepted', kind })
+  }
+
+  /** One move back. The position is rebuilt by playing the history again. */
+  private async undo(_seat: number): Promise<void> {
+    const loaded = await this.load()
+    if (!loaded?.game || loaded.game.winner) return
+    const { meta, game } = loaded
+    const history = game.moveHistory
+    if (!history.length) return
+
+    let rebuilt = createInitialState(meta.variant)
+    for (const record of history.slice(0, -1)) {
+      rebuilt = rollRandomPieces(
+        applyMove(rebuilt, record.move, { origin: record.origin, san: true }),
+        record.move.pieceId,
+      )
+    }
+    // The clock hands back to the side that is to move again; the time that
+    // was spent stays spent.
+    const clock = this.clock
+      ? { ...this.clock, lastMoveAt: Date.now(), running: true }
+      : null
+    this.game = rebuilt
+    this.clock = clock
+    await this.save()
+    await this.scheduleAlarm(meta, rebuilt, clock)
+    this.broadcast({ t: 'state', game: rebuilt, clockState: clock })
+  }
+
+  /** The same rooms, the same seats, the whole game from the start again. */
+  private async rematch(): Promise<void> {
+    const loaded = await this.load()
+    if (!loaded?.game?.winner) return
+    const { meta } = loaded
+    const fresh = createInitialState(meta.variant)
+    const clock = clockIsOn(meta.clock)
+      ? initialClockState(meta.clock, fresh.variant.teams.map((team) => team.id))
+      : null
+    this.game = fresh
+    this.clock = clock
+    await this.save()
+    await this.scheduleAlarm(meta, fresh, clock)
+    this.broadcast({ t: 'state', game: fresh, clockState: clock })
+  }
+
+  /** A line of chat, trimmed and capped, passed on to everybody. */
+  private chatLine(seat: number, text: unknown): void {
+    if (typeof text !== 'string') return
+    const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, 280)
+    if (!trimmed) return
+    const line: ChatLine = { from: seat, text: trimmed, at: Date.now() }
+    this.chat = [...this.chat.slice(-29), line]
+    this.broadcast({ t: 'chat', from: seat, text: trimmed, at: line.at })
   }
 
   /**

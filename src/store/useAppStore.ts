@@ -49,6 +49,7 @@ import {
 } from '@/lib/clock'
 import { pushRoute, routeFromLocation } from '@/lib/router'
 import { proveWork } from '@/lib/captcha'
+import { toast } from 'sonner'
 import {
   connect,
   createRoom,
@@ -79,6 +80,10 @@ export interface OnlineGame {
   presence: [boolean, boolean]
   watchers: number
   error: string | null
+  /** The chat of the room, oldest first. */
+  chat: { from: number; text: string; at: number }[]
+  /** An offer from the other seat that is waiting for an answer. */
+  offer: { kind: 'undo' | 'rematch'; from: number } | null
 }
 
 interface AppState {
@@ -189,6 +194,11 @@ interface AppState {
   /** Creates a room behind the hidden captcha and joins it. */
   startOnlineGame: () => Promise<CreateResult>
   resignOnline: () => void
+  /** Offers and answers, and the room's chat. */
+  offerOnlineUndo: () => void
+  offerOnlineRematch: () => void
+  respondOnlineOffer: (accept: boolean) => void
+  sendOnlineChat: (text: string) => void
 
   /* bot */
   setBot: (patch: Partial<BotSettings>) => void
@@ -418,6 +428,41 @@ export const useAppStore = create<AppState>((set, get) => {
       return
     }
 
+    if (message.t === 'chat') {
+      set({
+        online: {
+          ...online,
+          chat: [...online.chat.slice(-29), { from: message.from, text: message.text, at: message.at }],
+        },
+      })
+      return
+    }
+
+    if (message.t === 'offer') {
+      const mine = message.seat === online.seat
+      set({ online: { ...online, offer: { kind: message.kind, from: message.seat } } })
+      if (!mine) {
+        toast(
+          message.kind === 'undo'
+            ? 'The other player asks to take the last move back.'
+            : 'The other player asks for a rematch.',
+        )
+      }
+      return
+    }
+
+    if (message.t === 'offer-accepted') {
+      set({ online: { ...online, offer: null } })
+      toast(message.kind === 'undo' ? 'The last move was taken back.' : 'Rematch — a new game begins.')
+      return
+    }
+
+    if (message.t === 'offer-declined') {
+      set({ online: { ...online, offer: null } })
+      toast('The offer was declined.')
+      return
+    }
+
     if (message.t === 'error') {
       // A refused move comes back with the position the room holds, because the
       // board moved before the room had agreed to it.
@@ -461,14 +506,19 @@ export const useAppStore = create<AppState>((set, get) => {
     }
 
     const fresh = next.moveHistory.length > local.moveHistory.length
+    const shrank = next.moveHistory.length < local.moveHistory.length
     const last = next.moveHistory[next.moveHistory.length - 1]
     if (fresh && last) playSound(last.move.capturedId ? 'capture' : 'move')
 
     set({
       game: next,
+      // A move taken back, or a rematch, rewinds the history: the board shows
+      // what the room holds, and the take-backs start from there.
       undoStack: fresh
         ? [...get().undoStack.slice(0, local.moveHistory.length + 1), next]
-        : get().undoStack,
+        : shrank
+          ? [next]
+          : get().undoStack,
       selected: null,
       legalMoves: [],
       pendingPromotion: null,
@@ -1086,6 +1136,8 @@ export const useAppStore = create<AppState>((set, get) => {
           presence: [false, false],
           watchers: 0,
           error: null,
+          chat: [],
+          offer: null,
         },
         selected: null,
         legalMoves: [],
@@ -1128,6 +1180,20 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     resignOnline: () => room?.send({ t: 'resign' }),
+
+    offerOnlineUndo: () => room?.send({ t: 'offer', kind: 'undo' }),
+    offerOnlineRematch: () => room?.send({ t: 'offer', kind: 'rematch' }),
+    respondOnlineOffer: (accept) => {
+      const offer = get().online?.offer
+      if (!offer) return
+      room?.send({ t: 'offer-response', kind: offer.kind, accept })
+      if (!accept) set({ online: get().online ? { ...get().online!, offer: null } : null })
+    },
+    sendOnlineChat: (text) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+      room?.send({ t: 'chat', text: trimmed })
+    },
 
     undo: () => {
       // A shared game has no undo: the other player has already seen the move.

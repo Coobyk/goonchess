@@ -28,6 +28,14 @@ export interface MoveIntent {
   origin?: Vec
 }
 
+export type OfferKind = 'undo' | 'rematch'
+
+export interface ChatLine {
+  from: number
+  text: string
+  at: number
+}
+
 export type ServerMessage =
   | {
       t: 'hello'
@@ -41,9 +49,16 @@ export type ServerMessage =
       started: boolean
       name: string
       teams: string[]
+      /** The chat so far, as the room remembers it. */
+      chat?: ChatLine[]
     }
   | { t: 'state'; game: GameState; clockState?: ClockState | null }
   | { t: 'presence'; presence: boolean[]; watchers: number }
+  /** Another seat offers to take a move back, or to play again. */
+  | { t: 'offer'; kind: OfferKind; seat: number }
+  | { t: 'offer-accepted'; kind: OfferKind }
+  | { t: 'offer-declined'; kind: OfferKind }
+  | { t: 'chat'; from: number; text: string; at: number }
   /**
    * A refusal carries the position and clock the room holds, so the board can
    * be put back.
