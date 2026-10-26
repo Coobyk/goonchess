@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyMove, createInitialState, getLegalMoves } from '@/engine/rules'
 import { classicChess } from '@/engine/templates'
-import { planBoardEntrance, planBoardTransition, planMove } from './moveAnimation'
+import { planBoardTransition, planMove } from './moveAnimation'
 
 type State = ReturnType<typeof createInitialState>
 
@@ -40,27 +40,6 @@ describe('planMove', () => {
     const before = createInitialState(classicChess())
     const after = play(before, [4, 6], [4, 4])
     expect(planMove(before, after)!.duration).toBeGreaterThan(0)
-  })
-})
-
-describe('planBoardEntrance', () => {
-  it('pops every piece of the starting army in a staggered wave', () => {
-    const anim = planBoardEntrance(createInitialState(classicChess()))
-    expect(anim).not.toBeNull()
-    expect(anim!.pops).toHaveLength(32)
-    expect(anim!.flights).toHaveLength(0)
-    // Delays grow piece by piece and are capped.
-    const delays = anim!.pops.map((p) => p.delay)
-    expect(delays[0]).toBe(0)
-    expect(Math.max(...delays)).toBeLessThanOrEqual(600)
-    expect(new Set(delays).size).toBeGreaterThan(1)
-  })
-
-  it('plans nothing for an empty board', () => {
-    expect(planBoardEntrance(createInitialState(classicChess()))).not.toBeNull()
-    const empty = classicChess()
-    empty.setup = []
-    expect(planBoardEntrance(createInitialState(empty))).toBeNull()
   })
 })
 
@@ -103,13 +82,10 @@ describe('planBoardTransition', () => {
     expect(back!.dissolves).toHaveLength(0)
   })
 
-  it('falls back to an entrance when the board changes size', () => {
+  it('plans nothing when the board changes size', () => {
     const played = createInitialState(classicChess())
     const mini = createInitialState(classicChess())
     mini.variant = { ...mini.variant, board: { width: 6, height: 6, tiles: [] } }
-    const anim = planBoardTransition(played, mini)
-    expect(anim).not.toBeNull()
-    expect(anim!.flights).toHaveLength(0)
-    expect(anim!.pops.length).toBeGreaterThan(0)
+    expect(planBoardTransition(played, mini)).toBeNull()
   })
 })

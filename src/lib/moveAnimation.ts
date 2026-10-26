@@ -18,14 +18,8 @@ const DISSOLVE_MS = 200
 const POP_MS = 260
 const EMERGE_MS = 190
 
-/** Stagger delay between pieces emerging during board initialization. */
-export const BOARD_STAGGER = 30
-
-/** Maximum delay for board initialization animations. */
-const BOARD_MAX_DELAY = 600
-
-/** Base duration for board initialization piece animations. */
-const BOARD_EMERGE_MS = 200
+/** Stagger between captured pieces fading out, one after another. */
+const FADE_STAGGER = 30
 
 /** Stagger between pieces leaving as a board transition starts. */
 const TRANSITION_STAGGER = 20
@@ -286,36 +280,6 @@ function collectPieces(game: GameState): PieceSpot[] {
 let animSeq = 0
 const nextAnimId = () => ++animSeq
 
-/**
- * The first laying out of an army: every piece grows out of its square in a
- * wave from the centre of the board.
- */
-export function planBoardEntrance(game: GameState): Anim | null {
-  const spots = collectPieces(game)
-  if (!spots.length) return null
-
-  const centerX = (game.variant.board.width - 1) / 2
-  const centerY = (game.variant.board.height - 1) / 2
-  spots.sort(
-    (a, b) =>
-      Math.max(Math.abs(a.x - centerX), Math.abs(a.y - centerY)) -
-      Math.max(Math.abs(b.x - centerX), Math.abs(b.y - centerY)),
-  )
-
-  const pops: Pop[] = spots.map((spot, i) => ({
-    key: `enter-${spot.pieceId}`,
-    pieceId: spot.pieceId,
-    typeId: spot.typeId,
-    team: spot.team,
-    at: { x: spot.x, y: spot.y },
-    delay: Math.min(BOARD_MAX_DELAY, i * BOARD_STAGGER),
-  }))
-
-  const lastDelay = Math.min(BOARD_MAX_DELAY, (spots.length - 1) * BOARD_STAGGER)
-  const total = lastDelay + BOARD_EMERGE_MS
-  return { id: nextAnimId(), flights: [], dissolves: [], pops, duration: total, total }
-}
-
 /** Rings of the old board leave from the centre outwards. */
 function staggerFlights(flights: Flight[], from: GameState) {
   const centerX = (from.variant.board.width - 1) / 2
@@ -340,8 +304,9 @@ function staggerFlights(flights: Flight[], from: GameState) {
 export function planBoardTransition(prev: GameState, game: GameState): Anim | null {
   const { width, height } = game.variant.board
   if (prev.variant.board.width !== width || prev.variant.board.height !== height) {
-    // A differently sized board has no squares to glide between.
-    return planBoardEntrance(game)
+    // A differently sized board has no squares to glide between; it just
+    // appears as it is.
+    return null
   }
 
   const before = collectPieces(prev)
@@ -442,7 +407,7 @@ export function planBoardTransition(prev: GameState, game: GameState): Anim | nu
       typeId: was.typeId,
       team: was.team,
       at: { x: was.x, y: was.y },
-      delay: fading * BOARD_STAGGER,
+      delay: fading * FADE_STAGGER,
       duration: DISSOLVE_MS,
     })
     fading++
@@ -463,11 +428,12 @@ export function planBoardTransition(prev: GameState, game: GameState): Anim | nu
 
 /**
  * Plans whichever animation the change from the previous state calls for: a
- * move glides, everything else — undo, jump, reset, variant switch, the first
- * army — is a board transition or an entrance.
+ * move glides, everything else — undo, jump, reset, variant switch — is a
+ * board transition. The first board is not a change at all: the pieces are
+ * simply there.
  */
 function planTransition(prev: GameState | null, game: GameState): Anim | null {
-  if (!prev) return planBoardEntrance(game)
+  if (!prev) return null
   const sameVariant = prev.variant === game.variant || prev.variant.id === game.variant.id
   if (sameVariant && game.moveHistory.length > prev.moveHistory.length) {
     return planMove(prev, game)
