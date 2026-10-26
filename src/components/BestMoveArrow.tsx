@@ -3,6 +3,8 @@ import type { Vec } from '@/engine/types'
 /**
  * The one move the engine likes best, drawn as an arrow on the board. A calm
  * sky blue, so it reads apart from the rose and amber of the threat arrows.
+ * It is drawn broad and half see-through, the way an overlay should be: under
+ * it, never over it.
  */
 export function BestMoveArrow({
   from,
@@ -33,8 +35,8 @@ export function BestMoveArrow({
   const length = Math.hypot(dx, dy)
   if (length < cell * 0.5) return null
 
-  const padStart = cell * 0.3
-  const padEnd = cell * 0.34
+  const padStart = cell * 0.32
+  const padEnd = cell * 0.42
   const sx = fx + (dx / length) * padStart
   const sy = fy + (dy / length) * padStart
   const ex = tx - (dx / length) * padEnd
@@ -52,9 +54,9 @@ export function BestMoveArrow({
         <marker
           id="best-move-head"
           viewBox="0 0 10 10"
-          markerWidth="10"
-          markerHeight="10"
-          refX="8"
+          markerWidth={Math.max(14, cell * 0.5)}
+          markerHeight={Math.max(14, cell * 0.5)}
+          refX="6.5"
           refY="5"
           orient="auto-start-reverse"
           markerUnits="userSpaceOnUse"
@@ -62,14 +64,14 @@ export function BestMoveArrow({
           <path d="M0,0 L10,5 L0,10 Z" fill="rgb(56 189 248)" />
         </marker>
       </defs>
-      <g opacity={0.92}>
+      <g opacity={0.6}>
         <line
           x1={sx}
           y1={sy}
           x2={ex}
           y2={ey}
           stroke="rgb(0 0 0 / 0.35)"
-          strokeWidth={Math.max(5, cell * 0.1)}
+          strokeWidth={Math.max(7, cell * 0.17)}
           strokeLinecap="round"
         />
         <line
@@ -78,7 +80,7 @@ export function BestMoveArrow({
           x2={ex}
           y2={ey}
           stroke="rgb(56 189 248)"
-          strokeWidth={Math.max(3, cell * 0.06)}
+          strokeWidth={Math.max(5, cell * 0.12)}
           strokeLinecap="round"
           markerEnd="url(#best-move-head)"
         />

@@ -3,7 +3,8 @@ import type { ThreatEdge } from '@/engine/threats'
 
 /**
  * Arrows from every attacker to the piece it can capture. Hanging targets get
- * a rose arrow; targets that can be recaptured get an amber one.
+ * a rose arrow; targets that can be recaptured get an amber one. Broad and
+ * half see-through, so they read over the pieces without hiding them.
  */
 export function ThreatArrows({
   edges,
@@ -39,9 +40,9 @@ export function ThreatArrows({
         <marker
           id={hangingId}
           viewBox="0 0 10 10"
-          markerWidth="9"
-          markerHeight="9"
-          refX="8"
+          markerWidth={Math.max(13, cell * 0.45)}
+          markerHeight={Math.max(13, cell * 0.45)}
+          refX="6.5"
           refY="5"
           orient="auto-start-reverse"
           markerUnits="userSpaceOnUse"
@@ -51,9 +52,9 @@ export function ThreatArrows({
         <marker
           id={defendedId}
           viewBox="0 0 10 10"
-          markerWidth="9"
-          markerHeight="9"
-          refX="8"
+          markerWidth={Math.max(13, cell * 0.45)}
+          markerHeight={Math.max(13, cell * 0.45)}
+          refX="6.5"
           refY="5"
           orient="auto-start-reverse"
           markerUnits="userSpaceOnUse"
@@ -71,8 +72,8 @@ export function ThreatArrows({
         const dy = ty - fy
         const length = Math.hypot(dx, dy)
         if (length < cell * 0.5) return null
-        const padStart = cell * 0.3
-        const padEnd = cell * 0.34
+        const padStart = cell * 0.32
+        const padEnd = cell * 0.42
         const sx = fx + (dx / length) * padStart
         const sy = fy + (dy / length) * padStart
         const ex = tx - (dx / length) * padEnd
@@ -80,14 +81,14 @@ export function ThreatArrows({
         const color = edge.defended ? 'rgb(251 191 36)' : 'rgb(251 113 133)'
         const marker = edge.defended ? defendedId : hangingId
         return (
-          <g key={`${edge.attackerId}-${edge.targetId}`} opacity={0.9}>
+          <g key={`${edge.attackerId}-${edge.targetId}`} opacity={0.65}>
             <line
               x1={sx}
               y1={sy}
               x2={ex}
               y2={ey}
               stroke="rgb(0 0 0 / 0.35)"
-              strokeWidth={Math.max(4, cell * 0.08)}
+              strokeWidth={Math.max(6, cell * 0.15)}
               strokeLinecap="round"
             />
             <line
@@ -96,7 +97,7 @@ export function ThreatArrows({
               x2={ex}
               y2={ey}
               stroke={color}
-              strokeWidth={Math.max(2.5, cell * 0.05)}
+              strokeWidth={Math.max(4, cell * 0.1)}
               strokeLinecap="round"
               markerEnd={`url(#${marker})`}
             />
