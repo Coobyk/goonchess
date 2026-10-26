@@ -176,8 +176,8 @@ interface AppState {
   analysisMode: AnalysisMode
   setAnalysisMode: (mode: AnalysisMode) => void
   /** What the last analysis found, for the bar beside the board. */
-  analysisResult: { score: number; depth: number } | null
-  setAnalysisResult: (result: { score: number; depth: number } | null) => void
+  analysisResult: { score: number; depth: number; best?: { from: Vec; to: Vec } | null } | null
+  setAnalysisResult: (result: { score: number; depth: number; best?: { from: Vec; to: Vec } | null } | null) => void
   undo: () => void
   /** Goes back to the position after a given number of moves. */
   jumpToPly: (ply: number) => void

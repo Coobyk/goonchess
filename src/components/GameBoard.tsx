@@ -4,6 +4,7 @@ import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
 import { EvalBar } from './EvalBar'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
 import { ThreatArrows } from './ThreatArrows'
+import { BestMoveArrow } from './BestMoveArrow'
 import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
 import { computeThreats, mergeThreats } from '@/engine/threats'
@@ -289,6 +290,7 @@ export function GameBoard() {
   const cancelPromotion = useAppStore((s) => s.cancelPromotion)
   const analysisMode = useAppStore((s) => s.analysisMode)
   const analysisResult = useAppStore((s) => s.analysisResult)
+  const analysis = useAppStore((s) => s.analysis)
   const threatSettings = useAppStore((s) => s.threats)
   const turnView = useAppStore((s) => s.turnView)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
@@ -561,6 +563,16 @@ export function GameBoard() {
             {threatSettings.show && threatSettings.arrows && threats && (
               <ThreatArrows
                 edges={threats.edges}
+                cell={cell}
+                cols={cols}
+                rows={rows}
+                flip={flipBoard}
+              />
+            )}
+            {analysisMode === 'engine' && analysis.showArrow && analysisResult?.best && (
+              <BestMoveArrow
+                from={analysisResult.best.from}
+                to={analysisResult.best.to}
                 cell={cell}
                 cols={cols}
                 rows={rows}

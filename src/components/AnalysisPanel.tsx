@@ -83,7 +83,10 @@ export function AnalysisPanel() {
         const raw = reply.score
         // The search scores the side to move; the panel reports the first army.
         const score = game.turn === firstTeam?.id ? raw : -raw
-        setAnalysisResult({ score, depth: reply.depth })
+        // The move the engine likes best travels with the score, so the board
+        // can draw it as an arrow.
+        const best = reply.move ? { from: reply.move.from, to: reply.move.finalTo } : null
+        setAnalysisResult({ score, depth: reply.depth, best })
       })
   }, [mode, analysis.showLine, game, game.winner, setAnalysisResult])
 
@@ -168,16 +171,24 @@ export function AnalysisPanel() {
             {!result && !busy && (
               <p className="text-muted-foreground text-xs">No position to look at yet.</p>
             )}
-            {result && (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-lg tabular-nums">{label}</span>
-                  <span className="text-muted-foreground text-[10px]">depth {result.depth}</span>
-                  <span className="text-muted-foreground text-xs">
-                    for {variant.teams.find((t) => t.id === firstTeam?.id)?.name ?? 'the first army'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
+                {result && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-lg tabular-nums">{label}</span>
+                      <span className="text-muted-foreground text-[10px]">depth {result.depth}</span>
+                      <span className="text-muted-foreground text-xs">
+                        for {variant.teams.find((t) => t.id === firstTeam?.id)?.name ?? 'the first army'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-xs">Best-move arrow</Label>
+                      <Switch
+                        aria-label="Show best-move arrow"
+                        checked={analysis.showArrow}
+                        onCheckedChange={(showArrow) => setAnalysis({ showArrow })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
                   {analysis.showLine ? (
                     <p className="text-muted-foreground font-mono text-[11px] leading-relaxed">
                       {result.line.length ? result.line.join(' ') : '—'}
