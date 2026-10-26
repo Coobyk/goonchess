@@ -18,6 +18,21 @@ const DISSOLVE_MS = 200
 const POP_MS = 260
 const EMERGE_MS = 190
 
+/** Stagger delay between pieces emerging during board initialization. */
+export const BOARD_STAGGER = 30
+
+/** Maximum delay for board initialization animations. */
+const BOARD_MAX_DELAY = 600
+
+/** Base duration for board initialization piece animations. */
+const BOARD_EMERGE_MS = 200
+
+/** Stagger between pieces leaving as a board transition starts. */
+const TRANSITION_STAGGER = 20
+
+/** Cap on that stagger, so a full board never waits too long to settle. */
+const TRANSITION_MAX_STAGGER = 360
+
 export type FlightKind = 'slide' | 'vanish' | 'emerge'
 
 export interface Flight {
@@ -50,8 +65,13 @@ export interface Pop {
   delay: number
 }
 
-export interface MoveAnim {
-  /** Bumped per move so the layer remounts and the animations replay. */
+/**
+ * A board transition: a move, an undo, a reset, a variant switch or the first
+ * laying out of an army. Every change the board can go through is planned as
+ * flights, dissolves and pops, so pieces glide instead of teleporting.
+ */
+export interface Anim {
+  /** Bumped per animation so the layer remounts and the animations replay. */
   id: number
   flights: Flight[]
   dissolves: Dissolve[]
@@ -76,7 +96,7 @@ export function travelMs(from: Vec, to: Vec) {
 }
 
 /** Builds the animation for the move that was just played. */
-export function planMove(prev: GameState, game: GameState): MoveAnim | null {
+export function planMove(prev: GameState, game: GameState): Anim | null {
   if (game.moveHistory.length <= prev.moveHistory.length) return null
   const record = game.moveHistory[game.moveHistory.length - 1]
   const move = record.move
@@ -241,18 +261,232 @@ export function planMove(prev: GameState, game: GameState): MoveAnim | null {
   return { id: game.moveHistory.length, flights, dissolves, pops, duration: landing, total }
 }
 
+/** A piece standing on the board, in the terms the animator cares about. */
+interface PieceSpot {
+  pieceId: string
+  x: number
+  y: number
+  typeId: string
+  team: string
+}
+
+function collectPieces(game: GameState): PieceSpot[] {
+  const spots: PieceSpot[] = []
+  for (let y = 0; y < game.variant.board.height; y++) {
+    for (let x = 0; x < game.variant.board.width; x++) {
+      const pieceId = game.board[y][x]
+      if (!pieceId) continue
+      const piece = game.pieces[pieceId]
+      if (piece) spots.push({ pieceId, x, y, typeId: piece.typeId, team: piece.team })
+    }
+  }
+  return spots
+}
+
+let animSeq = 0
+const nextAnimId = () => ++animSeq
+
 /**
- * Tracks the animation of the latest move. The plan is known during the very
- * first render after a move, so a piece is never drawn in two places at once.
+ * The first laying out of an army: every piece grows out of its square in a
+ * wave from the centre of the board.
+ */
+export function planBoardEntrance(game: GameState): Anim | null {
+  const spots = collectPieces(game)
+  if (!spots.length) return null
+
+  const centerX = (game.variant.board.width - 1) / 2
+  const centerY = (game.variant.board.height - 1) / 2
+  spots.sort(
+    (a, b) =>
+      Math.max(Math.abs(a.x - centerX), Math.abs(a.y - centerY)) -
+      Math.max(Math.abs(b.x - centerX), Math.abs(b.y - centerY)),
+  )
+
+  const pops: Pop[] = spots.map((spot, i) => ({
+    key: `enter-${spot.pieceId}`,
+    pieceId: spot.pieceId,
+    typeId: spot.typeId,
+    team: spot.team,
+    at: { x: spot.x, y: spot.y },
+    delay: Math.min(BOARD_MAX_DELAY, i * BOARD_STAGGER),
+  }))
+
+  const lastDelay = Math.min(BOARD_MAX_DELAY, (spots.length - 1) * BOARD_STAGGER)
+  const total = lastDelay + BOARD_EMERGE_MS
+  return { id: nextAnimId(), flights: [], dissolves: [], pops, duration: total, total }
+}
+
+/** Rings of the old board leave from the centre outwards. */
+function staggerFlights(flights: Flight[], from: GameState) {
+  const centerX = (from.variant.board.width - 1) / 2
+  const centerY = (from.variant.board.height - 1) / 2
+  flights.sort(
+    (a, b) =>
+      Math.max(Math.abs(a.from.x - centerX), Math.abs(a.from.y - centerY)) -
+      Math.max(Math.abs(b.from.x - centerX), Math.abs(b.from.y - centerY)),
+  )
+  for (let i = 0; i < flights.length; i++) {
+    flights[i].delay = Math.min(TRANSITION_MAX_STAGGER, i * TRANSITION_STAGGER)
+  }
+}
+
+/**
+ * A board that is not reached by a move — an undo, a jump through history, a
+ * reset, a variant switch. Pieces keep their identity where they can: the same
+ * piece glides from where it stood to where it stands now, the rest are matched
+ * to an old piece of the same kind by nearest square, and whatever has no
+ * counterpart pops in or fades out.
+ */
+export function planBoardTransition(prev: GameState, game: GameState): Anim | null {
+  const { width, height } = game.variant.board
+  if (prev.variant.board.width !== width || prev.variant.board.height !== height) {
+    // A differently sized board has no squares to glide between.
+    return planBoardEntrance(game)
+  }
+
+  const before = collectPieces(prev)
+  const after = collectPieces(game)
+  if (!before.length && !after.length) return null
+
+  const flights: Flight[] = []
+  const dissolves: Dissolve[] = []
+  const pops: Pop[] = []
+
+  const standing = new Map(before.map((spot) => [spot.pieceId, spot]))
+  // Pieces of the new state whose square (or kind) has no old self yet.
+  const homeless: PieceSpot[] = []
+
+  for (const spot of after) {
+    const was = standing.get(spot.pieceId)
+    if (!was) {
+      homeless.push(spot)
+      continue
+    }
+    standing.delete(spot.pieceId)
+    if (was.x === spot.x && was.y === spot.y) {
+      // A promotion choosing its kind in place only has to pop once.
+      if (was.typeId !== spot.typeId) {
+        pops.push({
+          key: `turn-${spot.pieceId}`,
+          pieceId: spot.pieceId,
+          typeId: spot.typeId,
+          team: spot.team,
+          at: { x: spot.x, y: spot.y },
+          delay: 0,
+        })
+      }
+      continue
+    }
+    flights.push({
+      key: `glide-${spot.pieceId}`,
+      pieceId: spot.pieceId,
+      typeId: spot.typeId,
+      team: spot.team,
+      from: { x: was.x, y: was.y },
+      to: { x: spot.x, y: spot.y },
+      kind: 'slide',
+      duration: travelMs({ x: was.x, y: was.y }, { x: spot.x, y: spot.y }),
+      delay: 0,
+    })
+  }
+
+  // The old pieces nobody claimed become landing spots for the homeless, each
+  // taking the nearest free old piece of the same kind.
+  const vacant = [...standing.values()]
+  const claimed = new Set<string>()
+  for (const spot of homeless) {
+    let best: PieceSpot | null = null
+    let bestDistance = Infinity
+    for (const was of vacant) {
+      if (claimed.has(was.pieceId)) continue
+      if (was.typeId !== spot.typeId || was.team !== spot.team) continue
+      const distance = Math.abs(was.x - spot.x) + Math.abs(was.y - spot.y)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = was
+      }
+    }
+    if (best) {
+      claimed.add(best.pieceId)
+      if (bestDistance > 0) {
+        flights.push({
+          key: `settle-${spot.pieceId}`,
+          pieceId: spot.pieceId,
+          typeId: spot.typeId,
+          team: spot.team,
+          from: { x: best.x, y: best.y },
+          to: { x: spot.x, y: spot.y },
+          kind: 'slide',
+          duration: travelMs({ x: best.x, y: best.y }, { x: spot.x, y: spot.y }),
+          delay: 0,
+        })
+      }
+    } else {
+      pops.push({
+        key: `arrive-${spot.pieceId}`,
+        pieceId: spot.pieceId,
+        typeId: spot.typeId,
+        team: spot.team,
+        at: { x: spot.x, y: spot.y },
+        delay: 0,
+      })
+    }
+  }
+
+  // What is left of the old army fades where it stands.
+  let fading = 0
+  for (const was of vacant) {
+    if (claimed.has(was.pieceId)) continue
+    dissolves.push({
+      key: `fade-${was.pieceId}`,
+      typeId: was.typeId,
+      team: was.team,
+      at: { x: was.x, y: was.y },
+      delay: fading * BOARD_STAGGER,
+      duration: DISSOLVE_MS,
+    })
+    fading++
+  }
+
+  if (!flights.length && !dissolves.length && !pops.length) return null
+
+  staggerFlights(flights, prev)
+
+  const total = Math.max(
+    0,
+    ...flights.map((f) => f.delay + f.duration),
+    ...dissolves.map((d) => d.delay + d.duration),
+    ...pops.map((p) => p.delay + POP_MS),
+  )
+  return { id: nextAnimId(), flights, dissolves, pops, duration: total, total }
+}
+
+/**
+ * Plans whichever animation the change from the previous state calls for: a
+ * move glides, everything else — undo, jump, reset, variant switch, the first
+ * army — is a board transition or an entrance.
+ */
+function planTransition(prev: GameState | null, game: GameState): Anim | null {
+  if (!prev) return planBoardEntrance(game)
+  const sameVariant = prev.variant === game.variant || prev.variant.id === game.variant.id
+  if (sameVariant && game.moveHistory.length > prev.moveHistory.length) {
+    return planMove(prev, game)
+  }
+  return planBoardTransition(prev, game)
+}
+
+/**
+ * Tracks the animation of the latest board change. The plan is known during
+ * the very first render after the change, so a piece is never drawn in two
+ * places at once.
  */
 export function useMoveAnimation(game: GameState) {
-  const [anim, setAnim] = useState<MoveAnim | null>(null)
+  const [anim, setAnim] = useState<Anim | null>(null)
   const [duration, setDuration] = useState(0)
   const [prevGame, setPrevGame] = useState<GameState | null>(null)
 
-  // Derive the animation of the move that was just played.
   if (prevGame !== game) {
-    const plan = prevGame ? planMove(prevGame, game) : null
+    const plan = planTransition(prevGame, game)
     setAnim(plan)
     setDuration(plan?.duration ?? 0)
     setPrevGame(game)

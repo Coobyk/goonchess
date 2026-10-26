@@ -394,9 +394,11 @@ export function GameBoard() {
   const lastMove = lastRecord?.move
   const historyLen = game.moveHistory.length
 
-  // Pieces glide from where they were to where they landed. A drag records its
-  // release point on the move, so the glide starts under the cursor.
+  // Pieces glide from where they were to where they landed — whether that
+  // change was a move, an undo, a reset or a variant switch. A drag records
+  // its release point on the move, so the glide starts under the cursor.
   const { anim, duration: moveDuration } = useMoveAnimation(game)
+
   const pendingMoverId = pendingPromotion?.move.pieceId
   const pendingMover = pendingMoverId ? game.pieces[pendingMoverId] : null
   const pendingType = pendingMover ? (pieceTypes[pendingMover.typeId] ?? null) : null

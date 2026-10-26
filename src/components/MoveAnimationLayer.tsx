@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { PieceType } from '@/engine/types'
-import type { Flight, MoveAnim } from '@/lib/moveAnimation'
+import type { Flight, Anim } from '@/lib/moveAnimation'
 import { PieceGlyph } from './PieceGlyph'
 
 const FLIGHT_CLASS: Record<Flight['kind'], string> = {
@@ -23,7 +23,7 @@ export function MoveAnimationLayer({
   pieceTypes,
   teamIndex,
 }: {
-  anim: MoveAnim | null
+  anim: Anim | null
   cell: number
   cols: number
   rows: number
