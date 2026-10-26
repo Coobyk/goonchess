@@ -37,18 +37,9 @@ export interface BotResult {
   scores?: number[] | null
 }
 
-/** How far the search has come, told while it is still thinking. */
-export interface BotProgress {
-  depth: number
-  score: number
-  nodes: number
-  elapsedMs: number
-}
-
 interface Pending {
   id: number
   resolve: (result: BotResult) => void
-  onProgress?: (progress: BotProgress) => void
 }
 
 export class BotWorker {
@@ -64,15 +55,6 @@ export class BotWorker {
     worker.onmessage = (event: MessageEvent<BotReply>) => {
       const pending = this.pending
       if (!pending || pending.id !== event.data.id) return
-      if (event.data.kind === 'progress') {
-        pending.onProgress?.({
-          depth: event.data.depth,
-          score: event.data.score,
-          nodes: event.data.nodes,
-          elapsedMs: event.data.elapsedMs,
-        })
-        return
-      }
       this.pending = null
       pending.resolve({
         move: event.data.move,
@@ -116,15 +98,13 @@ export class BotWorker {
       exclude?: string[]
       /** Ask for the best line as well. */
       wantLine?: boolean
-      /** Told how the search is coming along, once per finished depth. */
-      onProgress?: (progress: BotProgress) => void
     } = {},
   ): Promise<BotResult> {
     this.cancel()
     const worker = this.ensureWorker()
     const id = this.nextId++
     return new Promise<BotResult>((resolve) => {
-      this.pending = { id, resolve, onProgress: options.onProgress }
+      this.pending = { id, resolve }
       const request: BotRequest = {
         id,
         state,

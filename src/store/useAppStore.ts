@@ -225,9 +225,6 @@ interface AppState {
   /* bot */
   setBot: (patch: Partial<BotSettings>) => void
   setBotThinking: (thinking: boolean) => void
-  /** How far the bot's search has come, while it is still thinking. */
-  botProgress: { depth: number; score: number; nodes: number } | null
-  setBotProgress: (progress: { depth: number; score: number; nodes: number } | null) => void
   setOpponentOpen: (open: boolean) => void
   setBoardAnimating: (busy: boolean) => void
 
@@ -571,7 +568,6 @@ export const useAppStore = create<AppState>((set, get) => {
     bot: initialBot,
     botSide: sideFor(initialBot, initial, null),
     botThinking: false,
-    botProgress: null,
     opponentOpen: false,
     clock: initialClock,
     clockState: initialClockState(initialClock, initial.teams.map((t) => t.id)),
@@ -1254,7 +1250,6 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setBotThinking: (botThinking) => set({ botThinking }),
-    setBotProgress: (botProgress) => set({ botProgress }),
     setOpponentOpen: (opponentOpen) => set({ opponentOpen }),
 
     setBoardAnimating: (busy) => {

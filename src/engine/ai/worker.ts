@@ -30,8 +30,6 @@ export interface BotRequest {
 
 export interface BotReply {
   id: number
-  /** A reply in progress: the search has finished another depth. */
-  kind?: 'progress'
   move: Move | null
   score: number
   depth: number
@@ -126,19 +124,7 @@ scope.onmessage = (event) => {
       })
       return
     }
-    const result = searchBestMove(state, {
-      team,
-      level,
-      seed,
-      timeBudgetMs,
-      analyze,
-      exclude,
-      onProgress: (info) => {
-        // Halfway through the search: the board is told what the bot thinks
-        // so far, and keeps thinking.
-        scope.postMessage({ id, kind: 'progress', move: null, line: [], scores: null, puzzle: null, ...info })
-      },
-    })
+    const result = searchBestMove(state, { team, level, seed, timeBudgetMs, analyze, exclude })
     scope.postMessage({
       id,
       move: result.move,

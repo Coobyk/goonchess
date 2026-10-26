@@ -84,11 +84,6 @@ export interface SearchOptions {
    * a repetition, which would be a draw.
    */
   exclude?: string[]
-  /**
-   * Told how the deepening is coming along, once per finished depth. The
-   * worker forwards it so the board can show what the bot is thinking.
-   */
-  onProgress?: (info: { depth: number; score: number; nodes: number; elapsedMs: number }) => void
 }
 
 export interface SearchResult {
@@ -775,12 +770,6 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     if (ctx.aborted || !results.length) break
     rootResults = results
     depth = d
-    options.onProgress?.({
-      depth,
-      score: results.reduce((best, entry) => Math.max(best, entry.score), -Infinity),
-      nodes: ctx.nodes,
-      elapsedMs: performance.now() - started,
-    })
     if (performance.now() >= ctx.deadline) break
   }
 

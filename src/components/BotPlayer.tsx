@@ -28,7 +28,6 @@ export function BotPlayer() {
   const clock = useAppStore((s) => s.clock)
   const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
-  const setBotProgress = useAppStore((s) => s.setBotProgress)
   const worker = useRef<BotWorker | null>(null)
   const running = useRef(false)
   // Bumped when a search finished on a position that is no longer current, so
@@ -50,7 +49,6 @@ export function BotPlayer() {
       worker.current?.cancel()
       running.current = false
       setBotThinking(false)
-      setBotProgress(null)
       return
     }
     if (running.current) return
@@ -78,17 +76,10 @@ export function BotPlayer() {
         seed,
         timeBudgetMs: budget,
         exclude: repeating,
-        // What the search thinks so far, shown beside the spinner while it
-        // keeps thinking.
-        onProgress: (progress) => {
-          if (useAppStore.getState().game !== state) return
-          setBotProgress({ depth: progress.depth, score: progress.score, nodes: progress.nodes })
-        },
       })
       .then((result) => {
         running.current = false
         setBotThinking(false)
-        setBotProgress(null)
         const store = useAppStore.getState()
         if (!isBotTeam(store.bot, team, store.botSide)) return
         if (store.game !== state) {
@@ -106,7 +97,7 @@ export function BotPlayer() {
           useAppStore.getState().playMove(move)
         }, wait)
       })
-  }, [bot, botSide, game, retry, setBotThinking, setBotProgress, opponentOpen, online])
+  }, [bot, botSide, game, retry, setBotThinking, opponentOpen, online])
 
   return null
 }
