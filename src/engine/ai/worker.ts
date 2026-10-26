@@ -50,6 +50,8 @@ export interface BotReply {
     to: { x: number; y: number }
     side: string
     gain: number
+    difficulty: string
+    themes: string[]
   } | null
 }
 
@@ -117,6 +119,8 @@ scope.onmessage = (event) => {
               to: { x: found.solution.finalTo.x, y: found.solution.finalTo.y },
               side: found.side,
               gain: found.gain,
+              difficulty: found.difficulty,
+              themes: found.themes,
             }
           : null,
       })

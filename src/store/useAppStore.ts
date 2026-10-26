@@ -176,7 +176,29 @@ interface AppState {
   resetGame: () => void
   /** The position a puzzle started from, so the puzzle can be set up again. */
   puzzleStart: GameState | null
+  /** The puzzle on the board, so it survives moving between views. */
+  puzzle: {
+    from: { x: number; y: number }
+    to: { x: number; y: number }
+    side: string
+    gain: number
+    difficulty: string
+    themes: string[]
+    movesBefore: number
+  } | null
+  /** Whether the puzzle on the board was solved. Null while unsolved. */
+  puzzleVerdict: boolean | null
   setPuzzleStart: (state: GameState | null) => void
+  setPuzzle: (puzzle: {
+    from: { x: number; y: number }
+    to: { x: number; y: number }
+    side: string
+    gain: number
+    difficulty: string
+    themes: string[]
+    movesBefore: number
+  } | null) => void
+  setPuzzleVerdict: (verdict: boolean | null) => void
   /** How the position is analysed: not at all, live, or the whole game. */
   analysisMode: AnalysisMode
   setAnalysisMode: (mode: AnalysisMode) => void
@@ -564,6 +586,8 @@ export const useAppStore = create<AppState>((set, get) => {
     queuedMove: null,
     reviewingHistory: false,
     puzzleStart: null,
+    puzzle: null,
+    puzzleVerdict: null,
     analysisMode: 'off',
     analysisResult: null,
     selectedPieceTypeId: initial.pieceTypes[0]?.id ?? null,
@@ -1082,6 +1106,8 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setPuzzleStart: (state) => set({ puzzleStart: state }),
+    setPuzzle: (puzzle) => set({ puzzle, puzzleVerdict: puzzle ? null : get().puzzleVerdict }),
+    setPuzzleVerdict: (puzzleVerdict) => set({ puzzleVerdict }),
 
     setAnalysisMode: (mode) => set({ analysisMode: mode }),
     setAnalysisResult: (result) => set({ analysisResult: result ? { ...result, score: Math.max(-1000, Math.min(1000, result.score)) } : null }),

@@ -30,6 +30,8 @@ export interface BotResult {
     to: { x: number; y: number }
     side: string
     gain: number
+    difficulty: string
+    themes: string[]
   } | null
   /** The score of every position, when a whole game was analysed. */
   scores?: number[] | null

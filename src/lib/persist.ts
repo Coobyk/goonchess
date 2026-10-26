@@ -88,3 +88,17 @@ export const loadAnalysisSettings = (): AnalysisSettings => ({
   ...read<Partial<AnalysisSettings>>(ANALYSIS_KEY, {}),
 })
 export const saveAnalysisSettings = (v: AnalysisSettings) => write(ANALYSIS_KEY, v)
+
+/* ------------------------------------------------------------- puzzles */
+
+const PUZZLE_KEY = 'goonchess:puzzle-stats'
+
+export interface PuzzleStats {
+  /** The run of puzzles answered correctly in a row, right now. */
+  streak: number
+  /** The longest run there has ever been. */
+  best: number
+}
+
+export const loadPuzzleStats = (): PuzzleStats => read<PuzzleStats>(PUZZLE_KEY, { streak: 0, best: 0 })
+export const savePuzzleStats = (v: PuzzleStats) => write(PUZZLE_KEY, v)

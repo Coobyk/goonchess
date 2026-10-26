@@ -1,4 +1,5 @@
-import { applyMove, createInitialState, legalOptionsForTeam } from '../rules'
+import { applyMove, createInitialState, isInCheck, legalOptionsForTeam } from '../rules'
+import { computeThreats } from '../threats'
 import { evaluate } from './evaluate'
 import type { GameState, Move, Variant } from '../types'
 
@@ -10,6 +11,8 @@ import type { GameState, Move, Variant } from '../types'
  * puzzle the player can actually solve, instead of a random position.
  */
 
+export type PuzzleDifficulty = 'easy' | 'medium' | 'hard'
+
 export interface Puzzle {
   /** The position before the move. */
   state: GameState
@@ -19,6 +22,10 @@ export interface Puzzle {
   gain: number
   /** Who has to play the move. */
   side: string
+  /** How hard the puzzle is, from what the move wins. */
+  difficulty: PuzzleDifficulty
+  /** What kind of tactic the move is: fork, check, promotion, … */
+  themes: string[]
 }
 
 /** The least a capture must win to count as a puzzle. */
@@ -32,6 +39,45 @@ function mulberry32(seed: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
+}
+
+/**
+ * What kind of tactic the solution is, and how hard it is to find.
+ *
+ * The difficulty is the material at stake; the themes read off the move and
+ * the position it makes: a capture that lands among two or more pieces of
+ * three points or more is a fork, a capture that gives check is a check, and
+ * so on.
+ */
+export function describePuzzle(state: GameState, solution: Move, gain: number): {
+  difficulty: PuzzleDifficulty
+  themes: string[]
+} {
+  const themes = new Set<string>(['capture'])
+  const next = applyMove(state, solution, { compute: false })
+  const opponent = next.turn
+
+  if (isInCheck(next, opponent)) themes.add('check')
+  if (solution.promotionTypeId) themes.add('promotion')
+  const victim = solution.capturedId ? state.pieces[solution.capturedId] : undefined
+  const victimPiece = victim ? state.pieceTypes[victim.typeId] : undefined
+  if ((victimPiece?.value ?? 0) >= 5) themes.add('big-capture')
+
+  // The moved piece attacks from where it landed: two or more worthwhile
+  // targets at once is a fork.
+  const attackerId = next.board[solution.finalTo.y]?.[solution.finalTo.x]
+  if (attackerId) {
+    const targets = new Set(
+      computeThreats(next, opponent).edges
+        .filter((edge) => edge.attackerId === attackerId)
+        .map((edge) => edge.targetId)
+        .filter((id) => (state.pieceTypes[state.pieces[id]?.typeId ?? '']?.value ?? 0) >= 3),
+    )
+    if (targets.size >= 2) themes.add('fork')
+  }
+
+  const difficulty: PuzzleDifficulty = gain >= 800 ? 'hard' : gain >= 500 ? 'medium' : 'easy'
+  return { difficulty, themes: [...themes] }
 }
 
 export function findPuzzle(variant: Variant, seed: number): Puzzle | null {
@@ -48,7 +94,8 @@ export function findPuzzle(variant: Variant, seed: number): Puzzle | null {
       const after = evaluate(option.next, state.turn, { fast: true })
       const gain = after - before
       if (gain >= MIN_GAIN && (!best || gain > best.gain)) {
-        best = { state, solution: option.move, gain, side: state.turn }
+        const { difficulty, themes } = describePuzzle(state, option.move, gain)
+        best = { state, solution: option.move, gain, side: state.turn, difficulty, themes }
       }
     }
     if (best) return best
