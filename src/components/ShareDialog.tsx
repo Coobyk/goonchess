@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { ClipboardType, Copy, Download, FileJson, Link2, Loader2, Upload, Users } from 'lucide-react'
+import { ClipboardType, Copy, Download, FileJson, FileText, Link2, Loader2, Upload, Users } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { captchaMessage } from '@/lib/captcha'
 import { variantToHash } from '@/lib/encoding'
 import { fromFen, toFen } from '@/lib/fen'
+import { fromPgn, toPgn } from '@/lib/pgn'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Textarea } from './ui/textarea'
@@ -24,9 +25,13 @@ export function ShareDialog({
   const importVariant = useAppStore((s) => s.importVariant)
   const loadVariantIntoMaker = useAppStore((s) => s.loadVariantIntoMaker)
   const startOnlineGame = useAppStore((s) => s.startOnlineGame)
+  const loadPosition = useAppStore((s) => s.loadPosition)
+  const setView = useAppStore((s) => s.setView)
   const [importText, setImportText] = useState('')
   const [fenText, setFenText] = useState('')
+  const [pgnText, setPgnText] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [pgnError, setPgnError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [playError, setPlayError] = useState<string | null>(null)
   const twoTeams = variant.teams.length === 2
@@ -108,6 +113,9 @@ export function ShareDialog({
             </TabsTrigger>
             <TabsTrigger value="fen">
               <ClipboardType /> FEN
+            </TabsTrigger>
+            <TabsTrigger value="pgn">
+              <FileText /> PGN
             </TabsTrigger>
           </TabsList>
 
@@ -226,6 +234,55 @@ export function ShareDialog({
             <p className="text-muted-foreground text-xs">
               A FEN describes a standard chess position. It is imported as a classic variant that you
               can then edit in the Maker.
+            </p>
+          </TabsContent>
+          <TabsContent value="pgn" className="space-y-3 pt-3">
+            <Label htmlFor="pgn-input">Paste a PGN</Label>
+            <Textarea
+              id="pgn-input"
+              value={pgnText}
+              onChange={(e) => {
+                setPgnText(e.target.value)
+                setPgnError(null)
+              }}
+              placeholder={'[Event "Casual game"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5'}
+              className="h-40 font-mono text-xs"
+            />
+            {pgnError && <p className="text-sm text-destructive">{pgnError}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  // The game is replayed on this variant when it can be, and
+                  // on classic chess when it cannot.
+                  const result = fromPgn(pgnText, variant) ?? fromPgn(pgnText)
+                  if (!result) {
+                    setPgnError('Those moves cannot be played out as written.')
+                    return
+                  }
+                  loadPosition(result.game)
+                  setView('play')
+                  toast.success('Game imported')
+                  setPgnText('')
+                  setPgnError(null)
+                  onOpenChange(false)
+                }}
+              >
+                <Upload /> Import game
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPgnText(toPgn(game))
+                  setPgnError(null)
+                }}
+              >
+                Use the current game
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              A PGN is a whole game written as a score sheet. It is replayed move by move — on this
+              variant when the moves fit it, on classic chess otherwise — and lands on the board
+              ready to step through.
             </p>
           </TabsContent>
         </Tabs>
