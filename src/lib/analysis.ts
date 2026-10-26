@@ -9,5 +9,5 @@ export interface AnalysisSettings {
 
 export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
   showLine: false,
-  showArrow: true,
+  showArrow: false,
 }
