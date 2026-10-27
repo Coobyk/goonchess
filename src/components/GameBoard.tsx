@@ -293,6 +293,7 @@ export function GameBoard() {
   const analysis = useAppStore((s) => s.analysis)
   const threatSettings = useAppStore((s) => s.threats)
   const turnView = useAppStore((s) => s.turnView)
+  const onlineSeat = useAppStore((s) => s.online?.seat ?? null)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [container, width] = useElementWidth<HTMLDivElement>()
   // The square the keyboard cursor is on. Arrow keys move it, Enter plays.
@@ -415,15 +416,21 @@ export function GameBoard() {
 
   // Flip the view or rotate the pieces only after the move animation lands.
   const sideIndex = variant.teams.findIndex((team) => team.id === turn)
-  const targetOrientation = turnView !== 'off' && sideIndex % 2 === 1 ? 1 : 0
+  // In a shared game each browser holds a seat: that team's pieces always sit
+  // at the bottom of its own board, whatever turnView says. Without a seat the
+  // turnView rule decides, flipping for the side to move.
+  const viewerIndex =
+    onlineSeat !== null && variant.teams[onlineSeat] ? onlineSeat : sideIndex
+  const targetOrientation =
+    (onlineSeat !== null || turnView !== 'off') && viewerIndex % 2 === 1 ? 1 : 0
   const [orientation, setOrientation] = useState(targetOrientation)
   useEffect(() => {
     if (orientation === targetOrientation) return
     const timer = window.setTimeout(() => setOrientation(targetOrientation), moveDuration + 120)
     return () => window.clearTimeout(timer)
   }, [orientation, targetOrientation, moveDuration])
-  const flipBoard = turnView === 'board' && orientation === 1
-  const rotatePieces = turnView === 'pieces' && orientation === 1
+  const flipBoard = (onlineSeat !== null || turnView === 'board') && orientation === 1
+  const rotatePieces = onlineSeat === null && turnView === 'pieces' && orientation === 1
 
   // Play a blast animation when a *new* move sets off an explosion (not on undo).
   const [blast, setBlast] = useState<{ id: number; x: number; y: number; radius: number } | null>(null)

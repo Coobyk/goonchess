@@ -91,6 +91,11 @@ export function PlayView() {
   const online = useAppStore((s) => s.online)
   // A shared game cannot be taken back: the other player already saw the move.
   const canUndo = useAppStore((s) => s.undoStack.length > 1) && !online
+  // In a shared game the viewer's team sits at the bottom of the board, so the
+  // nameplates follow the flip: own team below, opponent above.
+  const seatFlipped = online?.seat !== null && online?.seat !== undefined && online.seat % 2 === 1
+  const topTeamIndex = seatFlipped ? 0 : 1
+  const bottomTeamIndex = seatFlipped ? 1 : 0
   const turnView = useAppStore((s) => s.turnView)
   const setTurnView = useAppStore((s) => s.setTurnView)
   const bot = useAppStore((s) => s.bot)
@@ -214,8 +219,8 @@ export function PlayView() {
           </Alert>
         )}
         {(() => {
-          const team = variant.teams[1]
-          const other = variant.teams[0]
+          const team = variant.teams[topTeamIndex]
+          const other = variant.teams[bottomTeamIndex]
           const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
           const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
           const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
@@ -288,8 +293,8 @@ export function PlayView() {
         })()}
         <GameBoard />
         {(() => {
-          const team = variant.teams[0]
-          const other = variant.teams[1]
+          const team = variant.teams[bottomTeamIndex]
+          const other = variant.teams[topTeamIndex]
           const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
           const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
           const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
