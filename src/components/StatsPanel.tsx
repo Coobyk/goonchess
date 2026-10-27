@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { toast } from 'sonner'
+import { BarChart3, Flame } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { loadStats, recordResult, saveStats, type Stats } from '@/lib/stats'
+import {
+  dayKey,
+  liveStreakDays,
+  loadStats,
+  loadStreak,
+  recordPlayDay,
+  recordResult,
+  saveStreak,
+  saveStats,
+  type PlayStreak,
+  type Stats,
+} from '@/lib/stats'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 /**
@@ -14,9 +27,11 @@ export function StatsPanel() {
   const game = useAppStore((s) => s.game)
   const variant = useAppStore((s) => s.variant)
   const [stats, setStats] = useState<Stats>(() => loadStats())
+  const [streak, setStreak] = useState<PlayStreak>(() => loadStreak())
   const [recorded, setRecorded] = useState<string | null>(null)
 
-  // Note the result once the game is over.
+  // Note the result once the game is over. A finished game — win, loss or
+  // draw — marks the day as played and keeps the streak going.
   useEffect(() => {
     if (!game.winner) return
     const key = `${variant.id}:${game.moveHistory.length}:${game.winner}`
@@ -31,10 +46,27 @@ export function StatsPanel() {
     const next = recordResult(loadStats(), variant.id, result)
     saveStats(next)
     setStats(next)
-  }, [game, variant, recorded])
+    const today = dayKey(new Date())
+    const nextStreak = recordPlayDay(loadStreak(), today)
+    saveStreak(nextStreak)
+    setStreak(nextStreak)
+    // First finished game of the day: announce the streak.
+    if (streak.lastDay !== today) {
+      if (nextStreak.days === 1) {
+        toast('Your streak started! 🔥', {
+          description: 'Come back tomorrow to make it 2 days in a row.',
+        })
+      } else {
+        toast(`Day ${nextStreak.days} in a row! 🔥`, {
+          description: 'Come back tomorrow to keep the streak going.',
+        })
+      }
+    }
+  }, [game, variant, recorded, streak])
 
   const row = stats[variant.id]
   const others = Object.entries(stats).filter(([id]) => id !== variant.id)
+  const streakDays = liveStreakDays(streak, dayKey(new Date()))
 
   return (
     <Card className="py-4">
@@ -65,6 +97,20 @@ export function StatsPanel() {
               </p>
             ))}
           </div>
+        )}
+        {streakDays > 0 && (
+          <p
+            className={cn(
+              'flex items-center gap-1 border-t pt-2 font-medium',
+              streakDays >= 5 ? 'text-amber-500' : 'text-foreground',
+            )}
+          >
+            <Flame className="size-3.5" />
+            {streakDays === 1 ? '1 day' : `${streakDays} days`} in a row
+            {streak.best > streakDays && (
+              <span className="text-muted-foreground font-normal">· best {streak.best}</span>
+            )}
+          </p>
         )}
       </CardContent>
     </Card>
