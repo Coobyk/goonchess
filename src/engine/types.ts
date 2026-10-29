@@ -110,6 +110,12 @@ export interface PieceFlags {
   dice: boolean
   /** Turns into a random other piece after every move. */
   random: boolean
+  /**
+   * A Predator: it cannot resist catching a pawn or a minor piece, comes back
+   * when anything but a royal piece takes it, and only a royal piece can slay
+   * it for good.
+   */
+  predator: boolean
 }
 
 export type Effect =
@@ -137,6 +143,11 @@ export interface PieceType {
   promotion: Promotion | null
   /** A drawing of the piece, made of the shapes below. Wins over the icon. */
   art?: PieceArt
+  /**
+   * A picture per team (by team index) to draw the piece with. Wins over
+   * everything else, and falls back to the usual drawing when missing.
+   */
+  images?: string[]
 }
 
 /* ---------------------------------------------------------------- setup */
@@ -159,6 +170,8 @@ export type WinConditionKind =
   | 'threeCheck'
   | 'antichess'
   | 'race'
+  /** Predator Chess: a king that takes the Predator wins, and running out of pawns and minors loses. */
+  | 'predator'
 
 export interface WinCondition {
   id: string
@@ -182,6 +195,8 @@ export type VariantRule =
   | 'noCheck'
   /** The king and the rook never swap places. */
   | 'noCastle'
+  /** Predators must take the pawns and minor pieces they see, and come back when taken. */
+  | 'predator'
 
 export interface Variant {
   schema: 1
@@ -302,6 +317,8 @@ export interface GameState {
     | 'three-check'
     | 'antichess'
     | 'race'
+    | 'predator-kill'
+    | 'predator-depletion'
   /** Where the rolls of the random pieces stand, so a game can be rebuilt. */
   randomSeed?: number
 }

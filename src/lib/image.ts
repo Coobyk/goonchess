@@ -100,10 +100,21 @@ async function drawBoard(
       const piece = state.pieceTypes[inst.typeId]
       if (!piece) continue
       const teamIndex = variant.teams.findIndex((t) => t.id === inst.team)
+      const custom = piece.images?.[Math.max(0, teamIndex)]
       const letter = codeFor(piece.icon)
-      if (!letter) continue
-      const image = await loadPiece(`/pieces/cburnett/${teamIndex === 0 ? 'w' : 'b'}${letter}.svg`)
+      if (!custom && !letter) continue
+      const image = await loadPiece(
+        custom ?? `/pieces/cburnett/${teamIndex === 0 ? 'w' : 'b'}${letter}.svg`,
+      )
       if (!image) continue
+      // A picture of its own may not be square: fit it inside the square.
+      if (custom) {
+        const wide = image.width >= image.height
+        const w = wide ? size : (size * image.width) / image.height
+        const h = wide ? (size * image.height) / image.width : size
+        ctx.drawImage(image, x0 + x * cell + offset + (size - w) / 2, y0 + y * cell + offset + (size - h) / 2, w, h)
+        continue
+      }
       ctx.drawImage(image, x0 + x * cell + offset, y0 + y * cell + offset, size, size)
     }
   }

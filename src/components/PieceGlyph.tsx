@@ -54,6 +54,21 @@ export function PieceGlyph({
     >
       {piece.symbol || piece.name.slice(0, 1)}
     </span>
+  ) : piece.images?.[teamIndex] ? (
+    // A piece with a picture of its own, one for each side.
+    <img
+      src={piece.images[teamIndex]}
+      alt={piece.name}
+      width={size}
+      height={size}
+      draggable={false}
+      style={{
+        display: 'block',
+        width: size,
+        height: size,
+        objectFit: 'contain',
+      }}
+    />
   ) : piece.art && piece.art.length ? (
     // A piece that was drawn in the composer.
     <img

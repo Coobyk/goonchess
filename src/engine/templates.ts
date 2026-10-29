@@ -71,6 +71,7 @@ export function makePiece(
       mirror: true,
       enPassant: false,
       dice: false,
+      predator: false,
       ...partial.flags,
     },
     effects: partial.effects ?? [],
@@ -426,6 +427,77 @@ export function chaosLab(): Variant {
     winConditions: [
       { id: uid(), kind: 'kingCapture' },
       { id: uid(), kind: 'elimination' },
+    ],
+  }
+}
+
+/* ---------------------------------------------------------- predator chess */
+
+/**
+ * The queens are Predators: they move as a queen does, but they cannot resist
+ * catching a pawn or a minor piece they can see — when one is in sight, that
+ * capture is the only move the whole side may make. Taken by anything but a
+ * king, the Predator comes straight back; a king that takes it wins the game
+ * at once, and a side whose pawns and minors the Predator has all eaten loses.
+ */
+export function predatorChess(): Variant {
+  const king = makePiece({ name: 'King', icon: 'king', value: 0, move: [leaper(ALL8)], flags: { royal: true } })
+  const predator = makePiece({
+    name: 'Predator',
+    icon: 'custom',
+    symbol: '☠',
+    value: 9,
+    move: [slider(ALL8)],
+    flags: { predator: true },
+  })
+  // The Predator wears a face of its own: one picture for each side.
+  predator.images = ['/pieces/predator/PredWhite.png', '/pieces/predator/PredBlack.png']
+  const rook = makePiece({ name: 'Rook', icon: 'rook', value: 5, move: [slider(ORTH)] })
+  const bishop = makePiece({ name: 'Bishop', icon: 'bishop', value: 3, move: [slider(DIAG)] })
+  const knight = makePiece({ name: 'Knight', icon: 'knight', value: 3, move: [leaper(KNIGHT)], flags: { jump: true } })
+  const pawn = makePiece({
+    name: 'Pawn',
+    icon: 'pawn',
+    value: 1,
+    move: [leaper([{ x: 0, y: -1 }])],
+    capture: [leaper([{ x: -1, y: -1 }, { x: 1, y: -1 }])],
+    flags: { enPassant: true },
+  })
+  const doubleStep = slider([{ x: 0, y: -1 }], 2)
+  doubleStep.firstMoveOnly = true
+  pawn.move = [...pawn.move, doubleStep]
+  // There is one Predator to a side: a pawn may become any of the other ranks.
+  pawn.promotion = { typeIds: [rook.id, bishop.id, knight.id] }
+
+  const pieceTypes = [king, predator, rook, bishop, knight, pawn]
+  const setup: SetupPiece[] = []
+  const back = [rook, knight, bishop, predator, king, bishop, knight, rook]
+
+  for (const team of ['black', 'white']) {
+    const rank = team === 'black' ? 0 : 7
+    const pawnRank = team === 'black' ? 1 : 6
+    back.forEach((piece, x) => put(setup, piece.id, team, x, rank))
+    for (let x = 0; x < 8; x++) put(setup, pawn.id, team, x, pawnRank)
+  }
+
+  return {
+    schema: 1,
+    id: 'predator',
+    name: 'Predator Chess',
+    description:
+      'The queens are Predators: they must take the pawns and minors they see, come back when taken, and only a King can slay one for good.',
+    board: emptyBoard(8, 8),
+    teams: [
+      { id: 'white', name: 'White', color: '#f4f1ea', forward: 'up' },
+      { id: 'black', name: 'Black', color: '#3f3f46', forward: 'down' },
+    ],
+    pieceTypes,
+    setup,
+    rules: ['predator'],
+    winConditions: [
+      { id: uid(), kind: 'predator' },
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
     ],
   }
 }
@@ -835,6 +907,12 @@ export const TEMPLATES: {
     name: 'Crazyhouse',
     description: 'Captured pieces come back',
     build: crazyhouse,
+  },
+  {
+    id: 'predator',
+    name: 'Predator Chess',
+    description: 'A queen that cannot resist the hunt',
+    build: predatorChess,
   },
 ]
 

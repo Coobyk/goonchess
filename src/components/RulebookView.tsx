@@ -91,6 +91,10 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
     name: 'No castling',
     hint: 'The king and the rook never swap places.',
   },
+  predator: {
+    name: 'Predators',
+    hint: 'A Predator must take the pawn or minor piece it sees, come back when anything but a king takes it, and only a king can slay it for good.',
+  },
 }
 
 const TURN_VIEW_COPY = {

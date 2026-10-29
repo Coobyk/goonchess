@@ -41,6 +41,8 @@ const STATUS_TEXT: Record<string, string> = {
   'three-check': 'The third check',
   antichess: 'No pieces, or no move to make',
   race: 'The king reached the far rank',
+  'predator-kill': 'The King slew the Predator',
+  'predator-depletion': 'The Predator ate every pawn and minor piece',
 }
 
 /** The three strengths, as a compact row of buttons. */

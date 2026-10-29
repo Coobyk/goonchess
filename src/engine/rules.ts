@@ -612,6 +612,50 @@ function captureIsForced(state: GameState, teamId: string): boolean {
   return false
 }
 
+/* --------------------------------------------------------------- predator */
+
+/** The pieces a Predator hunts: pawns and the minor pieces. */
+export function isPredatorPrey(piece: PieceType | undefined): boolean {
+  return piece?.icon === 'pawn' || piece?.icon === 'knight' || piece?.icon === 'bishop'
+}
+
+/** One of the Predator's compulsory captures, told apart from any other move. */
+function predatorKey(move: Move): string {
+  return `${move.pieceId}|${move.from.x},${move.from.y}|${move.finalTo.x},${move.finalTo.y}|${move.capturedId ?? ''}`
+}
+
+/**
+ * The captures a Predator cannot resist.
+ *
+ * When a Predator sees an enemy pawn or minor piece, every other move of the
+ * team is off the table: the only legal moves are the Predator taking one of
+ * those targets, whichever it may be. Returns null when no compulsion is on —
+ * either the variant has no Predators in play or none of them sees any prey.
+ */
+function predatorForcedCaptures(state: GameState, teamId: string): Move[] | null {
+  if (!state.variant.rules?.includes('predator')) return null
+  let forced: Move[] | null = null
+  for (let y = 0; y < state.board.length; y++) {
+    const row = state.board[y]
+    for (let x = 0; x < row.length; x++) {
+      const id = row[x]
+      if (!id) continue
+      const inst = state.pieces[id]
+      if (!inst || inst.team !== teamId) continue
+      if (!state.pieceTypes[inst.typeId]?.flags.predator) continue
+      for (const move of movesFor(state, x, y)) {
+        if (!move.capturedId) continue
+        const victim = state.pieces[move.capturedId]
+        if (!victim) continue
+        if (!isPredatorPrey(state.pieceTypes[victim.typeId])) continue
+        forced ??= []
+        forced.push(move)
+      }
+    }
+  }
+  return forced
+}
+
 /**
  * Copies the mutable parts of a game state.
  *
@@ -706,6 +750,30 @@ export function getLegalMoves(state: GameState, x: number, y: number): Move[] {
  * needs that child state anyway, so it is built once and handed over instead
  * of being thrown away and rebuilt.
  */
+/**
+ * Whether a move takes an enemy Predator.
+ *
+ * What comes back is nobody's doing, so a move that takes the Predator is
+ * judged without the usual "do not stand in check": the Predator may come
+ * back wherever it likes, and the capture stands.
+ */
+function takesPredator(state: GameState, move: Move): boolean {
+  if (!move.capturedId) return false
+  const victim = state.pieces[move.capturedId]
+  return !!victim && !!state.pieceTypes[victim.typeId]?.flags.predator
+}
+
+/**
+ * The one move that outranks the hunt: a royal piece taking the Predator.
+ * The whole variant turns on that capture, so no compulsion stands in its
+ * way — a side whose own Predator sees prey may still send its king in.
+ */
+function slaysPredator(state: GameState, move: Move): boolean {
+  const mover = state.pieces[move.pieceId]
+  if (!mover || !state.pieceTypes[mover.typeId]?.flags.royal) return false
+  return takesPredator(state, move)
+}
+
 export function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
   const pieceId = state.board[y]?.[x]
   if (!pieceId) return []
@@ -713,6 +781,10 @@ export function legalOptions(state: GameState, x: number, y: number): MoveOption
   if (!inst) return []
   const options: MoveOption[] = []
   const forced = captureIsForced(state, inst.team)
+  // A Predator that sees prey leaves nothing else on the table, not even the
+  // moves that answer a check: the hunt cannot be resisted.
+  const predatorOnly = predatorForcedCaptures(state, inst.team)
+  const predatorKeys = predatorOnly ? new Set(predatorOnly.map(predatorKey)) : null
   // Racing Kings: a move that checks the opponent is against the rules as
   // much as one that leaves your own king in check.
   const noCheck = state.variant.rules?.includes('noCheck')
@@ -720,11 +792,17 @@ export function legalOptions(state: GameState, x: number, y: number): MoveOption
   // put through the proper check rather than the fast one.
   const atomic = state.variant.rules?.includes('atomic')
   for (const move of movesFor(state, x, y)) {
+    if (predatorKeys) {
+      if (!predatorKeys.has(predatorKey(move)) && !slaysPredator(state, move)) continue
+      options.push({ move, next: applyMove(state, move, { compute: false }) })
+      continue
+    }
     if (forced && !move.capturedId) continue
     if (!castlingIsLegal(state, move, inst)) continue
     const next = applyMove(state, move, { compute: false })
-    if (isInCheck(next, inst.team) && !(atomic && wonByBlast(state, next, inst.team))) continue
-    if (noCheck && isInCheck(next, next.turn)) continue
+    const free = takesPredator(state, move)
+    if (isInCheck(next, inst.team) && !free && !(atomic && wonByBlast(state, next, inst.team))) continue
+    if (noCheck && !free && isInCheck(next, next.turn)) continue
     options.push({ move, next })
   }
   return options
@@ -898,12 +976,16 @@ function collectDrops(
   teamId: string,
   wantStates: boolean,
   search: boolean,
+  predatorOnly?: Move[] | null,
 ): { moves: Move[]; states: (GameState | null)[] } {
   const moves: Move[] = []
   const states: (GameState | null)[] = []
   if (!state.variant.rules?.includes('crazyhouse')) return { moves, states }
   // Losing chess keeps its compulsory capture: a drop is not a capture.
   if (captureIsForced(state, teamId)) return { moves, states }
+  // Nor does a drop answer the Predator's call: the hunt cannot be resisted.
+  const forced = predatorOnly === undefined ? predatorForcedCaptures(state, teamId) : predatorOnly
+  if (forced && forced.length) return { moves, states }
   const hand = state.hands?.[teamId]
   if (!hand) return { moves, states }
   const width = state.variant.board.width
@@ -1023,6 +1105,9 @@ function collectTeamMoves(
   const size = state.variant.board.width * state.variant.board.height
   // Losing chess: with a capture on the board, only captures are allowed.
   const forced = captureIsForced(state, teamId)
+  // Predator Chess: with prey in a Predator's sight, only its captures remain.
+  const predatorOnly = predatorForcedCaptures(state, teamId)
+  const predatorKeys = predatorOnly ? new Set(predatorOnly.map(predatorKey)) : null
   // Racing Kings: every move has to be checked both ways around — giving
   // check is forbidden, so there is no fast path to skip the question with.
   const noCheck = state.variant.rules?.includes('noCheck')
@@ -1046,6 +1131,15 @@ function collectTeamMoves(
       const inst = state.pieces[pieceId]
       if (!inst || inst.team !== teamId) continue
       for (const move of movesFor(state, x, y)) {
+        if (predatorKeys) {
+          // The hunt cannot be resisted: a compulsory capture stands even when
+          // it walks out of check, and nothing else may be played instead —
+          // the king's slaying of the Predator alone outranks it.
+          if (!predatorKeys.has(predatorKey(move)) && !slaysPredator(state, move)) continue
+          moves.push(move)
+          states.push(wantStates ? applyMove(state, move, { compute: false, search }) : null)
+          continue
+        }
         if (forced && !move.capturedId) continue
         if (!castlingIsLegal(state, move, inst)) continue
         const fast =
@@ -1064,8 +1158,9 @@ function collectTeamMoves(
         }
         // This move has to be looked at properly, so the state is built now.
         const next = applyMove(state, move, { compute: false, search })
-        if (isInCheck(next, inst.team) && !(atomic && wonByBlast(state, next, teamId))) continue
-        if (noCheck && isInCheck(next, next.turn)) continue
+        const free = takesPredator(state, move)
+        if (isInCheck(next, inst.team) && !free && !(atomic && wonByBlast(state, next, teamId))) continue
+        if (noCheck && !free && isInCheck(next, next.turn)) continue
         moves.push(move)
         states.push(next)
       }
@@ -1073,7 +1168,7 @@ function collectTeamMoves(
   }
   if (exposed) giveScratch()
   // What a pocket can put back on the board joins the moves on it.
-  const drops = collectDrops(state, teamId, wantStates, search)
+  const drops = collectDrops(state, teamId, wantStates, search, predatorOnly)
   for (let i = 0; i < drops.moves.length; i++) {
     moves.push(drops.moves[i])
     states.push(drops.states[i])
@@ -1112,6 +1207,37 @@ export function hasAnyLegalMove(state: GameState, teamId: string): boolean {
 }
 
 /* ------------------------------------------------------------- apply move */
+
+/**
+ * Where a taken Predator comes back: its own square when that is free, or a
+ * random empty one. The draw comes from the game's seed, so a replay plays
+ * out the same way.
+ */
+function respawnSquare(state: GameState, predatorId: string): Vec | null {
+  const free = (x: number, y: number) =>
+    inBounds(state.variant.board, x, y) &&
+    !isBlocking(tileAt(state.variant, x, y)) &&
+    state.board[y][x] === null
+  // The setup named every piece after the square it started on.
+  const origin = predatorId.split('|').pop()?.split(',') ?? []
+  if (origin.length === 2) {
+    const x = Number(origin[0])
+    const y = Number(origin[1])
+    if (Number.isInteger(x) && Number.isInteger(y) && free(x, y)) return { x, y }
+  }
+  const empties: Vec[] = []
+  for (let y = 0; y < state.variant.board.height; y++) {
+    for (let x = 0; x < state.variant.board.width; x++) {
+      if (free(x, y)) empties.push({ x, y })
+    }
+  }
+  if (!empties.length) return null
+  // The seed moves on with every draw, as the rolls of the random pieces do.
+  let seed = (state.randomSeed ?? state.variant.randomSeed ?? 1) >>> 0
+  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+  state.randomSeed = seed
+  return empties[seed % empties.length]
+}
 
 interface ApplyOptions {
   compute?: boolean
@@ -1381,6 +1507,41 @@ export function applyMove(
     }
   }
 
+  // Predator bookkeeping: what the hunt did with this move.
+  let kingTookPredator = false
+  let predatorAtePrey: string | undefined
+  if (
+    next.variant.rules?.includes('predator') &&
+    move.capturedId &&
+    capturedInst &&
+    capturedPiece &&
+    !hasSwap
+  ) {
+    if (capturedPiece.flags.predator) {
+      if (piece.flags.royal) {
+        // A king that takes the Predator slays it for good — and wins the game.
+        kingTookPredator = true
+      } else {
+        // Anything else only wounded it: it comes straight back.
+        const spot = respawnSquare(next, move.capturedId)
+        if (spot) {
+          next.pieces[move.capturedId] = capturedInst
+          next.board[spot.y][spot.x] = move.capturedId
+          // The piece is back, so the capture booked no score and no pocket.
+          next.scores[inst.team] = (next.scores[inst.team] ?? 0) - capturedPiece.value
+          if (next.hands) {
+            const pocket = next.hands[inst.team]
+            const held = capturedInst.promotedFrom ?? capturedInst.typeId
+            if (pocket && held) pocket[held] = Math.max(0, (pocket[held] ?? 0) - 1)
+          }
+        }
+      }
+    }
+    if (piece.flags.predator && isPredatorPrey(capturedPiece)) {
+      predatorAtePrey = capturedInst.team
+    }
+  }
+
   const record: MoveRecord = {
     move: { ...move, promotionTypeId },
     team: state.turn,
@@ -1430,6 +1591,8 @@ export function applyMove(
     detectOutcome(next, inst.team, {
       capturedRoyal: !!capturedPiece?.flags.royal,
       royalTeams: [...royalTeams],
+      kingTookPredator,
+      predatorAtePrey,
     })
   }
   return next
@@ -1604,9 +1767,34 @@ export function royalOnFarRank(state: GameState, teamId: string): boolean {
 export function detectOutcome(
   state: GameState,
   mover: string,
-  meta: { capturedRoyal?: boolean; royalTeams?: string[] } = {},
+  meta: {
+    capturedRoyal?: boolean
+    royalTeams?: string[]
+    kingTookPredator?: boolean
+    predatorAtePrey?: string
+  } = {},
 ) {
   const { variant } = state
+
+  // Predator Chess: the hunt decides the game before anything else does.
+  if (variant.winConditions.some((w) => w.kind === 'predator')) {
+    if (meta.kingTookPredator) {
+      state.winner = mover
+      state.status = 'predator-kill'
+      return
+    }
+    if (meta.predatorAtePrey) {
+      const starved = !Object.values(state.pieces).some(
+        (p) => p.team === meta.predatorAtePrey && isPredatorPrey(state.pieceTypes[p.typeId]),
+      )
+      if (starved) {
+        // The Predator has eaten the last pawn and minor piece: the hunt is over.
+        state.winner = mover
+        state.status = 'predator-depletion'
+        return
+      }
+    }
+  }
 
   if (variant.winConditions.some((w) => w.kind === 'kingCapture')) {
     const dead = new Set(meta.royalTeams ?? [])

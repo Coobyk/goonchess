@@ -43,9 +43,17 @@ const WIN_KINDS: WinConditionKind[] = [
   'threeCheck',
   'antichess',
   'race',
+  'predator',
 ]
 /** The extra rules a variant can be built on, packed as a bitfield. */
-const RULES: VariantRule[] = ['atomic', 'crazyhouse', 'forcedCapture', 'noCheck', 'noCastle']
+const RULES: VariantRule[] = [
+  'atomic',
+  'crazyhouse',
+  'forcedCapture',
+  'noCheck',
+  'noCastle',
+  'predator',
+]
 const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
 const SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']
 
@@ -59,6 +67,7 @@ const FLAGS: [keyof PieceFlags, number][] = [
   ['enPassant', 64],
   ['dice', 128],
   ['random', 256],
+  ['predator', 512],
 ]
 
 const DEFAULT_TEAMS: Variant['teams'] = [
@@ -340,6 +349,7 @@ function unpackFlags(bits: number): PieceFlags {
     enPassant: false,
     dice: false,
     random: false,
+    predator: false,
   }
   for (const [key, bit] of FLAGS) flags[key] = (bits & bit) !== 0
   return flags
