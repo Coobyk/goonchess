@@ -74,7 +74,7 @@ function LibraryMenuItems({
 
   return (
     <>
-      <LibrarySectionLabel count={TEMPLATES.length}>Templates</LibrarySectionLabel>
+      <LibrarySectionLabel count={TEMPLATES.length}>Variants</LibrarySectionLabel>
       <div className={cn('grid gap-0.5', columns === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
         {TEMPLATES.map((template) => (
           <DropdownMenuItem
