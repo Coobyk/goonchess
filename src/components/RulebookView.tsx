@@ -243,16 +243,18 @@ export function RulebookView() {
   return (
     <div className="space-y-6">
       <PuzzlePanel />
-      <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 py-0 text-zinc-100 dark:from-zinc-900 dark:to-zinc-950">
+      <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-[#221830] via-[#181120] to-[#2a1a12] py-0 text-zinc-100">
         <CardContent className="relative px-6 py-8 sm:px-8">
-          <div className="pointer-events-none absolute -right-16 -top-20 size-60 rounded-full bg-emerald-400/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 right-28 size-52 rounded-full bg-sky-400/10 blur-3xl" />
+          <div className="pointer-events-none absolute -right-16 -top-20 size-60 rounded-full bg-purple-400/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 right-28 size-52 rounded-full bg-orange-400/10 blur-3xl" />
           <div className="relative max-w-3xl space-y-4">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-400">
               <BookOpen className="size-4" /> Learn
             </div>
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{variant.name}</h1>
+              <h1 className="font-spooky text-4xl tracking-wide text-orange-200 drop-shadow-[0_0_16px_rgba(255,125,31,0.4)] sm:text-5xl">
+                {variant.name}
+              </h1>
               <p className="text-sm text-zinc-300 sm:text-base">
                 {variant.description ||
                   'A custom chess variant. Every rule on this page comes from the current setup.'}
@@ -385,7 +387,7 @@ export function RulebookView() {
                       key={condition.id}
                       className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
                     >
-                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
+                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-orange-500/15 text-orange-500">
                         <ArrowRight className="size-3.5" />
                       </span>
                       <div className="min-w-0">
@@ -444,7 +446,7 @@ export function RulebookView() {
                       key={rule}
                       className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
                     >
-                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-sky-500/15 text-sky-500">
+                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-purple-500/20 text-purple-400">
                         <ArrowRight className="size-3.5" />
                       </span>
                       <div className="min-w-0">

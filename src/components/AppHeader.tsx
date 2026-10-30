@@ -202,19 +202,65 @@ export function AppHeader() {
   return (
     <>
       <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
+        {/* Halloween flair: webs in the corners, bats adrift. Drawn before the
+            bar's content so real controls always paint on top of them. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden md:block">
+          <svg
+            className="web absolute -top-px -left-px size-28"
+            viewBox="0 0 120 120"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1"
+          >
+            <path d="M120 0 A120 120 0 0 1 0 120 M78 0 A78 78 0 0 1 0 78 M40 0 A40 40 0 0 1 0 40 M0 0 L120 0 M0 0 L113 41 M0 0 L85 85 M0 0 L41 113 M0 0 L0 120" />
+          </svg>
+          <svg
+            className="web absolute -top-px -right-px size-28 -scale-x-100"
+            viewBox="0 0 120 120"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1"
+          >
+            <path d="M120 0 A120 120 0 0 1 0 120 M78 0 A78 78 0 0 1 0 78 M40 0 A40 40 0 0 1 0 40 M0 0 L120 0 M0 0 L113 41 M0 0 L85 85 M0 0 L41 113 M0 0 L0 120" />
+          </svg>
+          <svg className="bat absolute top-2 right-[30%] size-6" viewBox="0 0 64 30" fill="currentColor">
+            <path d="M2 2 C12 10 22 8 32 10 C42 8 52 10 62 2 C58 12 56 16 53 19 Q48 25 43 20 Q38 26 33 22 Q32 28 31 22 Q26 26 21 20 Q16 25 11 19 C8 16 6 12 2 2 Z" />
+          </svg>
+          <svg
+            className="bat absolute top-5 right-[36%] size-5"
+            viewBox="0 0 64 30"
+            fill="currentColor"
+            style={{ animationDelay: '-3s' }}
+          >
+            <path d="M2 2 C12 10 22 8 32 10 C42 8 52 10 62 2 C58 12 56 16 53 19 Q48 25 43 20 Q38 26 33 22 Q32 28 31 22 Q26 26 21 20 Q16 25 11 19 C8 16 6 12 2 2 Z" />
+          </svg>
+          <svg
+            className="bat absolute top-4 right-[24%] size-4"
+            viewBox="0 0 64 30"
+            fill="currentColor"
+            style={{ animationDelay: '-5.2s' }}
+          >
+            <path d="M2 2 C12 10 22 8 32 10 C42 8 52 10 62 2 C58 12 56 16 53 19 Q48 25 43 20 Q38 26 33 22 Q32 28 31 22 Q26 26 21 20 Q16 25 11 19 C8 16 6 12 2 2 Z" />
+          </svg>
+        </div>
+        <div className="relative mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <a
               href="/"
               aria-label="Goonchess home"
               onClick={goHome}
-              className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm transition-opacity hover:opacity-90"
+              className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-[#2c2237] to-[#151020] shadow-sm transition-opacity hover:opacity-90"
             >
               <img src="/logo.svg" alt="" className="size-7" />
             </a>
             <div className="hidden min-w-0 sm:block">
               <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-semibold tracking-tight">Goonchess</span>
+                <span className="wordmark truncate text-lg leading-none">
+                  Goonchess{' '}
+                  <span aria-hidden="true" className="pumpkin-flicker">
+                    🎃
+                  </span>
+                </span>
               </div>
               <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
                 {variant.name}

@@ -48,7 +48,7 @@ export default function App() {
         <footer className="border-t">
           <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-xs lg:px-8">
             <span>
-              Goonchess · built by{' '}
+              Goonchess · haunted by{' '}
               <a
                 href="https://coobyk.com"
                 target="_blank"

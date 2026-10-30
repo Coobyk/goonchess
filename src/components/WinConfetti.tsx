@@ -15,7 +15,16 @@ interface Particle {
   life: number
 }
 
-const COLORS = ['#f59e0b', '#fbbf24', '#f97316', '#ef4444', '#ec4899', '#8b5cf6', '#3b82f6', '#22c55e', '#f8fafc']
+const COLORS = [
+  '#ff7518', // pumpkin
+  '#ffb347', // candy corn
+  '#ff4d00', // ember
+  '#9d5ce6', // witch's robe
+  '#c084fc', // moonlit violet
+  '#a3e635', // slime
+  '#f5efdc', // bone
+  '#5b21b6', // deep spellbook purple
+]
 
 function makeParticles(width: number, height: number, teamColor?: string) {
   const colors = teamColor ? [teamColor, ...COLORS] : COLORS

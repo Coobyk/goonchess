@@ -2,12 +2,14 @@
 @import 'tw-animate-css';
 @import 'medeo-font/sans.css';
 @import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource/creepster';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-sans: 'Medeo Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
+  --font-spooky: 'Creepster', 'Medeo Sans', ui-sans-serif, cursive;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -47,67 +49,78 @@
 
 :root {
   --radius: 0.25rem;
-  --background: #ffffff;
-  --foreground: #000000;
-  --card: #ffffff;
-  --card-foreground: #000000;
-  --popover: #ffffff;
-  --popover-foreground: #000000;
-  --primary: #000000;
-  --primary-foreground: #ffffff;
-  --secondary: #f5f5f5;
-  --secondary-foreground: #000000;
-  --muted: #f5f5f5;
-  --muted-foreground: #666666;
-  --accent: #f5f5f5;
-  --accent-foreground: #000000;
-  --destructive: #ff3b30;
+  /* Moonlit bone: a warm parchment lit by a low pumpkin glow. */
+  --background: #f4eee1;
+  --foreground: #211726;
+  --card: #fbf7ec;
+  --card-foreground: #211726;
+  --popover: #fbf7ec;
+  --popover-foreground: #211726;
+  --primary: #c25507;
+  --primary-foreground: #fff3e4;
+  --secondary: #eae2cf;
+  --secondary-foreground: #211726;
+  --muted: #eae2cf;
+  --muted-foreground: #6f6377;
+  --accent: #efe7d4;
+  --accent-foreground: #211726;
+  --destructive: #d3180d;
   --destructive-foreground: #ffffff;
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #000000;
-  --sidebar: #fafafa;
-  --sidebar-foreground: #000000;
-  --sidebar-primary: #000000;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5f5f5;
-  --sidebar-accent-foreground: #000000;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #000000;
-  /* The board of Lichess: the brown one. It is the same in light and dark
-     mode, the way it is there. */
-  --board-light: #f0d9b5;
-  --board-dark: #b58863;
+  --border: #ddd2bd;
+  --input: #ddd2bd;
+  --ring: #c25507;
+  --sidebar: #efe9da;
+  --sidebar-foreground: #211726;
+  --sidebar-primary: #c25507;
+  --sidebar-primary-foreground: #fff3e4;
+  --sidebar-accent: #eae2cf;
+  --sidebar-accent-foreground: #211726;
+  --sidebar-border: #ddd2bd;
+  --sidebar-ring: #c25507;
+  /* The haunted board: bone squares on eggplant. The same pair in light and
+     dark mode, the way Lichess keeps its brown one. */
+  --board-light: #efe4cb;
+  --board-dark: #7a5c96;
+  /* A faint moonlit haze, a low moon and grain behind the page. */
+  --body-glow:
+    radial-gradient(1100px 520px at 72% -8%, rgb(122 92 150 / 0.13), transparent 62%),
+    radial-gradient(circle 72px at 86% -30px, rgb(246 240 222 / 0.20), rgb(246 240 222 / 0.05) 58%, transparent 72%),
+    radial-gradient(800px 420px at 12% -4%, rgb(194 85 7 / 0.06), transparent 58%);
 }
 
 .dark {
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #0a0a0a;
-  --card-foreground: #ffffff;
-  --popover: #0a0a0a;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #ffffff;
-  --muted: #1a1a1a;
-  --muted-foreground: #888888;
-  --accent: #1a1a1a;
-  --accent-foreground: #ffffff;
+  /* Haunted house: charcoal with a plum cast, lit by jack-o'-lantern orange. */
+  --background: #0d0a11;
+  --foreground: #f1ecf4;
+  --card: #151019;
+  --card-foreground: #f1ecf4;
+  --popover: #151019;
+  --popover-foreground: #f1ecf4;
+  --primary: #ff7d1f;
+  --primary-foreground: #1c0d00;
+  --secondary: #201a28;
+  --secondary-foreground: #f1ecf4;
+  --muted: #201a28;
+  --muted-foreground: #a496b0;
+  --accent: #251c30;
+  --accent-foreground: #f1ecf4;
   --destructive: #ff453a;
   --destructive-foreground: #ffffff;
-  --border: #262626;
-  --input: #262626;
-  --ring: #ffffff;
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #1a1a1a;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #262626;
-  --sidebar-ring: #ffffff;
+  --border: #2b2334;
+  --input: #2b2334;
+  --ring: #ff7d1f;
+  --sidebar: #151019;
+  --sidebar-foreground: #f1ecf4;
+  --sidebar-primary: #ff7d1f;
+  --sidebar-primary-foreground: #1c0d00;
+  --sidebar-accent: #251c30;
+  --sidebar-accent-foreground: #f1ecf4;
+  --sidebar-border: #2b2334;
+  --sidebar-ring: #ff7d1f;
+  --body-glow:
+    radial-gradient(1200px 560px at 70% -10%, rgb(122 92 170 / 0.16), transparent 62%),
+    radial-gradient(circle 72px at 86% -30px, rgb(246 240 222 / 0.16), rgb(246 240 222 / 0.04) 58%, transparent 72%),
+    radial-gradient(900px 460px at 14% -2%, rgb(255 125 31 / 0.05), transparent 58%);
 }
 
 @layer base {
@@ -122,9 +135,14 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
+    /* Haze and grain: the glow sits fixed behind the page, the noise breaks
+       the digital flatness of the flat colours. */
+    background-image: var(--body-glow),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+    background-attachment: fixed;
   }
   ::selection {
-    background: oklch(0.85 0.08 85 / 0.35);
+    background: rgb(255 125 31 / 0.35);
   }
 
   /*
@@ -151,10 +169,44 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* The haunted wordmark: blackletter-ish display type over a pumpkin glow. */
+  .wordmark {
+    font-family: var(--font-spooky);
+    letter-spacing: 0.05em;
+    color: var(--primary);
+    text-shadow:
+      0 0 14px rgb(255 125 31 / 0.45),
+      0 1px 0 rgb(0 0 0 / 0.35);
+  }
+  /* A bat drifting through the header. */
+  .bat {
+    color: #241a30;
+    opacity: 0.5;
+    animation: bat-float 7s ease-in-out infinite;
+    will-change: transform;
+  }
+  .dark .bat {
+    color: #c4aee4;
+    opacity: 0.22;
+  }
+  /* A corner spider web, drawn in one path. */
+  .web {
+    color: #6b4f8a;
+    opacity: 0.35;
+  }
+  .dark .web {
+    color: #9b7fc4;
+    opacity: 0.22;
+  }
+  /* The jack-o'-lantern light: a candle-shaped flicker. */
+  .pumpkin-flicker {
+    display: inline-block;
+    animation: pumpkin-flicker 2.8s ease-in-out infinite;
+  }
   .board-grid-shadow {
     box-shadow:
-      0 1px 2px rgb(0 0 0 / 0.08),
-      0 18px 50px -18px rgb(0 0 0 / 0.45);
+      0 1px 2px rgb(24 12 36 / 0.14),
+      0 18px 50px -18px rgb(74 40 110 / 0.5);
   }
   .scrollbar-none {
     scrollbar-width: none;
@@ -419,6 +471,36 @@
   }
 }
 
+@keyframes bat-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(5deg);
+  }
+}
+
+@keyframes pumpkin-flicker {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgb(255 125 31 / 0.55));
+  }
+  38% {
+    transform: scale(1.07);
+    filter: drop-shadow(0 0 7px rgb(255 125 31 / 0.9));
+  }
+  55% {
+    transform: scale(0.97);
+    filter: drop-shadow(0 0 3px rgb(255 125 31 / 0.5));
+  }
+  75% {
+    transform: scale(1.04);
+    filter: drop-shadow(0 0 5px rgb(255 125 31 / 0.75));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .blast-cell,
   .blast-core,
@@ -431,8 +513,11 @@
   .piece-dissolve,
   .piece-pop,
   .piece-selected,
-  .threat-hanging {
+  .threat-hanging,
+  .bat,
+  .pumpkin-flicker {
     animation-duration: 1ms;
     animation-delay: 0ms;
+    animation-iteration-count: 1;
   }
 }
