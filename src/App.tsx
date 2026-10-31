@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { AppHeader } from './components/AppHeader'
+import { MomentBanner } from './components/MomentBanner'
 import { MakerView } from './components/MakerView'
 import { PlayView } from './components/PlayView'
 import { RulebookView } from './components/RulebookView'
@@ -41,6 +42,7 @@ export default function App() {
   return (
     <TooltipProvider>
       <div className="flex min-h-full flex-col">
+        <MomentBanner />
         <AppHeader />
         <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-8">
           {view === 'play' ? <PlayView /> : view === 'maker' ? <MakerView /> : <RulebookView />}
