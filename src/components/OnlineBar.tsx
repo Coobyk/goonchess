@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { AlertTriangle, Check, Copy, Eye, Flag, Loader2, MessageCircle, Radio, Send, Undo2, WifiOff, X } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Eye, Flag, Loader2, MessageCircle, Radio, Send, Share2, Undo2, WifiOff, X } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -49,6 +49,21 @@ export function OnlineBar() {
       toast.success('Game link copied')
     } catch {
       toast.error('Clipboard unavailable — copy the address bar instead.')
+    }
+  }
+
+  const share = async () => {
+    const url = `${window.location.origin}/g/${online.code}`
+    if (typeof navigator.share !== 'function') {
+      await copy()
+      return
+    }
+    try {
+      await navigator.share({ title: 'Play me on Goonchess', text: 'Join my Goonchess game:', url })
+    } catch (error) {
+      // Closing the share sheet is a choice, not a failure.
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      await copy()
     }
   }
 
@@ -140,6 +155,9 @@ export function OnlineBar() {
         <span className="text-muted-foreground hidden font-mono text-xs sm:inline">/g/{online.code}</span>
         <Button size="sm" variant="outline" onClick={copy}>
           {copied ? <Check /> : <Copy />} Copy link
+        </Button>
+        <Button size="sm" variant="outline" onClick={share}>
+          <Share2 /> Share
         </Button>
         {/* A take-back needs the other player to agree; so does a rematch. */}
         {online.status === 'playing' && !online.offer && game.moveHistory.length > 0 && (
