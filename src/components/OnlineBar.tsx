@@ -165,8 +165,8 @@ export function OnlineBar() {
             <Undo2 /> Take back
           </Button>
         )}
-        {online.status === 'over' && !online.offer && (
-          <Button size="sm" variant="ghost" onClick={offerRematch}>
+        {online.status === 'over' && online.seat !== null && !online.offer && (
+          <Button size="sm" variant="ghost" onClick={offerRematch} disabled={!online.connected}>
             <Undo2 /> Rematch
           </Button>
         )}
