@@ -214,8 +214,17 @@ export function PlayView() {
             </AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-4">
               <span>{STATUS_TEXT[game.status] ?? 'Game over'}</span>
-              <Button size="sm" onClick={resetGame}>
-                Play again
+              <Button
+                size="sm"
+                onClick={resetGame}
+                disabled={!!online && (
+                  !online.connected || online.seat === null ||
+                  (!!online.offer && (online.offer.kind !== 'rematch' || online.offer.from === online.seat))
+                )}
+              >
+                {online?.offer?.kind === 'rematch'
+                  ? online.offer.from === online.seat ? 'Rematch requested' : 'Accept rematch'
+                  : 'Play again'}
               </Button>
             </AlertDescription>
           </Alert>
@@ -718,4 +727,4 @@ export function PlayView() {
       </aside>
     </div>
   )
-}
+            }
