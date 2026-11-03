@@ -1076,8 +1076,18 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     resetGame: () => {
-      // Restarting would leave the other player on a board nobody else has.
-      if (get().online) return
+      // Online, playing again requires both players. Never reset only this
+      // browser's board: offer a rematch, or accept the opponent's offer.
+      const online = get().online
+      if (online) {
+        if (!online.connected || online.seat === null || !get().game.winner) return
+        if (online.offer?.kind === 'rematch' && online.offer.from !== online.seat) {
+          get().respondOnlineOffer(true)
+        } else {
+          get().offerOnlineRematch()
+        }
+        return
+      }
       const current = get().variant
       // A puzzle is part of the game, so restarting means starting the puzzle
       // over, not going back to the opening position.
@@ -1206,7 +1216,11 @@ export const useAppStore = create<AppState>((set, get) => {
     resignOnline: () => room?.send({ t: 'resign' }),
 
     offerOnlineUndo: () => room?.send({ t: 'offer', kind: 'undo' }),
-    offerOnlineRematch: () => room?.send({ t: 'offer', kind: 'rematch' }),
+    offerOnlineRematch: () => {
+      const { online, game } = get()
+      if (!online?.connected || online.seat === null || !game.winner || online.offer) return
+      room?.send({ t: 'offer', kind: 'rematch' })
+    },
     respondOnlineOffer: (accept) => {
       const offer = get().online?.offer
       if (!offer) return
