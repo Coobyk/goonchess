@@ -727,4 +727,5 @@ export function PlayView() {
       </aside>
     </div>
   )
-            }
+}
+
