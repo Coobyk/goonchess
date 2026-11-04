@@ -1,4 +1,4 @@
-import { Ghost, Sun } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
 
@@ -13,7 +13,7 @@ export function ThemeToggle() {
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
     >
-      {theme === 'dark' ? <Ghost /> : <Sun />}
+      {theme === 'dark' ? <Sun /> : <Moon />}
     </Button>
   )
 }
