@@ -43,6 +43,7 @@ const STATUS_TEXT: Record<string, string> = {
   race: 'The king reached the far rank',
   'predator-kill': 'The King slew the Predator',
   'predator-depletion': 'The Predator ate every pawn and minor piece',
+  jealousy: 'The jealous King exploded',
 }
 
 /** The three strengths, as a compact row of buttons. */

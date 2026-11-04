@@ -95,6 +95,10 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
     name: 'Predators',
     hint: 'A Predator must take the pawn or minor piece it sees, come back when anything but a king takes it, and only a king can slay it for good.',
   },
+  loyalty: {
+    name: 'Loyalty',
+    hint: 'The king is jealous of his queen. If she looks the enemy king in the eye — however the line opened — he explodes where he stands, and her side loses the game on the spot.',
+  },
 }
 
 const TURN_VIEW_COPY = {

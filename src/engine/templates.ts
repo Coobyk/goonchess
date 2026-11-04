@@ -502,6 +502,31 @@ export function predatorChess(): Variant {
   }
 }
 
+/* ----------------------------------------------------------- loyalty chess */
+
+/**
+ * Classic chess with a jealous king. A queen that looks the enemy king in the
+ * eye — however the line opened — enrages her own king, and he explodes where
+ * he stands: the side whose queen gave the check loses the game on the spot,
+ * army intact. So a queen may never check, and a king hides from his own
+ * queen's sight as much as from the enemy's.
+ */
+export function loyaltyChess(): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'loyalty',
+    name: 'Loyalty Chess',
+    description:
+      'The king is jealous: if his queen checks the enemy king, he explodes in a rage and loses the game.',
+    rules: ['loyalty'],
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+    ],
+  }
+}
+
 /* ----------------------------------------------------------------- blank */
 
 export function blankVariant(width = 8, height = 8): Variant {
@@ -913,6 +938,12 @@ export const TEMPLATES: {
     name: 'Predator Chess',
     description: 'A queen that cannot resist the hunt',
     build: predatorChess,
+  },
+  {
+    id: 'loyalty',
+    name: 'Loyalty Chess',
+    description: 'A queen that checks dooms her own king',
+    build: loyaltyChess,
   },
 ]
 
