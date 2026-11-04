@@ -197,6 +197,8 @@ export type VariantRule =
   | 'noCastle'
   /** Predators must take the pawns and minor pieces they see, and come back when taken. */
   | 'predator'
+  /** A queen that looks the enemy king in the eye dooms her own king, which explodes. */
+  | 'loyalty'
 
 export interface Variant {
   schema: 1
@@ -319,6 +321,7 @@ export interface GameState {
     | 'race'
     | 'predator-kill'
     | 'predator-depletion'
+    | 'jealousy'
   /** Where the rolls of the random pieces stand, so a game can be rebuilt. */
   randomSeed?: number
 }

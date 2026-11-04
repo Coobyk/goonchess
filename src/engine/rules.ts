@@ -1507,6 +1507,49 @@ export function applyMove(
     }
   }
 
+  // Loyalty Chess: the king is jealous of his queen. A queen that looks the
+  // enemy king in the eye — whether she moved into the line or another piece
+  // stepped out of it — sends him into a rage, and he explodes where he
+  // stands. The army is spared: only the king goes up.
+  const jealousKings: string[] = []
+  if (next.variant.rules?.includes('loyalty')) {
+    const jealous = new Set<string>()
+    for (let y = 0; y < next.board.length; y++) {
+      const row = next.board[y]
+      for (let x = 0; x < row.length; x++) {
+        const id = row[x]
+        if (!id) continue
+        const queenInst = next.pieces[id]
+        if (!queenInst) continue
+        if (next.pieceTypes[queenInst.typeId]?.icon !== 'queen') continue
+        for (const eye of movesFor(next, x, y)) {
+          if (!eye.capturedId) continue
+          const prey = next.pieces[eye.capturedId]
+          if (!prey) continue
+          if (!next.pieceTypes[prey.typeId]?.flags.royal) continue
+          jealous.add(queenInst.team)
+          break
+        }
+      }
+    }
+    // Every jealous king goes up at once: if both queens found a king to
+    // look at on the same move, nobody is left to win the game.
+    for (const team of jealous) {
+      for (const id of Object.keys(next.pieces)) {
+        const doomed = next.pieces[id]
+        if (doomed.team !== team) continue
+        if (!next.pieceTypes[doomed.typeId]?.flags.royal) continue
+        const at = findPiece(next, id)
+        if (!at) continue
+        delete next.pieces[id]
+        next.board[at.y][at.x] = null
+        royalTeams.add(team)
+        jealousKings.push(team)
+        blasts.push({ x: at.x, y: at.y, radius: 1, victims: [{ x: at.x, y: at.y }] })
+      }
+    }
+  }
+
   // Predator bookkeeping: what the hunt did with this move.
   let kingTookPredator = false
   let predatorAtePrey: string | undefined
@@ -1593,6 +1636,7 @@ export function applyMove(
       royalTeams: [...royalTeams],
       kingTookPredator,
       predatorAtePrey,
+      jealousKings,
     })
   }
   return next
@@ -1772,9 +1816,26 @@ export function detectOutcome(
     royalTeams?: string[]
     kingTookPredator?: boolean
     predatorAtePrey?: string
+    jealousKings?: string[]
   } = {},
 ) {
   const { variant } = state
+
+  // Loyalty Chess: the king a queen doomed has blown up, and the game ends
+  // with him — whoever is left standing wins, if anyone is.
+  if (meta.jealousKings?.length) {
+    if (meta.jealousKings.length > 1) {
+      state.winner = 'draw'
+    } else if (meta.jealousKings[0] === mover) {
+      // The mover's own queen looked at the enemy king: the mover has lost.
+      state.winner = variant.teams.find((t) => t.id !== mover)?.id ?? 'draw'
+    } else {
+      // The other side's queen made the eye contact on this move.
+      state.winner = mover
+    }
+    state.status = 'jealousy'
+    return
+  }
 
   // Predator Chess: the hunt decides the game before anything else does.
   if (variant.winConditions.some((w) => w.kind === 'predator')) {
