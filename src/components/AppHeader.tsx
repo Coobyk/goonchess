@@ -208,18 +208,12 @@ export function AppHeader() {
               href="/"
               aria-label="Goonchess home"
               onClick={goHome}
-              className="shrink-0 transition-opacity hover:opacity-90"
+              className="flex shrink-0 items-center text-xl font-extrabold tracking-tight transition-opacity hover:opacity-90"
             >
-              <img
-                src="/logo_light.svg"
-                alt=""
-                className="h-8 w-auto dark:hidden"
-              />
-              <img
-                src="/logo_dark.svg"
-                alt=""
-                className="hidden h-8 w-auto dark:block"
-              />
+              Goon
+              <span className="ml-1 rounded-md bg-primary px-1.5 py-0.5 text-primary-foreground">
+                chess
+              </span>
             </a>
             <div className="hidden min-w-0 sm:block">
               <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
@@ -236,13 +230,25 @@ export function AppHeader() {
                 if (v) setView(v as 'play' | 'maker' | 'rulebook')
               }}
             >
-              <ToggleGroupItem value="play" aria-label="Play" className="gap-1.5 px-3 py-1.5">
+              <ToggleGroupItem
+                value="play"
+                aria-label="Play"
+                className="gap-1.5 px-3 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-none"
+              >
                 <Swords /> <span className="hidden sm:inline">Play</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="maker" aria-label="Maker" className="gap-1.5 px-3 py-1.5">
+              <ToggleGroupItem
+                value="maker"
+                aria-label="Maker"
+                className="gap-1.5 px-3 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-none"
+              >
                 <Wrench /> <span className="hidden sm:inline">Maker</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="rulebook" aria-label="Learn" className="gap-1.5 px-3 py-1.5">
+              <ToggleGroupItem
+                value="rulebook"
+                aria-label="Learn"
+                className="gap-1.5 px-3 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-none"
+              >
                 <BookOpen /> <span className="hidden sm:inline">Learn</span>
               </ToggleGroupItem>
             </ToggleGroup>

@@ -126,13 +126,13 @@ export function MakerBoard({ interactive = true }: { interactive?: boolean }) {
                 )}
 
                 {highlighted && (
-                  <span className="absolute inset-0 z-20 rounded-sm ring-2 ring-inset ring-sky-400/80" />
+                  <span className="absolute inset-0 z-20 rounded-sm ring-2 ring-inset ring-ring" />
                 )}
                 {isPending && (
                   <span className="absolute inset-0 z-20 animate-pulse ring-2 ring-inset ring-amber-400" />
                 )}
                 {isDropTarget && (
-                  <span className="absolute inset-0 z-20 bg-sky-400/25 ring-2 ring-inset ring-sky-400" />
+                  <span className="absolute inset-0 z-20 bg-primary/25 ring-2 ring-inset ring-ring" />
                 )}
               </button>
             )
