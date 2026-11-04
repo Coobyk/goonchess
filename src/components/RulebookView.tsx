@@ -243,32 +243,27 @@ export function RulebookView() {
   return (
     <div className="space-y-6">
       <PuzzlePanel />
-      <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 py-0 text-zinc-100 dark:from-zinc-900 dark:to-zinc-950">
+      <Card className="overflow-hidden py-0">
         <CardContent className="relative px-6 py-8 sm:px-8">
-          <div className="pointer-events-none absolute -right-16 -top-20 size-60 rounded-full bg-emerald-400/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 right-28 size-52 rounded-full bg-sky-400/10 blur-3xl" />
+          <div className="pointer-events-none absolute -right-16 -top-20 size-60 rounded-full bg-primary/10 blur-3xl" />
           <div className="relative max-w-3xl space-y-4">
-            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-400">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-primary">
               <BookOpen className="size-4" /> Learn
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{variant.name}</h1>
-              <p className="text-sm text-zinc-300 sm:text-base">
+              <p className="text-muted-foreground text-sm sm:text-base">
                 {variant.description ||
                   'A custom chess variant. Every rule on this page comes from the current setup.'}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
+              <Badge variant="secondary">
                 {board.width} × {board.height} board
               </Badge>
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
-                {teams.length} armies
-              </Badge>
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
-                {pieceTypes.length} piece types
-              </Badge>
-              <Badge variant="secondary" className="bg-white/10 text-zinc-100">
+              <Badge variant="secondary">{teams.length} armies</Badge>
+              <Badge variant="secondary">{pieceTypes.length} piece types</Badge>
+              <Badge variant="secondary">
                 {winConditions.length} win condition{winConditions.length === 1 ? '' : 's'}
               </Badge>
             </div>
@@ -279,7 +274,6 @@ export function RulebookView() {
               <Button
                 size="sm"
                 variant="secondary"
-                className="bg-white/10 text-zinc-100 hover:bg-white/20"
                 onClick={() => {
                   setMakerTab('rules')
                   setView('maker')
@@ -385,7 +379,7 @@ export function RulebookView() {
                       key={condition.id}
                       className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
                     >
-                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
+                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                         <ArrowRight className="size-3.5" />
                       </span>
                       <div className="min-w-0">
@@ -444,7 +438,7 @@ export function RulebookView() {
                       key={rule}
                       className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
                     >
-                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-sky-500/15 text-sky-500">
+                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                         <ArrowRight className="size-3.5" />
                       </span>
                       <div className="min-w-0">
@@ -504,7 +498,7 @@ export function RulebookView() {
                 return (
                   <div key={piece.id} className="rounded-xl border p-4">
                     <div className="flex items-start gap-4">
-                      <div className="grid size-12 shrink-0 place-items-center rounded-lg border bg-zinc-100">
+                      <div className="grid size-12 shrink-0 place-items-center rounded-lg border bg-muted">
                         <PieceGlyph piece={piece} teamIndex={teamForPiece(piece.id)} size={34} />
                       </div>
                       <div className="min-w-0 flex-1">
