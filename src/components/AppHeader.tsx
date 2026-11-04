@@ -208,14 +208,20 @@ export function AppHeader() {
               href="/"
               aria-label="Goonchess home"
               onClick={goHome}
-              className="grid size-9 shrink-0 place-items-center rounded-lg border bg-gradient-to-br from-zinc-800 to-zinc-950 shadow-sm transition-opacity hover:opacity-90"
+              className="shrink-0 transition-opacity hover:opacity-90"
             >
-              <img src="/logo.svg" alt="" className="size-7" />
+              <img
+                src="/logo_light.svg"
+                alt=""
+                className="h-8 w-auto dark:hidden"
+              />
+              <img
+                src="/logo_dark.svg"
+                alt=""
+                className="hidden h-8 w-auto dark:block"
+              />
             </a>
             <div className="hidden min-w-0 sm:block">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-semibold tracking-tight">Goonchess</span>
-              </div>
               <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
                 {variant.name}
               </p>
