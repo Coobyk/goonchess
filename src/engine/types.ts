@@ -199,6 +199,8 @@ export type VariantRule =
   | 'predator'
   /** A queen that looks the enemy king in the eye dooms her own king, which explodes. */
   | 'loyalty'
+  /** A piece may only capture pieces worth as much as itself or more. */
+  | 'hypergamy'
 
 export interface Variant {
   schema: 1

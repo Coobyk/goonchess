@@ -54,6 +54,7 @@ const RULES: VariantRule[] = [
   'noCastle',
   'predator',
   'loyalty',
+  'hypergamy',
 ]
 const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
 const SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']

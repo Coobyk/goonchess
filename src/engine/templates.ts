@@ -527,6 +527,32 @@ export function loyaltyChess(): Variant {
   }
 }
 
+/* ---------------------------------------------------------- hypergamy */
+
+/**
+ * Classic chess under a law of appetite: a piece may only take a piece worth
+ * as much as itself or more. A pawn can take anything, knights and bishops
+ * hunt each other, a rook reaches rooks and queens — and the queen, at the
+ * top of the order, can only ever be taken down by another queen. The king
+ * is beneath nobody and may always be captured, but he himself, worth
+ * nothing, can take no one.
+ */
+export function hypergamyChess(): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'hypergamy',
+    name: 'Hypergamy',
+    description:
+      'A piece may only capture pieces of equal or higher value: a pawn takes all, a queen only queens.',
+    rules: ['hypergamy'],
+    winConditions: [
+      { id: uid(), kind: 'checkmate' },
+      { id: uid(), kind: 'kingCapture' },
+    ],
+  }
+}
+
 /* ----------------------------------------------------------------- blank */
 
 export function blankVariant(width = 8, height = 8): Variant {
@@ -944,6 +970,12 @@ export const TEMPLATES: {
     name: 'Loyalty Chess',
     description: 'A queen that checks dooms her own king',
     build: loyaltyChess,
+  },
+  {
+    id: 'hypergamy',
+    name: 'Hypergamy',
+    description: 'Take only your equals or betters',
+    build: hypergamyChess,
   },
 ]
 
