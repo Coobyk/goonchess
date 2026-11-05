@@ -1,4 +1,4 @@
-import { applyMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank } from '../rules'
+import { applyMove, hasAnyLegalMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank } from '../rules'
 import { evaluate } from './evaluate'
 import { bookMove } from './book'
 import { enPassantSensitive, hashPosition, TABLE_SIZE, type Fingerprint } from './hash'
@@ -704,6 +704,27 @@ function moveName(move: Move) {
   return `${move.from.x},${move.from.y}->${move.finalTo.x},${move.finalTo.y}`
 }
 
+/**
+ * The move that ends the game at once, if there is one.
+ *
+ * A search that looks only one move deep scores the mate as a check and the
+ * taking of a rook as a rook, so left to itself it would rather take the
+ * rook. Asking the rules engine straight out whether the other side is left
+ * with no answer is cheap at the root, and it keeps even the shallowest bot
+ * from missing what is right in front of it.
+ */
+function immediateMate(state: GameState, ctx: SearchContext): Move | null {
+  if (!ctx.checkmateWins) return null
+  for (const move of allLegalMoves(state)) {
+    if (ctx.exclude?.has(moveName(move))) continue
+    const next = applyMove(state, move, { compute: false, search: true })
+    if (hasAnyLegalMove(next, next.turn)) continue
+    if (!isInCheck(next, next.turn)) continue
+    return move
+  }
+  return null
+}
+
 /** Picks the move to play, given a level and the position. */
 export function searchBestMove(state: GameState, options: SearchOptions): SearchResult {
   const profile = LEVELS[options.level]
@@ -765,6 +786,20 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   }
 
   ctx.tt.beginRound()
+  // A mate in one is worth seeing at every level, however shallow the search
+  // runs: the deepening search only finds it at depth two and above, and a
+  // one-move look on its own sees the check but not the mate.
+  const mate = immediateMate(state, ctx)
+  if (mate) {
+    return {
+      move: mate,
+      score: MATE - 1,
+      line: [mate],
+      depth: 1,
+      nodes: ctx.nodes,
+      elapsedMs: performance.now() - started,
+    }
+  }
   for (let d = 1; d <= profile.maxDepth; d++) {
     const results = searchRoot(state, d, ctx)
     if (ctx.aborted || !results.length) break

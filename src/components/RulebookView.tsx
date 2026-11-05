@@ -99,6 +99,10 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
     name: 'Loyalty',
     hint: 'The king is jealous of his queen. If she looks the enemy king in the eye — however the line opened — he explodes where he stands, and her side loses the game on the spot.',
   },
+  hypergamy: {
+    name: 'Hypergamy',
+    hint: 'A piece may only take a piece worth as much as itself or more. A pawn takes anything, knights and bishops hunt each other, a rook reaches rooks and queens — and the queen can only ever be taken down by another queen. The king is beneath nobody: every piece may take him, but he, worth nothing, can take no one.',
+  },
 }
 
 const TURN_VIEW_COPY = {

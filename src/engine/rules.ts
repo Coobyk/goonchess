@@ -228,6 +228,7 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
   const { variant } = state
   const geo = geometryFor(variant)
   const atomic = variant.rules?.includes('atomic')
+  const hypergamy = variant.rules?.includes('hypergamy')
   const pieceId = state.board[y]?.[x]
   if (!pieceId) return []
   const inst = state.pieces[pieceId]
@@ -286,6 +287,14 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     if (!allowCapture && mode === 'move') return
     const occPiece = state.pieceTypes[occInst.typeId]
     if (occPiece?.flags.uncapturable) return
+    // Hypergamy: a piece only ever takes its equals or its betters — a pawn
+    // takes anything, a queen only another queen. The king, worth nothing,
+    // can take no one; and a royal piece is beneath nobody, so the king
+    // himself may always be captured, whoever asks.
+    if (hypergamy && occPiece) {
+      if (piece.flags.royal && !occPiece.flags.royal) return
+      if (!occPiece.flags.royal && occPiece.value < piece.value) return
+    }
     // Atomic: a king's capture would set off the blast on top of the king
     // itself, so no king ever takes anything.
     if (atomic && piece.flags.royal) return
@@ -494,6 +503,11 @@ function enPassantMove(
   if (!jumped || jumped.team === inst.team) return null
   const jumpedPiece = state.pieceTypes[jumped.typeId]
   if (!jumpedPiece?.flags.enPassant || jumpedPiece.flags.uncapturable) return null
+  // The same law of appetite holds over the skipped square.
+  if (state.variant.rules?.includes('hypergamy')) {
+    if (piece.flags.royal && !jumpedPiece.flags.royal) return null
+    if (!jumpedPiece.flags.royal && jumpedPiece.value < piece.value) return null
+  }
 
   const dx = previous.finalTo.x - previous.from.x
   const dy = previous.finalTo.y - previous.from.y
