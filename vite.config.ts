@@ -28,6 +28,7 @@ export default defineConfig({
   // `npm run dev` is the UI; `npm run worker` serves the API on 8787. Anything
   // under /api is the Worker's, everything else stays with Vite.
   server: {
+    host: '0.0.0.0',
     proxy: {
       '/api': 'http://127.0.0.1:8787',
     },
