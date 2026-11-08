@@ -24,8 +24,14 @@ export interface LevelProfile {
   quiescence: number
   /** How much worse a move may be than the best one, in centipawns. */
   slop: number
-  /** Chance of playing a random legal move instead of a good one. */
+  /** Chance of playing a random move instead of the best one. */
   randomness: number
+  /**
+   * How much worse than the best move a random move may be, in centipawns.
+   * A queen is worth 900, so a limit under that keeps the bot from throwing
+   * its pieces away. Infinity means any legal move (Casual, on purpose).
+   */
+  randomSlop: number
   /** The shortest time the bot may take, so it does not answer instantly. */
   minThinkMs: number
 }
@@ -37,6 +43,7 @@ export const LEVELS: Record<BotLevel, LevelProfile> = {
     quiescence: 0,
     slop: 120,
     randomness: 0.25,
+    randomSlop: Infinity,
     minThinkMs: 350,
   },
   normal: {
@@ -45,6 +52,7 @@ export const LEVELS: Record<BotLevel, LevelProfile> = {
     quiescence: 2,
     slop: 25,
     randomness: 0.05,
+    randomSlop: 100,
     minThinkMs: 450,
   },
   strong: {
@@ -53,6 +61,7 @@ export const LEVELS: Record<BotLevel, LevelProfile> = {
     quiescence: 3,
     slop: 0,
     randomness: 0,
+    randomSlop: 0,
     minThinkMs: 500,
   },
 }
@@ -829,13 +838,16 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   // one now and then, so it does not feel like a machine. An analysis always
   // reports the best line.
   let chosen = sorted[0]
-  if (!options.analyze && profile.randomness > 0 && random() < profile.randomness) {
+  const wantsRandom =
+    !options.analyze && profile.randomness > 0 && random() < profile.randomness
+  if (wantsRandom && profile.randomSlop === Infinity) {
+    // Casual stays careless on purpose: any legal move will do.
     const any = allLegalMoves(state).filter((m) => !ctx.exclude?.has(moveName(m)))
     if (any.length) chosen = { move: any[Math.floor(random() * any.length)], score: 0 }
-  } else if (!options.analyze && profile.slop > 0 && sorted.length > 1) {
+  } else if (wantsRandom || (!options.analyze && profile.slop > 0 && sorted.length > 1)) {
     // The scores of the moves that were cut off are only upper bounds, so the
     // shortlist is scored properly before a near miss is picked.
-    const shortlist = sorted.slice(0, 6)
+    const shortlist = sorted.slice(0, wantsRandom ? 10 : 6)
     ctx.aborted = false
     ctx.deadline = performance.now() + 600
     const exact = shortlist.map((entry) => ({
@@ -843,7 +855,10 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
       score: scoreMove(state, entry.move, depth, ctx),
     }))
     const best = exact.reduce((a, b) => (b.score > a.score ? b : a))
-    const pool = exact.filter((entry) => entry.score >= best.score - profile.slop)
+    // A random move is still a move among the good ones: a careless bot may
+    // miss the best move, but it does not give away a queen for nothing.
+    const limit = wantsRandom ? profile.randomSlop : profile.slop
+    const pool = exact.filter((entry) => entry.score >= best.score - limit)
     chosen = pool[Math.floor(random() * pool.length)]
   }
 
