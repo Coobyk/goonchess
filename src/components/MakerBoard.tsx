@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { TerrainOverlay } from './TerrainOverlay'
 import { BoardShell, tileBackground } from './BoardShell'
-import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
+import { PieceGlyph } from './PieceGlyph'
+import { boardCellSize, useElementWidth } from '@/lib/boardMetrics'
+import { PIECE_DRAG_TYPE } from '@/lib/dnd'
 import { useAppStore } from '@/store/useAppStore'
 import { cn } from '@/lib/utils'
-
-export const PIECE_DRAG_TYPE = 'application/x-goonchess-piece'
 
 export function MakerBoard({ interactive = true }: { interactive?: boolean }) {
   const variant = useAppStore((s) => s.variant)
@@ -108,13 +109,7 @@ export function MakerBoard({ interactive = true }: { interactive?: boolean }) {
                 )}
                 style={{ backgroundColor: tileBackground(x, y) }}
               >
-                {tile?.terrain === 'wall' && (
-                  <span className="absolute inset-0 bg-foreground/25 [background-image:repeating-linear-gradient(45deg,transparent_0_5px,rgba(0,0,0,0.25)_5px_7px)]" />
-                )}
-                {tile?.terrain === 'void' && <span className="absolute inset-0 bg-black/75" />}
-                {(tile?.terrain === 'portal' || tile?.terrain === 'oneway') && (
-                  <span className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.55),rgba(56,189,248,0.12)_60%,transparent_72%)]" />
-                )}
+                <TerrainOverlay terrain={tile?.terrain} />
                 {tile?.terrain === 'oneway' && (
                   <span className="absolute left-0.5 top-0.5 z-10 font-mono text-[9px] text-cyan-200">1→</span>
                 )}

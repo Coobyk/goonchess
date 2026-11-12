@@ -1,9 +1,9 @@
 import { Copy, Layers, Plus, Trash2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
-import type { Effect, MovePattern, PieceArt, PieceIcon, PieceType, Vec } from '@/engine/types'
+import type { Effect, MovePattern, PieceArt, PieceIcon, PieceType } from '@/engine/types'
 import { PIECE_ICONS } from '@/engine/types'
-import { leaper, slider } from '@/engine/templates'
+import { ALL8, classicChess, DIAG, KNIGHT, leaper, ORTH, slider } from '@/engine/templates'
 import { uid } from '@/engine/rules'
 import { useAppStore } from '@/store/useAppStore'
 import { PatternGrid } from './PatternGrid'
@@ -21,42 +21,12 @@ import { Slider } from './ui/slider'
 import { Switch } from './ui/switch'
 import { cn } from '@/lib/utils'
 
-const KNIGHT: Vec[] = [
-  { x: 1, y: 2 },
-  { x: 2, y: 1 },
-  { x: 2, y: -1 },
-  { x: 1, y: -2 },
-  { x: -1, y: -2 },
-  { x: -2, y: -1 },
-  { x: -2, y: 1 },
-  { x: -1, y: 2 },
-]
-const ORTH: Vec[] = [
-  { x: 1, y: 0 },
-  { x: -1, y: 0 },
-  { x: 0, y: 1 },
-  { x: 0, y: -1 },
-]
-const DIAG: Vec[] = [
-  { x: 1, y: 1 },
-  { x: 1, y: -1 },
-  { x: -1, y: 1 },
-  { x: -1, y: -1 },
-]
-const ALL8: Vec[] = [...ORTH, ...DIAG]
-
-const TEMPLATE_PIECES: { label: string; build: () => Partial<PieceType> }[] = [
-  { label: 'King', build: () => ({ name: 'King', icon: 'king', value: 0, move: [leaper(ALL8)], flags: { royal: true } as PieceType['flags'] }) },
-  { label: 'Queen', build: () => ({ name: 'Queen', icon: 'queen', value: 9, move: [slider(ALL8)] }) },
-  { label: 'Rook', build: () => ({ name: 'Rook', icon: 'rook', value: 5, move: [slider(ORTH)] }) },
-  { label: 'Bishop', build: () => ({ name: 'Bishop', icon: 'bishop', value: 3, move: [slider(DIAG)] }) },
-  { label: 'Knight', build: () => ({ name: 'Knight', icon: 'knight', value: 3, move: [leaper(KNIGHT)], flags: { jump: true } as PieceType['flags'] }) },
-  { label: 'Pawn', build: () => {
-    const dbl = slider([{ x: 0, y: -1 }], 2)
-    dbl.firstMoveOnly = true
-    return { name: 'Pawn', icon: 'pawn', value: 1, move: [leaper([{ x: 0, y: -1 }]), dbl], capture: [leaper([{ x: -1, y: -1 }, { x: 1, y: -1 }])] }
-  } },
-]
+/** The six classic pieces, as quick-add templates — the same definitions the
+ * classic variant is built from. */
+const TEMPLATE_PIECES = classicChess().pieceTypes.map((piece) => ({
+  label: piece.name,
+  build: () => ({ ...piece }),
+}))
 
 export function PiecesTab() {
   const variant = useAppStore((s) => s.variant)

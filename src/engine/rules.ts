@@ -1,6 +1,5 @@
 import type {
   Blast,
-  Effect,
   GameState,
   Move,
   MovePattern,
@@ -12,10 +11,11 @@ import type {
   Vec,
 } from './types'
 import { positionKey } from './repetition'
+import { nextSeed } from './rand'
+import { SAN_LETTERS } from './types'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
-export const opposite = (v: Vec): Vec => ({ x: v.x, y: v.y })
 
 export function inBounds(board: { width: number; height: number }, x: number, y: number) {
   return x >= 0 && y >= 0 && x < board.width && y < board.height
@@ -102,14 +102,6 @@ export function squareName(variant: Variant, x: number, y: number) {
 }
 
 /** Resolves a portal / one-way tile in a single hop. Portals never chain. */
-export function resolvePortals(variant: Variant, x: number, y: number): Vec | null {
-  const geo = geometryFor(variant)
-  if (x < 0 || y < 0 || x >= geo.width || y >= geo.height) return null
-  const index = geo.portal[y * geo.width + x]
-  if (index < 0) return null
-  return { x: index % geo.width, y: (index / geo.width) | 0 }
-}
-
 function isBlocking(tile: Tile | null) {
   return !tile || tile.terrain === 'void' || tile.terrain === 'wall'
 }
@@ -579,8 +571,16 @@ export function findPiece(state: GameState, pieceId: string): Vec | null {
   return null
 }
 
+/** Whether a team still has pieces standing at all. */
+export function teamHasPieces(state: GameState, teamId: string): boolean {
+  for (const id in state.pieces) {
+    if (state.pieces[id].team === teamId) return true
+  }
+  return false
+}
+
 /** Whether a team still has a royal piece standing. */
-function teamHasRoyal(state: GameState, teamId: string): boolean {
+export function teamHasRoyal(state: GameState, teamId: string): boolean {
   for (const id in state.pieces) {
     const inst = state.pieces[id]
     if (inst.team !== teamId) continue
@@ -629,7 +629,7 @@ function captureIsForced(state: GameState, teamId: string): boolean {
 /* --------------------------------------------------------------- predator */
 
 /** The pieces a Predator hunts: pawns and the minor pieces. */
-export function isPredatorPrey(piece: PieceType | undefined): boolean {
+function isPredatorPrey(piece: PieceType | undefined): boolean {
   return piece?.icon === 'pawn' || piece?.icon === 'knight' || piece?.icon === 'bishop'
 }
 
@@ -709,7 +709,7 @@ export function rollRandomPieces(state: GameState, exceptPieceId?: string): Game
   let seed = (state.randomSeed ?? variant.randomSeed ?? 1) >>> 0
   const roll = () => {
     // A small, well-spread random number generator.
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+    seed = nextSeed(seed)
     return seed / 4294967296
   }
 
@@ -788,7 +788,7 @@ function slaysPredator(state: GameState, move: Move): boolean {
   return takesPredator(state, move)
 }
 
-export function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
+function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
   const pieceId = state.board[y]?.[x]
   if (!pieceId) return []
   const inst = state.pieces[pieceId]
@@ -1013,7 +1013,7 @@ function collectDrops(
     if ((hand[typeId] ?? 0) <= 0) continue
     const type = state.pieceTypes[typeId]
     if (!type) continue
-    const pawn = type.name === 'Pawn'
+    const pawn = type.icon === 'pawn'
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         if (state.board[y][x] !== null) continue
@@ -1248,12 +1248,12 @@ function respawnSquare(state: GameState, predatorId: string): Vec | null {
   if (!empties.length) return null
   // The seed moves on with every draw, as the rolls of the random pieces do.
   let seed = (state.randomSeed ?? state.variant.randomSeed ?? 1) >>> 0
-  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+  seed = nextSeed(seed)
   state.randomSeed = seed
   return empties[seed % empties.length]
 }
 
-interface ApplyOptions {
+export interface ApplyOptions {
   compute?: boolean
   /** Where the player released a dragged piece, in board units. */
   origin?: Vec
@@ -1372,7 +1372,7 @@ export function applyMove(
     // move — a dropped rook, among them, never castles.
     const forward = teamById(next.variant, inst.team)?.forward ?? 'up'
     const secondRank = forward === 'down' ? 1 : next.variant.board.height - 2
-    next.pieces[move.pieceId].hasMoved = !(piece.name === 'Pawn' && fy === secondRank)
+    next.pieces[move.pieceId].hasMoved = !(piece.icon === 'pawn' && fy === secondRank)
   } else {
     next.pieces[move.pieceId].hasMoved = true
   }
@@ -1415,7 +1415,7 @@ export function applyMove(
         if (!oInst) continue
         const oPiece = next.pieceTypes[oInst.typeId]
         // Pawns shrug off the blast; everything else is destroyed.
-        if (oPiece?.name === 'Pawn') continue
+        if (oPiece?.icon === 'pawn') continue
         if (oPiece?.flags.royal) royalTeams.add(oInst.team)
         if (oInst.team !== inst.team) {
           if (!options.search) {
@@ -1684,17 +1684,6 @@ function notationFor(
   return `${piece.name} ${from}${cap}${to}${promotion}${roll}${enPassant}${suffix}`
 }
 
-/* ------------------------------------------------------- algebraic notation */
-
-const SAN_LETTERS: Record<string, string> = {
-  king: 'K',
-  queen: 'Q',
-  rook: 'R',
-  bishop: 'B',
-  knight: 'N',
-  pawn: 'P',
-}
-
 /**
  * The move in algebraic notation — "Nf3", "exd5", "O-O", "e8=Q+".
  *
@@ -1822,7 +1811,7 @@ export function royalOnFarRank(state: GameState, teamId: string): boolean {
   return false
 }
 
-export function detectOutcome(
+function detectOutcome(
   state: GameState,
   mover: string,
   meta: {
@@ -1929,7 +1918,7 @@ export function detectOutcome(
     if (wc.kind !== 'elimination') continue
     for (const team of variant.teams) {
       if (team.id === mover) continue
-      const alive = Object.values(state.pieces).some((p) => p.team === team.id)
+      const alive = teamHasPieces(state, team.id)
       if (!alive) {
         state.winner = mover
         state.status = 'eliminated'
@@ -2015,6 +2004,3 @@ export function detectOutcome(
   }
 }
 
-export function cloneEffects(effects: Effect[]): Effect[] {
-  return effects.map((e) => ({ ...e }))
-}

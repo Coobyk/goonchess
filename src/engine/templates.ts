@@ -1,3 +1,4 @@
+import { defaultPieceFlags } from './types'
 import type {
   BoardConfig,
   MovePattern,
@@ -11,20 +12,20 @@ import type {
 } from './types'
 import { uid } from './rules'
 
-const ORTH: Vec[] = [
+export const ORTH: Vec[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ]
-const DIAG: Vec[] = [
+export const DIAG: Vec[] = [
   { x: 1, y: 1 },
   { x: 1, y: -1 },
   { x: -1, y: 1 },
   { x: -1, y: -1 },
 ]
-const ALL8: Vec[] = [...ORTH, ...DIAG]
-const KNIGHT: Vec[] = [
+export const ALL8: Vec[] = [...ORTH, ...DIAG]
+export const KNIGHT: Vec[] = [
   { x: 1, y: 2 },
   { x: 2, y: 1 },
   { x: 2, y: -1 },
@@ -35,7 +36,7 @@ const KNIGHT: Vec[] = [
   { x: -1, y: 2 },
 ]
 
-export function emptyBoard(width: number, height: number): BoardConfig {
+function emptyBoard(width: number, height: number): BoardConfig {
   const tiles: Tile[][] = Array.from({ length: height }, () =>
     Array.from({ length: width }, () => ({ terrain: 'normal' as Terrain })),
   )
@@ -50,7 +51,7 @@ export function slider(vectors: Vec[], maxRange = 0, id = uid()): MovePattern {
   return { id, kind: 'slider', vectors, maxRange }
 }
 
-export function makePiece(
+function makePiece(
   partial: Omit<Partial<PieceType>, 'flags'> & { name: string; flags?: Partial<PieceFlags> },
 ): PieceType {
   return {
@@ -61,19 +62,7 @@ export function makePiece(
     value: partial.value ?? 1,
     move: partial.move ?? [leaper(ALL8)],
     capture: partial.capture ?? [],
-    flags: {
-      jump: false,
-      mustCapture: false,
-      uncapturable: false,
-      royal: false,
-      movesOnce: false,
-      random: false,
-      mirror: true,
-      enPassant: false,
-      dice: false,
-      predator: false,
-      ...partial.flags,
-    },
+    flags: defaultPieceFlags(partial.flags),
     effects: partial.effects ?? [],
     promotion: partial.promotion ?? null,
   }
@@ -749,14 +738,14 @@ export function threeCheck(): Variant {
 export function antichess(): Variant {
   const base = classicChess()
   const pieceTypes = base.pieceTypes.map((piece) => {
-    if (piece.name === 'King') {
+    if (piece.icon === 'king') {
       // The king is a piece like any other: it can be taken, and taking it
       // ends nothing.
       return { ...piece, flags: { ...piece.flags, royal: false } }
     }
-    if (piece.name === 'Pawn') {
+    if (piece.icon === 'pawn') {
       // Anything at all, the king among them — it is just a piece here.
-      const targets = base.pieceTypes.filter((p) => p.name !== 'Pawn').map((p) => p.id)
+      const targets = base.pieceTypes.filter((p) => p.icon !== 'pawn').map((p) => p.id)
       return { ...piece, promotion: { typeIds: targets } }
     }
     return piece
@@ -782,7 +771,7 @@ export function antichess(): Variant {
  */
 export function horde(): Variant {
   const base = classicChess()
-  const pawn = base.pieceTypes.find((p) => p.name === 'Pawn')!
+  const pawn = base.pieceTypes.find((p) => p.icon === 'pawn')!
   const setup = base.setup.filter((s) => s.team !== 'white')
   for (let y = 4; y <= 7; y++) {
     for (let x = 0; x < 8; x++) setup.push({ typeId: pawn.id, team: 'white', x, y })

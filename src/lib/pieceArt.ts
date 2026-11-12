@@ -12,7 +12,14 @@
 
 import type { ArtShape, PieceArt, PieceArtLayer, PieceIcon } from '@/engine/types'
 
-export const ART_SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']
+export const ART_SHAPES: ArtShape[] = Object.keys({
+  king: 0,
+  queen: 0,
+  rook: 0,
+  bishop: 0,
+  knight: 0,
+  pawn: 0,
+} satisfies Record<ArtShape, number>) as ArtShape[]
 
 export const ART_SHAPE_LABELS: Record<ArtShape, string> = {
   king: 'King',

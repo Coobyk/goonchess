@@ -5,6 +5,42 @@ export interface Vec {
 
 export const vecKey = (v: Vec) => `${v.x},${v.y}`
 
+/** The smallest and largest board the Maker allows — the client clamps to
+ * these and the server rejects outside them. */
+export const BOARD_MIN = 3
+export const BOARD_MAX = 16
+
+/** The point target a fresh "points" win condition starts on. */
+export const DEFAULT_POINT_TARGET = 20
+
+/** A die has six sides — a dice piece rolls one of these. */
+export const DICE_SIDES = 6
+
+/** The "square" a pocket piece is held on: outside any real board, so a drop
+ * knows it comes from the hand and not from a square. */
+export const POCKET_SQUARE: Vec = { x: -1, y: -1 }
+export const isPocketSquare = (v: Vec): boolean => v.x === POCKET_SQUARE.x && v.y === POCKET_SQUARE.y
+
+/** The letter a piece icon writes in SAN and FEN notation. */
+export const SAN_LETTERS: Partial<Record<PieceIcon, string>> = {
+  king: 'K',
+  queen: 'Q',
+  rook: 'R',
+  bishop: 'B',
+  knight: 'N',
+  pawn: 'P',
+}
+
+/** The icon a capital FEN letter names. */
+export const ICON_BY_LETTER: Record<string, PieceIcon> = {
+  K: 'king',
+  Q: 'queen',
+  R: 'rook',
+  B: 'bishop',
+  N: 'knight',
+  P: 'pawn',
+}
+
 /* ------------------------------------------------------------------ board */
 
 export type Terrain = 'normal' | 'void' | 'wall' | 'portal' | 'oneway'
@@ -44,15 +80,40 @@ export type PieceIcon =
   | 'pawn'
   | 'custom'
 
-export const PIECE_ICONS: { id: PieceIcon; label: string }[] = [
-  { id: 'king', label: 'King' },
-  { id: 'queen', label: 'Queen' },
-  { id: 'rook', label: 'Rook' },
-  { id: 'bishop', label: 'Bishop' },
-  { id: 'knight', label: 'Knight' },
-  { id: 'pawn', label: 'Pawn' },
-  { id: 'custom', label: 'Letter / Symbol' },
-]
+export const PIECE_ICON_LABELS: Record<PieceIcon, string> = {
+  king: 'King',
+  queen: 'Queen',
+  rook: 'Rook',
+  bishop: 'Bishop',
+  knight: 'Knight',
+  pawn: 'Pawn',
+  custom: 'Letter / Symbol',
+}
+
+export const PIECE_ICONS: { id: PieceIcon; label: string }[] = (
+  Object.entries(PIECE_ICON_LABELS) as [PieceIcon, string][]
+).map(([id, label]) => ({ id, label }))
+
+/**
+ * The fields a move can be asked to match against: a click on a square, a
+ * move the bot chose, or a message over the wire. Only the fields the intent
+ * carries count toward the match.
+ */
+export interface MoveIntent {
+  to?: Vec
+  finalTo?: Vec
+  pieceId?: string
+  drop?: { typeId: string }
+}
+
+export function intentMatches(move: Move, intent: MoveIntent): boolean {
+  if (intent.to && (move.to.x !== intent.to.x || move.to.y !== intent.to.y)) return false
+  if (intent.finalTo && (move.finalTo.x !== intent.finalTo.x || move.finalTo.y !== intent.finalTo.y))
+    return false
+  if (intent.pieceId !== undefined && move.pieceId !== intent.pieceId) return false
+  if (intent.drop && move.drop?.typeId !== intent.drop.typeId) return false
+  return true
+}
 
 /** The shapes a piece can be drawn from. */
 export type ArtShape = 'king' | 'queen' | 'rook' | 'bishop' | 'knight' | 'pawn'
@@ -116,6 +177,29 @@ export interface PieceFlags {
    * it for good.
    */
   predator: boolean
+}
+
+/** What a fresh piece gets — everything off but mirror, which makes a custom
+ * move symmetric by default. */
+export function defaultPieceFlags(partial?: Partial<PieceFlags>): PieceFlags {
+  return {
+    jump: false,
+    mustCapture: false,
+    uncapturable: false,
+    royal: false,
+    movesOnce: false,
+    mirror: true,
+    enPassant: false,
+    dice: false,
+    random: false,
+    predator: false,
+    ...partial,
+  }
+}
+
+/** Compile-time "impossible": an exhaustive switch calls it on the rest. */
+export function assertNever(value: never): never {
+  throw new Error(`unexpected value: ${String(value)}`)
 }
 
 export type Effect =

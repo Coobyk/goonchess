@@ -135,6 +135,11 @@ function LibraryMenuItems({
   )
 }
 
+const BLANK_BOARDS: { size: number; toast: string }[] = [
+  { size: 8, toast: 'Blank board' },
+  { size: 12, toast: 'Blank 12×12' },
+]
+
 export function AppHeader() {
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
@@ -266,14 +271,15 @@ export function AppHeader() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>New</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}>
-                    <Plus className="text-muted-foreground" />
-                    Blank 8×8 board
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(12, 12), 'Blank 12×12')}>
-                    <Plus className="text-muted-foreground" />
-                    Blank 12×12 board
-                  </DropdownMenuItem>
+                  {BLANK_BOARDS.map(({ size, toast }) => (
+                    <DropdownMenuItem
+                      key={size}
+                      onClick={() => loadTemplate(() => blankVariant(size, size), toast)}
+                    >
+                      <Plus className="text-muted-foreground" />
+                      Blank {size}×{size} board
+                    </DropdownMenuItem>
+                  ))}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setLibraryOpen(true)}>
                     <Library className="text-muted-foreground" />
@@ -375,14 +381,15 @@ export function AppHeader() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[calc(100vw-1.5rem)] max-w-sm p-1.5">
                 <LibrarySectionLabel>New</LibrarySectionLabel>
-                <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(8, 8), 'Blank board')}>
-                  <Plus className="text-muted-foreground" />
-                  Blank 8×8 board
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => loadTemplate(() => blankVariant(12, 12), 'Blank 12×12')}>
-                  <Plus className="text-muted-foreground" />
-                  Blank 12×12 board
-                </DropdownMenuItem>
+                {BLANK_BOARDS.map(({ size, toast }) => (
+                  <DropdownMenuItem
+                    key={size}
+                    onClick={() => loadTemplate(() => blankVariant(size, size), toast)}
+                  >
+                    <Plus className="text-muted-foreground" />
+                    Blank {size}×{size} board
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuItem
                   onClick={() => {
                     setMakerTab('board')

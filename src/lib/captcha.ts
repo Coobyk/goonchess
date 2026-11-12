@@ -47,6 +47,7 @@ export function captchaMessage(code: string): string {
     case 'expired':
       return 'The check took too long. Try again.'
     case 'bad_variant':
+    case 'needs_two_teams':
       return 'This variant cannot be played online — online games need exactly two teams.'
     default:
       return 'Could not create a link. Try again.'

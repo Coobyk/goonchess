@@ -1,4 +1,4 @@
-import type { GameState, Move } from './types'
+import type { GameState, Move, Vec } from './types'
 
 /**
  * The identity of a position.
@@ -32,11 +32,12 @@ export function positionKey(state: GameState): string {
     rows.push(row)
   }
 
+  const ep = enPassantRight(state)
   const parts: (string | number)[] = [
     rows.join('/'),
     teamIndex.get(state.turn) ?? 0,
     castlingRights(state),
-    enPassantRight(state),
+    ep ? `${ep.x},${ep.y}` : '-',
   ]
   // Three-Check: two positions with the same pieces are different games when
   // the checks have been counted differently. Every other game keeps the
@@ -66,7 +67,7 @@ export function positionKey(state: GameState): string {
 }
 
 /** Which castles are still possible. */
-function castlingRights(state: GameState): string {
+export function castlingRights(state: GameState): string {
   const { variant } = state
   const out: string[] = []
   for (const team of variant.teams) {
@@ -87,38 +88,56 @@ function castlingRights(state: GameState): string {
     if (Math.min(...rooks) < variant.board.width / 2) out.push(upper ? 'Q' : 'q')
     if (Math.max(...rooks) >= variant.board.width / 2) out.push(upper ? 'K' : 'k')
   }
-  return out.join('') || '-'
+  // The rights are written in the usual order: KQkq.
+  return 'KQkq'.split('').filter((c) => out.includes(c)).join('') || '-'
 }
 
-/** The square an en passant capture would land on, if one is possible. */
-function enPassantRight(state: GameState): string {
+/**
+ * The square an en passant capture would land on, if one is possible right
+ * now. Position keys, FEN output and the search's hash all ask this, so it
+ * lives once — a taker beside the landing square, belonging to the side to
+ * move and carrying the same `enPassant` flag the capture rule checks.
+ */
+/**
+ * The square a double push skipped over, written into a FEN whether or not
+ * a capture is waiting for it — FEN records the target, not the capture.
+ */
+export function enPassantTarget(state: GameState): Vec | null {
   const last = state.moveHistory[state.moveHistory.length - 1]
-  if (!last) return '-'
-  const piece = state.pieceTypes[state.pieces[last.move.pieceId]?.typeId ?? '']
-  if (piece?.icon !== 'pawn') return '-'
+  if (!last) return null
+  const dx = last.move.finalTo.x - last.move.from.x
   const dy = last.move.finalTo.y - last.move.from.y
-  if (Math.abs(dy) !== 2) return '-'
-  const x = last.move.finalTo.x
-  const y = last.move.finalTo.y - Math.sign(dy)
-  // Only an enemy pawn that stands diagonally next to it can take en passant.
-  for (const dx of [-1, 1]) {
-    for (const dy2 of [-1, 1]) {
-      const nx = x + dx
-      const ny = y + dy2
-      if (nx < 0 || nx >= state.variant.board.width) continue
-      if (ny < 0 || ny >= state.variant.board.height) continue
-      const id = state.board[ny][nx]
-      if (!id) continue
-      const inst = state.pieces[id]
-      // Only the side that is to move now can take en passant.
-      if (inst.team !== state.turn) continue
-      if (state.pieceTypes[inst.typeId]?.icon === 'pawn') return `${x},${y}`
-    }
-  }
-  return '-'
+  if (Math.abs(dx) + Math.abs(dy) !== 2 || (dx !== 0 && dy !== 0)) return null
+  const jumped = state.pieces[last.move.pieceId]
+  const jumpedPiece = jumped ? state.pieceTypes[jumped.typeId] : undefined
+  if (!jumpedPiece?.flags.enPassant) return null
+  return { x: last.move.from.x + dx / 2, y: last.move.from.y + dy / 2 }
 }
 
-function findSquare(state: GameState, pieceId: string) {
+export function enPassantRight(state: GameState): Vec | null {
+  const last = state.moveHistory[state.moveHistory.length - 1]
+  if (!last) return null
+  const dx = last.move.finalTo.x - last.move.from.x
+  const dy = last.move.finalTo.y - last.move.from.y
+  // Only a straight two-square crossing leaves a square to capture onto.
+  if (Math.abs(dx) + Math.abs(dy) !== 2 || (dx !== 0 && dy !== 0)) return null
+  const jumped = state.pieces[last.move.pieceId]
+  const jumpedPiece = jumped ? state.pieceTypes[jumped.typeId] : undefined
+  if (!jumpedPiece?.flags.enPassant || jumpedPiece.flags.uncapturable) return null
+  const skipped = { x: last.move.from.x + dx / 2, y: last.move.from.y + dy / 2 }
+  if (state.board[skipped.y]?.[skipped.x]) return null
+  // The taker stands right beside the jumped piece after it lands.
+  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    const id = state.board[last.move.finalTo.y + oy]?.[last.move.finalTo.x + ox]
+    if (!id) continue
+    const inst = state.pieces[id]
+    if (inst.team !== state.turn) continue
+    if (state.pieceTypes[inst.typeId]?.flags.enPassant) return skipped
+  }
+  return null
+}
+
+export function findSquare(state: GameState, pieceId: string) {
   for (let y = 0; y < state.board.length; y++) {
     const x = state.board[y].indexOf(pieceId)
     if (x >= 0) return { x, y }

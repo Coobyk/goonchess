@@ -1,5 +1,8 @@
-import type { GameState, Variant, Vec } from '@/engine/types'
-import type { ClockSettings, ClockState } from '@/lib/clock'
+import type { Variant } from '@/engine/types'
+import type { ClockSettings } from '@/lib/clock'
+import type { ClientMessage, ServerMessage } from '@/lib/protocol'
+
+export type { ChatLine, OfferKind, ServerMessage } from '@/lib/protocol'
 
 /**
  * The HTTP and socket side of a shared game.
@@ -8,62 +11,6 @@ import type { ClockSettings, ClockState } from '@/lib/clock'
  * the link is the only thing that has to travel. Nothing here knows the rules:
  * the server validates every move, and this file only carries intent and state.
  */
-
-export interface RoomInfo {
-  code: string
-  name: string
-  seats: [boolean, boolean]
-  started: boolean
-  over: boolean
-  width: number
-  height: number
-}
-
-export interface MoveIntent {
-  from: Vec
-  to: Vec
-  finalTo: Vec
-  roll?: number
-  promotionTypeId?: string
-  origin?: Vec
-}
-
-export type OfferKind = 'undo' | 'rematch'
-
-export interface ChatLine {
-  from: number
-  text: string
-  at: number
-}
-
-export type ServerMessage =
-  | {
-      t: 'hello'
-      you: { seat: number | null; token: string | null }
-      variant: Variant
-      game: GameState | null
-      /** The time control the room enforces, and where it stands. */
-      clock: ClockSettings
-      clockState: ClockState | null
-      seats: boolean[]
-      started: boolean
-      name: string
-      teams: string[]
-      /** The chat so far, as the room remembers it. */
-      chat?: ChatLine[]
-    }
-  | { t: 'state'; game: GameState; clockState?: ClockState | null }
-  | { t: 'presence'; presence: boolean[]; watchers: number }
-  /** Another seat offers to take a move back, or to play again. */
-  | { t: 'offer'; kind: OfferKind; seat: number }
-  | { t: 'offer-accepted'; kind: OfferKind }
-  | { t: 'offer-declined'; kind: OfferKind }
-  | { t: 'chat'; from: number; text: string; at: number }
-  /**
-   * A refusal carries the position and clock the room holds, so the board can
-   * be put back.
-   */
-  | { t: 'error'; code: string; game?: GameState; clockState?: ClockState | null }
 
 const seatKey = (code: string) => `goonchess.seat.${code}`
 
@@ -80,16 +27,6 @@ export function writeSeatToken(code: string, token: string): void {
     localStorage.setItem(seatKey(code), token)
   } catch {
     /* private browsing, or storage full */
-  }
-}
-
-export async function fetchRoom(code: string): Promise<RoomInfo | null> {
-  try {
-    const response = await fetch(`/api/games/${code}`, { cache: 'no-store' })
-    if (!response.ok) return null
-    return (await response.json()) as RoomInfo
-  } catch {
-    return null
   }
 }
 
@@ -119,7 +56,7 @@ export async function createRoom(
 
 export interface Connection {
   /** Sends one message if the socket is up. False means it never went out. */
-  send: (message: unknown) => boolean
+  send: (message: ClientMessage) => boolean
   close: () => void
 }
 

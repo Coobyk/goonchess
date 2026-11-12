@@ -1,6 +1,9 @@
 import { uid } from '@/engine/rules'
+import { ART_SHAPES } from './pieceArt'
 import { BOARD_DARK, BOARD_LIGHT } from './palette'
 import {
+  assertNever,
+  DEFAULT_POINT_TARGET,
   PIECE_ICONS,
   type ArtShape,
   type BoardConfig,
@@ -33,44 +36,49 @@ import {
  */
 export const FORMAT_VERSION = 6
 
-const TERRAINS: Terrain[] = ['normal', 'void', 'wall', 'portal', 'oneway']
-const WIN_KINDS: WinConditionKind[] = [
-  'checkmate',
-  'kingCapture',
-  'elimination',
-  'points',
-  'center',
-  'threeCheck',
-  'antichess',
-  'race',
-  'predator',
-]
-/** The extra rules a variant can be built on, packed as a bitfield. */
-const RULES: VariantRule[] = [
-  'atomic',
-  'crazyhouse',
-  'forcedCapture',
-  'noCheck',
-  'noCastle',
-  'predator',
-  'loyalty',
-  'hypergamy',
-]
-const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
-const SHAPES: ArtShape[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']
+/** Every member of a union, listed once so the compiler counts them — a new
+ * kind that is not written here fails the build instead of packing as -1. */
+const of = <T extends string>(members: Record<T, true>): T[] => Object.keys(members) as T[]
 
-const FLAGS: [keyof PieceFlags, number][] = [
-  ['jump', 1],
-  ['mustCapture', 2],
-  ['uncapturable', 4],
-  ['royal', 8],
-  ['movesOnce', 16],
-  ['mirror', 32],
-  ['enPassant', 64],
-  ['dice', 128],
-  ['random', 256],
-  ['predator', 512],
-]
+const TERRAINS = of<Terrain>({ normal: true, void: true, wall: true, portal: true, oneway: true })
+const WIN_KINDS = of<WinConditionKind>({
+  checkmate: true,
+  kingCapture: true,
+  elimination: true,
+  points: true,
+  center: true,
+  threeCheck: true,
+  antichess: true,
+  race: true,
+  predator: true,
+})
+/** The extra rules a variant can be built on, packed as a bitfield. */
+const RULES = of<VariantRule>({
+  atomic: true,
+  crazyhouse: true,
+  forcedCapture: true,
+  noCheck: true,
+  noCastle: true,
+  predator: true,
+  loyalty: true,
+  hypergamy: true,
+})
+const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
+const SHAPES: ArtShape[] = ART_SHAPES
+
+const FLAG_BITS: Record<keyof PieceFlags, number> = {
+  jump: 1,
+  mustCapture: 2,
+  uncapturable: 4,
+  royal: 8,
+  movesOnce: 16,
+  mirror: 32,
+  enPassant: 64,
+  dice: 128,
+  random: 256,
+  predator: 512,
+}
+const FLAGS = Object.entries(FLAG_BITS) as [keyof PieceFlags, number][]
 
 const DEFAULT_TEAMS: Variant['teams'] = [
   { id: 'white', name: 'Ivory', color: '#f4f1ea', forward: 'up' },
@@ -113,7 +121,9 @@ export function packVariant(variant: Variant): unknown {
     ]),
     variant.setup.map((s) => [pieceIndex.get(s.typeId) ?? -1, teamIndex.get(s.team) ?? 0, s.x, s.y]),
     variant.winConditions.map((w) =>
-      w.kind === 'points' ? [WIN_KINDS.indexOf('points'), w.threshold ?? 20] : [WIN_KINDS.indexOf(w.kind)],
+      w.kind === 'points'
+          ? [WIN_KINDS.indexOf('points'), w.threshold ?? DEFAULT_POINT_TARGET]
+          : [WIN_KINDS.indexOf(w.kind)],
     ),
     packRandomSeed(variant),
     packRules(variant.rules),
@@ -179,7 +189,9 @@ function packArtLayer(layer: PieceArtLayer): unknown[] {
 function packEffect(effect: Effect, pieceIndex: Map<string, number>): unknown[] {
   if (effect.kind === 'swap') return [0]
   if (effect.kind === 'explosion') return [1, effect.radius]
-  return [2, pieceIndex.get(effect.pieceTypeId) ?? -1, effect.offset.x, effect.offset.y]
+  if (effect.kind === 'spawn')
+    return [2, pieceIndex.get(effect.pieceTypeId) ?? -1, effect.offset.x, effect.offset.y]
+  return assertNever(effect)
 }
 
 /* ---------------------------------------------------------------- unpack */
@@ -306,7 +318,7 @@ export function unpackVariant(input: unknown): Variant {
       const kind = WIN_KINDS[raw[0] as number]
       if (!kind) return null
       return kind === 'points'
-        ? { id: uid(), kind, threshold: Number(raw[1]) || 20 }
+        ? { id: uid(), kind, threshold: Number(raw[1]) || DEFAULT_POINT_TARGET }
         : { id: uid(), kind }
     })
     .filter((w): w is WinCondition => w !== null)
@@ -341,18 +353,7 @@ function unpackRules(bits: unknown): VariantRule[] | undefined {
 const asArray = (input: unknown): unknown[] => (Array.isArray(input) ? input : [])
 
 function unpackFlags(bits: number): PieceFlags {
-  const flags = {
-    jump: false,
-    mustCapture: false,
-    uncapturable: false,
-    royal: false,
-    movesOnce: false,
-    mirror: false,
-    enPassant: false,
-    dice: false,
-    random: false,
-    predator: false,
-  }
+  const flags = {} as PieceFlags
   for (const [key, bit] of FLAGS) flags[key] = (bits & bit) !== 0
   return flags
 }

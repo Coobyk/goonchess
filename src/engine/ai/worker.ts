@@ -10,10 +10,11 @@ import type { GameState, Move, Variant } from '../types'
 
 export interface BotRequest {
   id: number
-  state: GameState
-  team: string
-  level: BotLevel
   seed: number
+  /** Search jobs only: puzzle and analyse requests carry their own data. */
+  state?: GameState
+  team?: string
+  level?: BotLevel
   /** Overrides the level's time budget, for playing against a clock. */
   timeBudgetMs?: number
   /** Analyse the position instead of playing a move. */
@@ -25,7 +26,7 @@ export interface BotRequest {
   /** Send the best line back as well. */
   wantLine?: boolean
   /** Analyse a whole game, position by position. */
-  analyse?: { states: GameState[]; team: string }
+  analyseGame?: { states: GameState[]; team: string }
 }
 
 export interface BotReply {
@@ -70,15 +71,15 @@ scope.onmessage = (event) => {
     puzzle,
     exclude,
     wantLine,
-    analyse,
+    analyseGame,
   } = event.data
   try {
-    if (analyse) {
+    if (analyseGame) {
       // Every position of the game is looked at in turn, and the scores are
       // sent back for the graph.
-      const scores = analyse.states.map((position) => {
+      const scores = analyseGame.states.map((position) => {
         const result = searchBestMove(position, {
-          team: analyse.team,
+          team: analyseGame.team,
           level: 'casual',
           seed: 1,
           analyze: true,
@@ -124,6 +125,7 @@ scope.onmessage = (event) => {
       })
       return
     }
+    if (!state || !team || !level) return
     const result = searchBestMove(state, { team, level, seed, timeBudgetMs, analyze, exclude })
     scope.postMessage({
       id,
@@ -137,7 +139,7 @@ scope.onmessage = (event) => {
       puzzle: null,
       book: result.book,
     })
-  } catch (error) {
+  } catch {
     scope.postMessage({
       id,
       move: null,
@@ -149,7 +151,6 @@ scope.onmessage = (event) => {
       scores: null,
       puzzle: null,
     })
-    throw error
   }
 }
 

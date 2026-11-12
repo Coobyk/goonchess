@@ -12,6 +12,8 @@
  * must not itself be the thing that gets abused.
  */
 
+import { toBase64Url } from '../src/lib/base64'
+
 const encoder = new TextEncoder()
 
 /** How much work a client must do. 16 bits is ~65k hashes, about 100 ms. */
@@ -27,21 +29,6 @@ export interface Challenge {
   salt: string
   bits: number
   expiresAt: number
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromBase64Url(input: string): Uint8Array {
-  let b64 = input.replace(/-/g, '+').replace(/_/g, '/')
-  while (b64.length % 4) b64 += '='
-  const binary = atob(b64)
-  const out = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
-  return out
 }
 
 async function sign(secret: string, payload: string): Promise<string> {
@@ -84,7 +71,7 @@ export function countLeadingZeroBits(bytes: Uint8Array): number {
   return count
 }
 
-export async function digest(input: string): Promise<Uint8Array> {
+async function digest(input: string): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(input)))
 }
 
@@ -141,5 +128,3 @@ export function allowCreate(ip: string): boolean {
   entry.count += 1
   return true
 }
-
-export { fromBase64Url }

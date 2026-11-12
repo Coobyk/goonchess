@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
 import { LayoutGrid, ListTree, Redo2, Settings2, Swords, Undo2 } from 'lucide-react'
-import { useAppStore, type MakerTab } from '@/store/useAppStore'
+import { TerrainSwatch } from './TerrainOverlay'
+import { useAppStore } from '@/store/useAppStore'
+import { MAKER_TABS, type MakerTab } from '@/lib/router'
 import { MakerBoard } from './MakerBoard'
 import { BoardTab } from './BoardTab'
 import { PiecesTab } from './PiecesTab'
@@ -12,12 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Separator } from './ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
-const TABS: { id: MakerTab; label: string; icon: typeof LayoutGrid }[] = [
-  { id: 'board', label: 'Board', icon: LayoutGrid },
-  { id: 'pieces', label: 'Pieces', icon: ListTree },
-  { id: 'setup', label: 'Setup', icon: Settings2 },
-  { id: 'rules', label: 'Rules', icon: Swords },
-]
+const TAB_META: Record<MakerTab, { label: string; icon: typeof LayoutGrid }> = {
+  board: { label: 'Board', icon: LayoutGrid },
+  pieces: { label: 'Pieces', icon: ListTree },
+  setup: { label: 'Setup', icon: Settings2 },
+  rules: { label: 'Rules', icon: Swords },
+}
+const TABS = MAKER_TABS.map((id) => ({ id, ...TAB_META[id] }))
 
 export function MakerView() {
   const makerTab = useAppStore((s) => s.makerTab)
@@ -28,21 +30,7 @@ export function MakerView() {
   const canUndoVariant = useAppStore((s) => s.variantHistory.length > 0)
   const canRedoVariant = useAppStore((s) => s.variantFuture.length > 0)
   const brush = useAppStore((s) => s.brush)
-  const setBrush = useAppStore((s) => s.setBrush)
   const portalPending = useAppStore((s) => s.portalPending)
-
-  useEffect(() => {
-    const first = variant.pieceTypes[0]
-    if (!first) return
-    if (makerTab === 'setup' && brush.mode === 'terrain') {
-      setBrush({ mode: 'piece', terrain: brush.terrain, team: brush.team, typeId: first.id })
-    }
-    if (makerTab === 'board' && brush.mode === 'piece') {
-      setBrush({ ...brush, mode: 'terrain' })
-    }
-    // Only react to tab changes; brush reads are intentional one-shot syncs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [makerTab])
 
   const brushLabel = (() => {
     if (brush.mode === 'erase') return 'Eraser'
@@ -129,20 +117,16 @@ export function MakerView() {
             </div>
             <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm border bg-[repeating-linear-gradient(45deg,transparent_0_3px,rgba(0,0,0,0.3)_3px_5px)]" />
-                wall
+                <TerrainSwatch terrain="wall" /> wall
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm bg-black" /> void
+                <TerrainSwatch terrain="void" /> void
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.9),rgba(56,189,248,0.15))]" />
-                portal
+                <TerrainSwatch terrain="portal" /> portal
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block size-3 rounded-sm bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.9),rgba(56,189,248,0.15))] font-mono text-[8px] text-cyan-100">
-                  1→
-                </span>
+                <TerrainSwatch terrain="oneway" className="font-mono text-[8px] text-cyan-100">1→</TerrainSwatch>
                 one-way
               </span>
             </div>

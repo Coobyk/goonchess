@@ -3,6 +3,8 @@ import { toast } from 'sonner'
 import { ClipboardType, Copy, Download, FileJson, FileText, Link2, Loader2, Upload, Users } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { captchaMessage } from '@/lib/captcha'
+import { copyText } from '@/lib/clipboard'
+import { fileNameFor } from '@/lib/image'
 import { variantToHash } from '@/lib/encoding'
 import { fromFen, toFen } from '@/lib/fen'
 import { fromPgn, toPgn } from '@/lib/pgn'
@@ -32,6 +34,7 @@ export function ShareDialog({
   const [fenText, setFenText] = useState('')
   const [pgnText, setPgnText] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fenError, setFenError] = useState<string | null>(null)
   const [pgnError, setPgnError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [playError, setPlayError] = useState<string | null>(null)
@@ -45,14 +48,7 @@ export function ShareDialog({
     [variant],
   )
 
-  const copy = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast.success(`${label} copied`)
-    } catch {
-      toast.error('Clipboard unavailable — select the text and copy manually.')
-    }
-  }
+  const copy = (text: string, label: string) => copyText(text, label)
 
   const createGame = async () => {
     setPlayError(null)
@@ -63,20 +59,12 @@ export function ShareDialog({
       // The link is the whole invitation, so it goes to the clipboard before
       // the dialog closes. A browser that refuses still has the copy button on
       // the bar above the board.
-      try {
-        await navigator.clipboard.writeText(`${window.location.origin}${created.path}`)
-        toast.success('Game link copied — send it to whoever you want to play.')
-      } catch {
-        toast.success('Game link ready — copy it from the bar above the board.')
-      }
+      const wrote = await copyText(`${window.location.origin}${created.path}`, 'Game link')
+      if (!wrote) toast.info('Send it to whoever you want to play.')
       onOpenChange(false)
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : 'unknown'
-      setPlayError(
-        code === 'needs_two_teams'
-          ? 'Online games need exactly two teams. This variant has ' + variant.teams.length + '.'
-          : captchaMessage(code),
-      )
+      setPlayError(captchaMessage(code))
     } finally {
       setCreating(false)
     }
@@ -87,7 +75,7 @@ export function ShareDialog({
     const href = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = href
-    a.download = `${variant.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'variant'}.json`
+    a.download = fileNameFor(variant.name, 'json')
     a.click()
     URL.revokeObjectURL(href)
   }
@@ -219,18 +207,18 @@ export function ShareDialog({
               value={fenText}
               onChange={(e) => {
                 setFenText(e.target.value)
-                setError(null)
+                setFenError(null)
               }}
               placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
               className="h-24 font-mono text-xs"
             />
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {fenError && <p className="text-sm text-destructive">{fenError}</p>}
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => {
                   const result = fromFen(fenText)
                   if (!result) {
-                    setError('That does not look like a FEN.')
+                    setFenError('That does not look like a FEN.')
                     return
                   }
                   loadVariantIntoMaker(result.variant)
@@ -246,7 +234,7 @@ export function ShareDialog({
                 onClick={() => {
                   const fen = toFen(game)
                   if (!fen) {
-                    setError('This variant cannot be written as FEN.')
+                    setFenError('This variant cannot be written as FEN.')
                     return
                   }
                   setFenText(fen)

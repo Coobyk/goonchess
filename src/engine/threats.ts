@@ -55,7 +55,7 @@ export interface ThreatReport {
   edges: ThreatEdge[]
 }
 
-export const threatKey = (x: number, y: number) => `${x},${y}`
+const threatKey = (x: number, y: number) => `${x},${y}`
 
 /**
  * Finds what the other teams threaten against `teamId` right now. Attack
@@ -170,6 +170,17 @@ export function mergeThreats(reports: ThreatReport[]): ThreatReport {
     }
   }
   return { coverage, pieces, edges }
+}
+
+/**
+ * The threats a player has asked to see: either what the side to move can
+ * attack, or what every side can attack.
+ */
+export function threatsFor(state: GameState, settings: ThreatSettings): ThreatReport | null {
+  if (!settings.show) return null
+  const teams =
+    settings.scope === 'both' ? state.variant.teams.map((team) => team.id) : [state.turn]
+  return mergeThreats(teams.map((team) => computeThreats(state, team)))
 }
 
 /** Counts for the sidebar legend. */

@@ -12,21 +12,30 @@
  * written is the tightest part of the free plan.
  */
 import { applyMove, createInitialState, dropOptions, getLegalMoves, rollRandomPieces } from '../src/engine/rules'
-import type { GameState, Variant, Vec } from '../src/engine/types'
+import { DICE_SIDES, intentMatches, type GameState, type Variant, type Vec } from '../src/engine/types'
 import {
   clockIsOn,
+  flagFell,
   initialClockState,
   NO_CLOCK,
+  projectedClock,
+  settleClock,
+  flagFall,
   type ClockSettings,
   type ClockState,
 } from '../src/lib/clock'
+import { replayMoves } from '../src/lib/replay'
+import { CHAT_HISTORY, CHAT_MAX_LENGTH, type ChatLine, type ClientMessage as Message, type OfferKind } from '../src/lib/protocol'
 import { hashToken, randomToken } from './ids'
+import { CREATE_PATH, json } from './http'
 
 /** A room nobody ever joined is not worth keeping. */
 const EMPTY_ROOM_TTL = 24 * 60 * 60 * 1000
 /** A game that was played survives a week, which covers a slow correspondence one. */
 const PLAYED_ROOM_TTL = 7 * 24 * 60 * 60 * 1000
 const MAX_MESSAGE = 8 * 1024
+/** A flag check wakes a little early rather than risk waking late. */
+const ALARM_GRACE_MS = 500
 
 interface Meta {
   code: string
@@ -48,22 +57,6 @@ interface StoredGame {
 interface Attachment {
   /** 0 or 1 for the two players, null for anyone watching. */
   seat: number | null
-}
-
-type Message =
-  | { t: 'move'; from: Vec; to: Vec; finalTo: Vec; roll?: number; promotionTypeId?: string; origin?: Vec; drop?: { typeId: string } }
-  | { t: 'resign' }
-  /** An offer to take the last move back, or to play the whole game again. */
-  | { t: 'offer'; kind: OfferKind }
-  | { t: 'offer-response'; kind: OfferKind; accept: boolean }
-  | { t: 'chat'; text: string }
-
-type OfferKind = 'undo' | 'rematch'
-
-interface ChatLine {
-  from: number
-  text: string
-  at: number
 }
 
 export class GameRoom {
@@ -106,7 +99,7 @@ export class GameRoom {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
 
-    if (url.pathname.endsWith('/create')) {
+    if (url.pathname === CREATE_PATH) {
       if (request.method !== 'POST') return json({ error: 'method' }, 405)
       const body = (await request.json()) as {
         code: string
@@ -192,7 +185,7 @@ export class GameRoom {
       // Both seats are taken: the game begins.
       const fresh = createInitialState(meta.variant)
       const clock = clockIsOn(meta.clock)
-        ? initialClockState(meta.clock, fresh.variant.teams.map((team) => team.id))
+        ? initialClockState(meta.clock, fresh.variant)
         : null
       meta.startedAt = Date.now()
       await this.ctx.storage.put('meta', meta)
@@ -276,11 +269,9 @@ export class GameRoom {
     let clock = loaded.clock
     // The room owns the clock: a move that arrives after the flag fell does
     // not count, and the game is already lost.
-    if (clock && clockIsOn(meta.clock) && clock.running && clock.lastMoveAt !== null) {
-      if ((clock.times[game.turn] ?? 0) - (now - clock.lastMoveAt) <= 0) {
-        await this.finishTimeout(meta, game, clock)
-        return
-      }
+    if (clock && clockIsOn(meta.clock) && flagFell(clock, game.turn, now)) {
+      await this.finishTimeout(meta, game, clock)
+      return
     }
 
     const refusedClock = this.displayClock(game, loaded.clock)
@@ -297,7 +288,7 @@ export class GameRoom {
     // legal moves are worked out with the roll the player saw.
     const pieceId = game.board[from.y]?.[from.x]
     const roll =
-      pieceId && Number.isInteger(message.roll) && message.roll! >= 1 && message.roll! <= 6
+      pieceId && Number.isInteger(message.roll) && message.roll! >= 1 && message.roll! <= DICE_SIDES
         ? { pieceId, value: message.roll! }
         : undefined
 
@@ -307,13 +298,8 @@ export class GameRoom {
     const legal = message.drop
       ? dropOptions(position, game.turn).map((option) => option.move)
       : getLegalMoves(position, from.x, from.y)
-    const move = legal.find(
-      (candidate) =>
-        candidate.to.x === to.x &&
-        candidate.to.y === to.y &&
-        candidate.finalTo.x === finalTo.x &&
-        candidate.finalTo.y === finalTo.y &&
-        candidate.drop?.typeId === message.drop?.typeId,
+    const move = legal.find((candidate) =>
+      intentMatches(candidate, { to, finalTo, drop: message.drop }),
     )
     if (!move) return this.reject(seat, 'illegal_move', game, refusedClock)
 
@@ -326,19 +312,7 @@ export class GameRoom {
       promotionTypeId = undefined
     }
 
-    if (clock && clockIsOn(meta.clock)) {
-      const times = { ...clock.times }
-      const mover = game.turn
-      if (clock.running && clock.lastMoveAt !== null) {
-        times[mover] =
-          Math.max(0, (times[mover] ?? 0) - (now - clock.lastMoveAt)) +
-          meta.clock.increment * 1000
-      } else {
-        // The first move starts the clock and still earns the increment.
-        times[mover] = (times[mover] ?? 0) + meta.clock.increment * 1000
-      }
-      clock = { times, lastMoveAt: now, running: true }
-    }
+    if (clock && clockIsOn(meta.clock)) clock = settleClock(clock, meta.clock, game.turn, now)
 
     const origin = message.origin && vec(message.origin) ? message.origin : undefined
     const next = rollRandomPieces(
@@ -402,26 +376,23 @@ export class GameRoom {
       this.broadcast({ t: 'offer-declined', kind })
       return
     }
-    if (kind === 'undo') await this.undo(from)
+    if (kind === 'undo') await this.undo()
     else await this.rematch()
     this.broadcast({ t: 'offer-accepted', kind })
   }
 
   /** One move back. The position is rebuilt by playing the history again. */
-  private async undo(_seat: number): Promise<void> {
+  private async undo(): Promise<void> {
     const loaded = await this.load()
     if (!loaded?.game || loaded.game.winner) return
     const { meta, game } = loaded
     const history = game.moveHistory
     if (!history.length) return
 
-    let rebuilt = createInitialState(meta.variant)
-    for (const record of history.slice(0, -1)) {
-      rebuilt = rollRandomPieces(
-        applyMove(rebuilt, record.move, { origin: record.origin, san: true }),
-        record.move.pieceId,
-      )
-    }
+    const rebuilt = replayMoves(meta.variant, history.slice(0, -1), (record) => ({
+      origin: record.origin,
+      san: true,
+    }))
     // The clock hands back to the side that is to move again; the time that
     // was spent stays spent.
     const clock = this.clock
@@ -441,7 +412,7 @@ export class GameRoom {
     const { meta } = loaded
     const fresh = createInitialState(meta.variant)
     const clock = clockIsOn(meta.clock)
-      ? initialClockState(meta.clock, fresh.variant.teams.map((team) => team.id))
+      ? initialClockState(meta.clock, fresh.variant)
       : null
     this.game = fresh
     this.clock = clock
@@ -453,10 +424,10 @@ export class GameRoom {
   /** A line of chat, trimmed and capped, passed on to everybody. */
   private chatLine(seat: number, text: unknown): void {
     if (typeof text !== 'string') return
-    const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, 280)
+    const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX_LENGTH)
     if (!trimmed) return
     const line: ChatLine = { from: seat, text: trimmed, at: Date.now() }
-    this.chat = [...this.chat.slice(-29), line]
+    this.chat = [...this.chat, line].slice(-CHAT_HISTORY)
     this.broadcast({ t: 'chat', from: seat, text: trimmed, at: line.at })
   }
 
@@ -521,16 +492,15 @@ export class GameRoom {
     let at = ttl
     if (game && !game.winner && clock?.running && clock.lastMoveAt !== null) {
       const left = Math.max(0, clock.times[game.turn] ?? 0)
-      at = Math.min(at, clock.lastMoveAt + left + 500)
+      at = Math.min(at, clock.lastMoveAt + left + ALARM_GRACE_MS)
     }
     await this.ctx.storage.setAlarm(Math.max(Date.now(), at))
   }
 
   /** The clock as the side to move sees it right now, for a fresh connection. */
   private displayClock(game: GameState | null, clock: ClockState | null): ClockState | null {
-    if (!game || !clock || !clock.running || clock.lastMoveAt === null || game.winner) return clock
-    const left = Math.max(0, (clock.times[game.turn] ?? 0) - (Date.now() - clock.lastMoveAt))
-    return { ...clock, times: { ...clock.times, [game.turn]: left }, lastMoveAt: Date.now() }
+    if (!game || !clock || game.winner) return clock
+    return projectedClock(clock, game.turn, Date.now())
   }
 
   /** Ends the game if the side to move has run out of time. */
@@ -539,24 +509,14 @@ export class GameRoom {
     game: GameState | null,
     clock: ClockState | null,
   ): Promise<boolean> {
-    if (!game || game.winner || !clock || !clock.running || clock.lastMoveAt === null) return false
-    if ((clock.times[game.turn] ?? 0) - (Date.now() - clock.lastMoveAt) > 0) return false
+    if (!game || game.winner || !clock || !flagFell(clock, game.turn, Date.now())) return false
     await this.finishTimeout(meta, game, clock)
     return true
   }
 
   /** The side to move ran out of time: the other side wins. */
   private async finishTimeout(meta: Meta, game: GameState, clock: ClockState): Promise<void> {
-    const side = game.turn
-    const order = meta.variant.teams.map((team) => team.id)
-    const index = order.indexOf(side)
-    const next: GameState = { ...game, winner: order[(index + 1) % order.length] ?? null, status: 'timeout' }
-    const nextClock: ClockState = {
-      ...clock,
-      times: { ...clock.times, [side]: 0 },
-      lastMoveAt: null,
-      running: false,
-    }
+    const { game: next, clock: nextClock } = flagFall(game, clock, game.turn)
     this.game = next
     this.clock = nextClock
     await this.save()
@@ -612,9 +572,4 @@ function send(ws: WebSocket, message: unknown) {
   }
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  })
-}
+

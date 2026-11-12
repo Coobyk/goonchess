@@ -1,5 +1,12 @@
-import { applyMove, createInitialState, rollRandomPieces } from '@/engine/rules'
-import type { GameState } from '@/engine/types'
+import { applyMove, createInitialState, rollRandomPieces, type ApplyOptions } from '@/engine/rules'
+import { countPosition, positionKey } from '@/engine/repetition'
+import type { GameState, Move, MoveRecord, Variant } from '@/engine/types'
+
+// A random piece is rolled anew after every move, the same way it was when
+// the game was played. The piece that has just moved keeps its kind.
+function step(state: GameState, record: MoveRecord, options: ApplyOptions): GameState {
+  return rollRandomPieces(applyMove(state, record.move, options), record.move.pieceId)
+}
 
 /**
  * Rebuilds a game from its start, so it can be replayed or exported.
@@ -8,23 +15,34 @@ import type { GameState } from '@/engine/types'
  * recorded moves lands on exactly the same positions.
  */
 export function replayStates(game: GameState): GameState[] {
-  const start = createInitialState(game.variant)
-  const states: GameState[] = [start]
-  let current = start
+  const states = [createInitialState(game.variant)]
   for (const record of game.moveHistory) {
-    current = applyMove(current, record.move, { compute: false })
-    // A random piece is rolled anew after every move, the same way it was
-    // when the game was played. The piece that has just moved keeps its kind.
-    current = rollRandomPieces(current, record.move.pieceId)
-    states.push(current)
+    states.push(step(states[states.length - 1], record, { compute: false }))
   }
   return states
 }
 
-/** The move that led to a state, for the replay label. */
-export function moveLabel(game: GameState, index: number): string {
-  const record = game.moveHistory[index - 1]
-  if (!record) return 'Start'
-  const team = game.variant.teams.find((t) => t.id === record.team)
-  return `${team?.name ?? record.team} ${record.notation}`
+/**
+ * The position a list of moves ends in. The room's undo relies on it: take
+ * every move back by playing all but the last one again.
+ */
+export function replayMoves(
+  variant: Variant,
+  records: MoveRecord[],
+  options: (record: MoveRecord) => ApplyOptions = () => ({}),
+): GameState {
+  let state = createInitialState(variant)
+  for (const record of records) state = step(state, record, options(record))
+  return state
+}
+
+/**
+ * Would this move bring back a position that has already been played?
+ *
+ * The third time round is a draw, and shuffling towards it is never good
+ * play, so a bot that can avoid it should.
+ */
+export function wouldRepeat(state: GameState, move: Move): boolean {
+  const next = applyMove(state, move, { compute: false })
+  return countPosition(next, positionKey(next)) > 0
 }

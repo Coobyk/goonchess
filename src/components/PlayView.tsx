@@ -20,18 +20,20 @@ import { Textarea } from './ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { useMediaQuery } from '@/lib/mediaQuery'
-import { useAppStore } from '@/store/useAppStore'
+import { copyText } from '@/lib/clipboard'
+import { useAppStore, selectViewerSeat } from '@/store/useAppStore'
 import { OnlineBar } from './OnlineBar'
 import { cn } from '@/lib/utils'
-import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
-import { botLevelFor, humanSeatFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
+import { LEVELS, type BotLevel } from '@/engine/ai/search'
+import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
 import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
 import { toFen } from '@/lib/fen'
 import { toPgn } from '@/lib/pgn'
 import { downloadBlob, fileNameFor, positionName, renderBoardImage } from '@/lib/image'
 import { playSound } from '@/lib/sound'
+import { isPocketSquare, type GameState, type TeamConfig, type Variant } from '@/engine/types'
 
-const STATUS_TEXT: Record<string, string> = {
+const STATUS_TEXT: Partial<Record<GameState['status'], string>> = {
   checkmate: 'Checkmate',
   'royal-captured': 'Royal captured',
   eliminated: 'Army eliminated',
@@ -43,9 +45,130 @@ const STATUS_TEXT: Record<string, string> = {
   'three-check': 'The third check',
   antichess: 'No pieces, or no move to make',
   race: 'The king reached the far rank',
+  resign: 'Resigned',
   'predator-kill': 'The King slew the Predator',
   'predator-depletion': 'The Predator ate every pawn and minor piece',
   jealousy: 'The jealous King exploded',
+}
+
+/**
+ * One side's nameplate: colour, name, clock, and what it has captured — or
+ * what it still holds, in Crazyhouse.
+ */
+function TeamPlate({
+  team,
+  other,
+  variant,
+  game,
+  crazyhouse,
+  threeCheck,
+  pocketPick,
+  dark,
+}: {
+  team: TeamConfig
+  other: TeamConfig
+  variant: Variant
+  game: GameState
+  crazyhouse: boolean
+  threeCheck: boolean
+  pocketPick: string | null
+  dark: boolean
+}) {
+  const selectPocket = useAppStore((s) => s.selectPocket)
+  const value = (typeId: string) =>
+    variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
+  const lost = game.captured
+    .filter((c) => c.team === team.id)
+    .sort((a, b) => a.typeId.localeCompare(b.typeId))
+  const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
+  // The difference, not what each side has taken: equal material shows nothing.
+  const advantage =
+    game.captured.filter((c) => c.team === other.id).reduce((sum, c) => sum + value(c.typeId), 0) -
+    material
+  const pocket = Object.entries(game.hands?.[team.id] ?? {}).filter(([, count]) => count > 0)
+  return (
+    <div
+      className={cn(
+        'flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2',
+        game.turn === team.id && !game.winner ? 'border-foreground bg-secondary' : 'bg-card',
+      )}
+    >
+      <span
+        className="size-2.5 rounded-full ring-1 ring-black/20"
+        style={{ backgroundColor: team.color }}
+      />
+      <span className="text-sm font-medium">{team.name}</span>
+      {threeCheck && (
+        <span className="text-muted-foreground text-xs tabular-nums" title="Checks given">
+          {game.checks?.[team.id] ?? 0}/3 checks
+        </span>
+      )}
+      <ClockFor team={team.id} />
+      <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
+        {crazyhouse ? (
+          pocket.length === 0 ? (
+            <span className="text-muted-foreground text-xs">Pocket empty</span>
+          ) : (
+            pocket.map(([typeId, count]) => {
+              const pt = variant.pieceTypes.find((p) => p.id === typeId)
+              const held = pocketPick === typeId
+              const canDrop = !game.winner && game.turn === team.id
+              return (
+                <button
+                  key={typeId}
+                  type="button"
+                  title={`${pt?.name ?? 'Piece'} in the pocket — tap to pick it up`}
+                  aria-label={`Drop ${pt?.name ?? 'piece'} (${count} in pocket)`}
+                  aria-pressed={held}
+                  onClick={() => selectPocket(typeId)}
+                  disabled={!canDrop}
+                  className={cn(
+                    'flex items-center gap-0.5 rounded-md border px-1 py-0.5 transition-colors',
+                    held ? 'border-foreground bg-secondary' : 'border-transparent hover:bg-muted',
+                    !canDrop && 'opacity-60',
+                  )}
+                >
+                  <PieceGlyph
+                    piece={pt}
+                    teamIndex={variant.teams.findIndex((t) => t.id === team.id)}
+                    size={18}
+                  />
+                  <span className="text-xs tabular-nums">×{count}</span>
+                </button>
+              )
+            })
+          )
+        ) : (
+          Object.entries(
+            lost.reduce(
+              (g, c) => {
+                ;(g[c.typeId] ??= []).push(c)
+                return g
+              },
+              {} as Record<string, typeof lost>,
+            ),
+          ).map(([typeId, grp]) => {
+            const pt = variant.pieceTypes.find((p) => p.id === typeId)
+            return (
+              <div key={typeId} className="flex -space-x-2">
+                {grp.map((_c, i) => (
+                  <span key={i} title={pt?.name}>
+                    <PieceGlyph piece={pt} teamIndex={dark ? 0 : 1} size={18} muted />
+                  </span>
+                ))}
+              </div>
+            )
+          })
+        )}
+      </div>
+      {advantage !== 0 && (
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {advantage > 0 ? '+' : ''}
+          {advantage} pts
+        </span>
+      )}
+    </div>
+  )
 }
 
 /** The three strengths, as a compact row of buttons. */
@@ -63,9 +186,9 @@ function StrengthButtons({
       value={level}
       onValueChange={(value) => value && onChange(value as BotLevel)}
     >
-      {(Object.keys(LEVEL_LABELS) as BotLevel[]).map((option) => (
+      {(Object.keys(LEVELS) as BotLevel[]).map((option) => (
         <ToggleGroupItem key={option} value={option} className="flex-1 py-1 px-2 text-xs">
-          {LEVEL_LABELS[option]}
+          {LEVELS[option].label}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
@@ -158,15 +281,11 @@ export function PlayView() {
   const crazyhouse = !!variant.rules?.includes('crazyhouse')
   const selected = useAppStore((s) => s.selected)
   const legalMoves = useAppStore((s) => s.legalMoves)
-  const selectPocket = useAppStore((s) => s.selectPocket)
   // A drop waits on the off-board square: no real square is ever selected.
   const pocketPick =
-    selected && selected.x === -1 && selected.y === -1
+    selected && isPocketSquare(selected)
       ? legalMoves[0]?.drop?.typeId ?? null
       : null
-  /** What a side holds in its pocket, as [typeId, count] pairs. */
-  const pocketOf = (teamId: string) =>
-    Object.entries(game.hands?.[teamId] ?? {}).filter(([, count]) => count > 0)
   const resetGame = useAppStore((s) => s.resetGame)
   const undo = useAppStore((s) => s.undo)
   const online = useAppStore((s) => s.online)
@@ -179,7 +298,7 @@ export function PlayView() {
   // The viewer's team sits at the bottom of the board — a shared game's seat,
   // or the human's side against a single bot — so the nameplates follow the
   // flip: own team below, opponent above.
-  const viewerSeat = online ? online.seat : humanSeatFor(variant, bot, botSide)
+  const viewerSeat = useAppStore(selectViewerSeat)
   const seatFlipped = viewerSeat !== null && viewerSeat % 2 === 1
   const topTeamIndex = seatFlipped ? 0 : 1
   const bottomTeamIndex = seatFlipped ? 1 : 0
@@ -247,12 +366,7 @@ export function PlayView() {
                 className="min-h-11"
                 onClick={async () => {
                   if (!pgnExport) return
-                  try {
-                    await navigator.clipboard.writeText(pgnExport.text)
-                    toast.success('PGN copied')
-                  } catch {
-                    toast.error('Clipboard unavailable. Select the PGN text and copy manually.')
-                  }
+                  await copyText(pgnExport.text, 'PGN')
                 }}
               >
                 <ClipboardCopy /> Copy PGN
@@ -304,153 +418,27 @@ export function PlayView() {
             </AlertDescription>
           </Alert>
         )}
-        {(() => {
-          const team = variant.teams[topTeamIndex]
-          const other = variant.teams[bottomTeamIndex]
-          const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
-          const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
-          const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
-          // The difference, not what each side has taken: equal material shows nothing.
-          const advantage = game.captured.filter((c) => c.team === other.id).reduce((sum, c) => sum + value(c.typeId), 0) - material
-          return (
-            <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
-              <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
-              <span className="text-sm font-medium">{team.name}</span>
-              {threeCheck && (
-                <span className="text-muted-foreground text-xs tabular-nums" title="Checks given">
-                  {game.checks?.[team.id] ?? 0}/3 checks
-                </span>
-              )}
-              <ClockFor team={team.id} />
-              <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
-                {crazyhouse ? (
-                  pocketOf(team.id).length === 0 ? (
-                    <span className="text-muted-foreground text-xs">Pocket empty</span>
-                  ) : (
-                    pocketOf(team.id).map(([typeId, count]) => {
-                      const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                      const held = pocketPick === typeId
-                      const canDrop = !game.winner && game.turn === team.id
-                      return (
-                        <button
-                          key={typeId}
-                          type="button"
-                          title={`${pt?.name ?? 'Piece'} in the pocket — tap to pick it up`}
-                          aria-label={`Drop ${pt?.name ?? 'piece'} (${count} in pocket)`}
-                          aria-pressed={held}
-                          onClick={() => selectPocket(typeId)}
-                          disabled={!canDrop}
-                          className={cn(
-                            'flex items-center gap-0.5 rounded-md border px-1 py-0.5 transition-colors',
-                            held ? 'border-foreground bg-secondary' : 'border-transparent hover:bg-muted',
-                            !canDrop && 'opacity-60',
-                          )}
-                        >
-                          <PieceGlyph
-                            piece={pt}
-                            teamIndex={variant.teams.findIndex((t) => t.id === team.id)}
-                            size={18}
-                          />
-                          <span className="text-xs tabular-nums">×{count}</span>
-                        </button>
-                      )
-                    })
-                  )
-                ) : (
-                  Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
-                    const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                    return (
-                      <div key={typeId} className="flex -space-x-2">
-                        {grp.map((_c, i) => (
-                          <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
-                        ))}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-              {advantage !== 0 && (
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {advantage > 0 ? '+' : ''}{advantage} pts
-                </span>
-              )}
-            </div>
-          )
-        })()}
+        <TeamPlate
+          team={variant.teams[topTeamIndex]}
+          other={variant.teams[bottomTeamIndex]}
+          variant={variant}
+          game={game}
+          crazyhouse={crazyhouse}
+          threeCheck={threeCheck}
+          pocketPick={pocketPick}
+          dark={theme === 'dark'}
+        />
         <GameBoard />
-        {(() => {
-          const team = variant.teams[bottomTeamIndex]
-          const other = variant.teams[topTeamIndex]
-          const lost = game.captured.filter((c) => c.team === team.id).sort((a,b)=>a.typeId.localeCompare(b.typeId))
-          const value = (typeId: string) => variant.pieceTypes.find((p) => p.id === typeId)?.value ?? 0
-          const material = lost.reduce((sum, c) => sum + value(c.typeId), 0)
-          // The difference, not what each side has taken: equal material shows nothing.
-          const advantage = game.captured.filter((c) => c.team === other.id).reduce((sum, c) => sum + value(c.typeId), 0) - material
-          return (
-            <div className={`flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2 ${game.turn === team.id && !game.winner ? "border-foreground bg-secondary" : "bg-card"}`}>
-              <span className="size-2.5 rounded-full ring-1 ring-black/20" style={{ backgroundColor: team.color }} />
-              <span className="text-sm font-medium">{team.name}</span>
-              {threeCheck && (
-                <span className="text-muted-foreground text-xs tabular-nums" title="Checks given">
-                  {game.checks?.[team.id] ?? 0}/3 checks
-                </span>
-              )}
-              <ClockFor team={team.id} />
-              <div className="flex flex-1 flex-wrap items-center justify-end gap-0">
-                {crazyhouse ? (
-                  pocketOf(team.id).length === 0 ? (
-                    <span className="text-muted-foreground text-xs">Pocket empty</span>
-                  ) : (
-                    pocketOf(team.id).map(([typeId, count]) => {
-                      const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                      const held = pocketPick === typeId
-                      const canDrop = !game.winner && game.turn === team.id
-                      return (
-                        <button
-                          key={typeId}
-                          type="button"
-                          title={`${pt?.name ?? 'Piece'} in the pocket — tap to pick it up`}
-                          aria-label={`Drop ${pt?.name ?? 'piece'} (${count} in pocket)`}
-                          aria-pressed={held}
-                          onClick={() => selectPocket(typeId)}
-                          disabled={!canDrop}
-                          className={cn(
-                            'flex items-center gap-0.5 rounded-md border px-1 py-0.5 transition-colors',
-                            held ? 'border-foreground bg-secondary' : 'border-transparent hover:bg-muted',
-                            !canDrop && 'opacity-60',
-                          )}
-                        >
-                          <PieceGlyph
-                            piece={pt}
-                            teamIndex={variant.teams.findIndex((t) => t.id === team.id)}
-                            size={18}
-                          />
-                          <span className="text-xs tabular-nums">×{count}</span>
-                        </button>
-                      )
-                    })
-                  )
-                ) : (
-                  Object.entries(lost.reduce((g, c) => { (g[c.typeId] ??= []).push(c); return g }, {} as Record<string, typeof lost>)).map(([typeId, grp]) => {
-                    const pt = variant.pieceTypes.find((p) => p.id === typeId)
-                    return (
-                      <div key={typeId} className="flex -space-x-2">
-                        {grp.map((_c, i) => (
-                          <span key={i} title={pt?.name}><PieceGlyph piece={pt} teamIndex={theme === 'dark' ? 0 : 1} size={18} muted /></span>
-                        ))}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-              {advantage !== 0 && (
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {advantage > 0 ? '+' : ''}{advantage} pts
-                </span>
-              )}
-            </div>
-          )
-        })()}
+        <TeamPlate
+          team={variant.teams[bottomTeamIndex]}
+          other={variant.teams[topTeamIndex]}
+          variant={variant}
+          game={game}
+          crazyhouse={crazyhouse}
+          threeCheck={threeCheck}
+          pocketPick={pocketPick}
+          dark={theme === 'dark'}
+        />
         <div className="flex flex-wrap items-center justify-center gap-2">
           {!online && (
             <>
@@ -605,7 +593,7 @@ export function PlayView() {
                     <p className="text-xs text-muted-foreground">
                       {bot.mode === 'all'
                         ? ''
-                        : LEVEL_HINTS[bot.level]}
+                        : LEVELS[bot.level].hint}
                     </p>
                   </div>
                 )}
@@ -678,12 +666,7 @@ export function PlayView() {
                       toast.error('This variant cannot be written as FEN.')
                       return
                     }
-                    try {
-                      await navigator.clipboard.writeText(fen)
-                      toast.success('FEN copied')
-                    } catch {
-                      toast.error('Clipboard unavailable.')
-                    }
+                    await copyText(fen, 'FEN')
                   }}
                 >
                   <ClipboardCopy /> Copy position as FEN

@@ -1,5 +1,5 @@
 import { Copy, Eraser, FlipHorizontal, FlipVertical, Trash2 } from 'lucide-react'
-import { PIECE_DRAG_TYPE } from './MakerBoard'
+import { PIECE_DRAG_TYPE } from '@/lib/dnd'
 import { PieceGlyph } from './PieceGlyph'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -24,18 +24,20 @@ export function SetupTab() {
     count: variant.setup.filter((s) => s.team === t.id).length,
   }))
 
-  const royalWarnings = variant.teams
-    .filter(() =>
-      variant.winConditions.some((w) => w.kind === 'checkmate' || w.kind === 'kingCapture'),
-    )
-    .filter(
-      (t) =>
-        !variant.setup.some(
-          (s) => s.team === t.id && variant.pieceTypes.find((p) => p.id === s.typeId)?.flags.royal,
-        ),
-    )
+  const needsRoyals = variant.winConditions.some(
+    (w) => w.kind === 'checkmate' || w.kind === 'kingCapture',
+  )
+  const royalWarnings = needsRoyals
+    ? variant.teams.filter(
+        (t) =>
+          !variant.setup.some(
+            (s) => s.team === t.id && variant.pieceTypes.find((p) => p.id === s.typeId)?.flags.royal,
+          ),
+      )
+    : []
 
-  const [otherTeam] = variant.teams.filter((t) => t.id !== activeTeam)
+  // Copying an army side-to-side only has a meaning with exactly two.
+  const otherTeam = variant.teams.length === 2 ? variant.teams.find((t) => t.id !== activeTeam) : undefined
 
   return (
     <div className="space-y-4">
@@ -119,7 +121,7 @@ export function SetupTab() {
             size="sm"
             variant="outline"
             disabled={!otherTeam}
-            onClick={() => duplicateSide(activeTeam, otherTeam.id)}
+            onClick={() => otherTeam && duplicateSide(activeTeam, otherTeam.id)}
           >
             <Copy /> Copy to {otherTeam?.name ?? 'other team'}
           </Button>

@@ -1,5 +1,5 @@
-import type { GameState } from '@/engine/types'
-import { boardColors } from './palette'
+import { SAN_LETTERS, type GameState } from '@/engine/types'
+import { boardColors, portalRgba } from './palette'
 
 /**
  * Draws the board on a canvas so it can be saved as a picture, or turned into
@@ -75,7 +75,7 @@ async function drawBoard(
         ctx.fillStyle = '#000'
         ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
       } else if (tile?.terrain === 'portal' || tile?.terrain === 'oneway') {
-        ctx.fillStyle = 'rgba(56,189,248,0.35)'
+        ctx.fillStyle = portalRgba(0.35)
         ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
       }
 
@@ -101,7 +101,7 @@ async function drawBoard(
       if (!piece) continue
       const teamIndex = variant.teams.findIndex((t) => t.id === inst.team)
       const custom = piece.images?.[Math.max(0, teamIndex)]
-      const letter = codeFor(piece.icon)
+      const letter = SAN_LETTERS[piece.icon] ?? null
       if (!custom && !letter) continue
       const image = await loadPiece(
         custom ?? `/pieces/cburnett/${teamIndex === 0 ? 'w' : 'b'}${letter}.svg`,
@@ -152,16 +152,6 @@ async function drawBoard(
 }
 
 /** Draws a board and its pieces at the given spot on a canvas. */
-export async function drawBoardToContext(
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  options: BoardImageOptions,
-  originX = 0,
-  originY = 0,
-) {
-  await drawBoard(ctx, state, options, originX, originY)
-}
-
 export async function renderBoardImage(
   state: GameState,
   options: BoardImageOptions = {},
@@ -180,15 +170,6 @@ export async function renderBoardImage(
   return await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
 }
 
-function codeFor(icon: string): string | null {
-  if (icon === 'king') return 'K'
-  if (icon === 'queen') return 'Q'
-  if (icon === 'rook') return 'R'
-  if (icon === 'bishop') return 'B'
-  if (icon === 'knight') return 'N'
-  if (icon === 'pawn') return 'P'
-  return null
-}
 
 function roundRect(
   ctx: CanvasRenderingContext2D,

@@ -48,10 +48,6 @@ export function setSoundPack(id: string) {
   preloadSounds()
 }
 
-export function currentSoundPack() {
-  return packId
-}
-
 /**
  * Download every sound of every pack. Called once when the app opens, so a
  * fresh session with an empty cache still plays the very first move at once.
@@ -61,10 +57,6 @@ export function preloadSounds() {
   for (const pack of SOUND_PACKS) {
     for (const name of Object.keys(VOLUME) as SoundName[]) elementFor(pack.id, name)
   }
-}
-
-export function isSoundEnabled() {
-  return enabled
 }
 
 export function setSoundEnabled(value: boolean) {

@@ -1,15 +1,5 @@
-import { useEffect, useState } from 'react'
-import type { PieceType } from '@/engine/types'
+import { SAN_LETTERS, type PieceType } from '@/engine/types'
 import { RAINBOW, SHAPE_OF_ICON, artToUri, rainbowUri } from '@/lib/pieceArt'
-
-const CODES: Record<string, string> = {
-  king: 'K',
-  queen: 'Q',
-  rook: 'R',
-  bishop: 'B',
-  knight: 'N',
-  pawn: 'P',
-}
 
 export function PieceGlyph({
   piece,
@@ -23,7 +13,7 @@ export function PieceGlyph({
   muted?: boolean
 }) {
   if (!piece) return null
-  const code = CODES[piece.icon]
+  const code = SAN_LETTERS[piece.icon]
   // A random piece is drawn in the colours of a rainbow: it changes its kind
   // after every move, and it says so.
   const light = teamIndex === 0
@@ -116,23 +106,3 @@ export function PieceGlyph({
   )
 }
 
-export function useElementWidth<T extends HTMLElement>() {
-  const [node, setNode] = useState<T | null>(null)
-  const [width, setWidth] = useState(0)
-  useEffect(() => {
-    if (!node) return
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) setWidth(entry.contentRect.width)
-    })
-    observer.observe(node)
-    setWidth(node.getBoundingClientRect().width)
-    return () => observer.disconnect()
-  }, [node])
-  return [setNode, width] as const
-}
-
-export function boardCellSize(containerWidth: number, cols: number, max = 64, min = 20) {
-  if (!containerWidth) return max
-  const raw = Math.floor((containerWidth - 44) / cols)
-  return Math.max(min, Math.min(max, raw))
-}

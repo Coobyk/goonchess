@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { mateIn } from '@/engine/ai/score'
 
 /**
  * The bar beside the board.
@@ -16,14 +17,13 @@ export function EvalBar({
   score: number
   className?: string
 }) {
-  const mate = Math.abs(score) > 90_000
+  const inMoves = mateIn(score)
   // A pawn is a long way; anything past that is mate.
   const clamped = Math.max(-10, Math.min(10, score / 100))
   // The first army is at the bottom of the board, so it fills from there.
   const share = 50 + clamped * 5
-  const label = mate
-    ? `M${Math.max(1, Math.ceil((100_000 - Math.abs(score)) / 100))}`
-    : `${score >= 0 ? '+' : '−'}${Math.abs(clamped).toFixed(1)}`
+  const label =
+    inMoves !== null ? `M${inMoves}` : `${score >= 0 ? '+' : '−'}${Math.abs(clamped).toFixed(1)}`
 
   return (
     <div

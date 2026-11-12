@@ -1,12 +1,7 @@
+import { useEffect, useState } from 'react'
 import type { BotLevel } from '@/engine/ai/search'
 import type { BotReply, BotRequest } from '@/engine/ai/worker'
-import { createInitialState } from '@/engine/rules'
 import type { GameState, Move, Variant } from '@/engine/types'
-
-/** A starting position, used when a request carries no board of its own. */
-function emptyState(variant: Variant): GameState {
-  return createInitialState(variant)
-}
 
 /**
  * Talks to the bot worker. One search at a time: a new request replaces the
@@ -86,6 +81,16 @@ export class BotWorker {
     return worker
   }
 
+  /** One request replaces the last: the position it thought about is history. */
+  private send(request: Omit<BotRequest, 'id'>): Promise<BotResult> {
+    this.cancel()
+    const id = this.nextId++
+    return new Promise<BotResult>((resolve) => {
+      this.pending = { id, resolve }
+      this.ensureWorker().postMessage({ ...request, id })
+    })
+  }
+
   /** Starts a search. The promise resolves with the move the bot picked. */
   think(
     state: GameState,
@@ -100,43 +105,12 @@ export class BotWorker {
       wantLine?: boolean
     } = {},
   ): Promise<BotResult> {
-    this.cancel()
-    const worker = this.ensureWorker()
-    const id = this.nextId++
-    return new Promise<BotResult>((resolve) => {
-      this.pending = { id, resolve }
-      const request: BotRequest = {
-        id,
-        state,
-        team,
-        level,
-        seed: options.seed ?? Date.now(),
-        timeBudgetMs: options.timeBudgetMs,
-        analyze: options.analyze,
-        exclude: options.exclude,
-        wantLine: options.wantLine,
-      }
-      worker.postMessage(request)
-    })
+    return this.send({ state, team, level, seed: options.seed ?? Date.now(), ...options })
   }
 
   /** Looks for a puzzle in a variant. */
   findPuzzle(variant: Variant, seed = Date.now()): Promise<BotResult> {
-    this.cancel()
-    const worker = this.ensureWorker()
-    const id = this.nextId++
-    return new Promise<BotResult>((resolve) => {
-      this.pending = { id, resolve }
-      const request: BotRequest = {
-        id,
-        state: emptyState(variant),
-        team: variant.teams[0]?.id ?? 'white',
-        level: 'normal',
-        seed,
-        puzzle: { variant, seed },
-      }
-      worker.postMessage(request)
-    })
+    return this.send({ seed, puzzle: { variant, seed } })
   }
 
   /**
@@ -146,21 +120,7 @@ export class BotWorker {
    * as a graph of how the game went.
    */
   analyseGame(states: GameState[], team: string): Promise<BotResult> {
-    this.cancel()
-    const worker = this.ensureWorker()
-    const id = this.nextId++
-    return new Promise<BotResult>((resolve) => {
-      this.pending = { id, resolve }
-      const request: BotRequest = {
-        id,
-        state: states[0] ?? emptyState({} as Variant),
-        team,
-        level: 'casual',
-        seed: 1,
-        analyse: { states, team },
-      }
-      worker.postMessage(request)
-    })
+    return this.send({ seed: 1, analyseGame: { states, team } })
   }
 
   /** Drops the current search, if any. */
@@ -173,4 +133,11 @@ export class BotWorker {
     this.worker = null
     this.pending = null
   }
+}
+
+/** The worker client for the life of a component. */
+export function useBotWorker(): BotWorker {
+  const [client] = useState(() => new BotWorker())
+  useEffect(() => () => client.dispose(), [client])
+  return client
 }

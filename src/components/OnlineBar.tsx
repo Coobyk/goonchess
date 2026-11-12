@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
 import { AlertTriangle, Check, Copy, Eye, Flag, Loader2, MessageCircle, Radio, Send, Share2, Undo2, WifiOff, X } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { cn } from '@/lib/utils'
+import { copyText } from '@/lib/clipboard'
+import { CHAT_MAX_LENGTH } from '@/lib/protocol'
+import { pathFor } from '@/lib/router'
 
 /**
  * The strip above a shared board: which side you are, whether the other player
@@ -42,18 +44,14 @@ export function OnlineBar() {
   const nameOf = (seat: number) => variant.teams[seat]?.name ?? `team ${seat + 1}`
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/g/${online.code}`)
+    if (await copyText(`${window.location.origin}${pathFor('play', 'board', online.code)}`, 'Game link')) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
-      toast.success('Game link copied')
-    } catch {
-      toast.error('Clipboard unavailable — copy the address bar instead.')
     }
   }
 
   const share = async () => {
-    const url = `${window.location.origin}/g/${online.code}`
+    const url = `${window.location.origin}${pathFor('play', 'board', online.code)}`
     if (typeof navigator.share !== 'function') {
       await copy()
       return
@@ -201,7 +199,7 @@ export function OnlineBar() {
               <Input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                maxLength={280}
+                maxLength={CHAT_MAX_LENGTH}
                 placeholder="Say something…"
                 className="h-8 text-xs"
                 aria-label="Chat message"

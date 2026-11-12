@@ -1,5 +1,6 @@
 import type { GameState, Move, Variant } from '@/engine/types'
-import { createInitialState, squareName, teamById } from '@/engine/rules'
+import { createInitialState, squareName } from '@/engine/rules'
+import { castlingRights, enPassantTarget, findSquare } from '@/engine/repetition'
 import { classicChess } from '@/engine/templates'
 
 /**
@@ -63,63 +64,16 @@ export function toFen(state: GameState): string | null {
 
   const sideToMove = state.turn === variant.teams[0]?.id ? 'w' : 'b'
   const castling = castlingRights(state)
-  const enPassant = enPassantSquare(state)
+  const ep = enPassantTarget(state)
+  const enPassant = ep ? squareName(variant, ep.x, ep.y) : '-'
   const halfmove = halfmoveClock(state)
   const fullmove = Math.floor(state.moveHistory.length / 2) + 1
 
   return `${rankRows.join('/')} ${sideToMove} ${castling} ${enPassant} ${halfmove} ${fullmove}`
 }
 
-function castlingRights(state: GameState): string {
-  const { variant } = state
-  const rights: string[] = []
-  for (const team of variant.teams) {
-    const home = team.id === variant.teams[0]?.id ? variant.board.height - 1 : 0
-    // The king must be home and unmoved.
-    let kingHome = false
-    const rooks: { x: number }[] = []
-    for (const id in state.pieces) {
-      const inst = state.pieces[id]
-      if (inst.team !== team.id || inst.hasMoved) continue
-      const piece = state.pieceTypes[inst.typeId]
-      const at = findSquare(state, id)
-      if (!at || at.y !== home) continue
-      if (piece?.icon === 'king') kingHome = true
-      if (piece?.icon === 'rook') rooks.push({ x: at.x })
-    }
-    if (!kingHome || rooks.length < 2) continue
-    const left = Math.min(...rooks.map((r) => r.x))
-    const right = Math.max(...rooks.map((r) => r.x))
-    const upper = team.id === variant.teams[0]?.id
-    if (left < variant.board.width / 2) rights.push(upper ? 'Q' : 'q')
-    if (right >= variant.board.width / 2) rights.push(upper ? 'K' : 'k')
-  }
-  // The rights are written in the usual order: KQkq.
-  const order = 'KQkq'
-  const set = new Set(rights)
-  const sorted = order.split('').filter((c) => set.has(c)).join('')
-  return sorted || '-'
-}
 
-function findSquare(state: GameState, pieceId: string) {
-  for (let y = 0; y < state.board.length; y++) {
-    const x = state.board[y].indexOf(pieceId)
-    if (x >= 0) return { x, y }
-  }
-  return null
-}
 
-function enPassantSquare(state: GameState): string {
-  const last = state.moveHistory[state.moveHistory.length - 1]
-  if (!last) return '-'
-  const piece = state.pieceTypes[state.pieces[last.move.pieceId]?.typeId ?? '']
-  if (piece?.icon !== 'pawn') return '-'
-  const dy = last.move.finalTo.y - last.move.from.y
-  if (Math.abs(dy) !== 2) return '-'
-  const x = last.move.finalTo.x
-  const y = last.move.finalTo.y - Math.sign(dy)
-  return `${String.fromCharCode(97 + x)}${state.variant.board.height - y}`
-}
 
 function halfmoveClock(state: GameState): number {
   let count = 0
@@ -181,24 +135,54 @@ export function fromFen(fen: string): { variant: Variant; game: GameState } | nu
   const turn = side === 'b' ? variant.teams[1].id : variant.teams[0].id
   game.turn = turn
 
-  // The engine only knows en passant from the last move, so a double push is
-  // written into the history to make it work.
+  // The engine only knows castling from the unmoved flags, so a letter the
+  // FEN withholds is written back as a rook (or the king) having moved.
+  const rights = castling ?? '-'
+  for (const team of variant.teams) {
+    const upper = team.id === variant.teams[0].id
+    const home = upper ? variant.board.height - 1 : 0
+    const [k, q] = upper ? ['K', 'Q'] : ['k', 'q']
+    if (!rights.includes(k) && !rights.includes(q)) {
+      // The king has no rights either side, so it cannot castle at all.
+      const king = Object.keys(game.pieces).find((id) => {
+        const inst = game.pieces[id]
+        const at = findSquare(game, id)
+        return inst.team === team.id && game.pieceTypes[inst.typeId]?.icon === 'king' && at?.y === home
+      })
+      if (king) game.pieces[king].hasMoved = true
+      continue
+    }
+    for (const [letter, wing] of [[k, 1], [q, -1]] as const) {
+      if (rights.includes(letter)) continue
+      // The rook on that wing has moved (or is gone, which denies the castle
+      // just the same).
+      const rook = Object.keys(game.pieces).find((id) => {
+        const inst = game.pieces[id]
+        const at = findSquare(game, id)
+        const onWing = at && Math.sign(at.x - variant.board.width / 2 + 0.5) === wing
+        return inst.team === team.id && game.pieceTypes[inst.typeId]?.icon === 'rook' && at?.y === home && onWing
+      })
+      if (rook) game.pieces[rook].hasMoved = true
+    }
+  }
+
+  // The engine only knows en passant from the last move, so the push that
+  // opened it is written into the history: the square the FEN names is the
+  // one that was skipped, and the pawn that crossed it stands beside it on
+  // the same file, on the team that is not to move.
   if (enPassant !== '-') {
     const file = enPassant.charCodeAt(0) - 97
-    const rank = Number(enPassant[1])
-    const y = variant.board.height - rank
-    const team = turn
+    const y = variant.board.height - Number(enPassant[1])
     const pawnId = Object.keys(game.pieces).find((id) => {
       const inst = game.pieces[id]
-      if (inst.team !== team) return false
-      const piece = game.pieceTypes[inst.typeId]
-      if (piece?.icon !== 'pawn') return false
+      if (inst.team === turn) return false
+      if (!game.pieceTypes[inst.typeId]?.flags.enPassant) return false
       const at = findSquare(game, id)
-      return !!at && at.x === file
+      return !!at && at.x === file && Math.abs(at.y - y) === 1
     })
     if (pawnId) {
-      const from = { x: file, y: y === 0 ? 1 : y + 1 }
-      const to = { x: file, y }
+      const to = findSquare(game, pawnId)!
+      const from = { x: file, y: 2 * y - to.y }
       const move: Move = {
         from,
         to,
@@ -206,18 +190,15 @@ export function fromFen(fen: string): { variant: Variant; game: GameState } | nu
         effects: [],
         finalTo: to,
       }
-      game.pieces[pawnId].hasMoved = true
       game.moveHistory = [
         {
           move,
-          team,
-          notation: `Pawn ${squareName(variant, from.x, from.y)}-${squareName(variant, to.x, to.y)}`,
+          team: game.pieces[pawnId].team,
+          notation: `${squareName(variant, from.x, from.y)}-${squareName(variant, to.x, to.y)}`,
         },
       ]
     }
   }
 
-  void castling
-  void teamById
   return { variant, game }
 }

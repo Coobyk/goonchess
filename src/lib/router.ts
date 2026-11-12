@@ -1,4 +1,5 @@
-import type { MakerTab, View } from '@/store/useAppStore'
+export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
+export type View = 'play' | 'maker' | 'rulebook'
 
 export const MAKER_TABS: MakerTab[] = ['board', 'pieces', 'setup', 'rules']
 

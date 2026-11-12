@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Library, Save, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
@@ -28,6 +28,11 @@ export function LibraryDialog({
   const loadFromLibrary = useAppStore((s) => s.loadFromLibrary)
   const deleteFromLibrary = useAppStore((s) => s.deleteFromLibrary)
   const [name, setName] = useState(variant.name)
+  // The dialog stays mounted between opens, so the field follows whichever
+  // variant is showing when it next appears.
+  useEffect(() => {
+    if (open) setName(variant.name)
+  }, [open, variant.name])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

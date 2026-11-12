@@ -12,7 +12,9 @@ import {
   VolumeX,
   Wrench,
 } from 'lucide-react'
-import type { Effect, MovePattern, PieceType, TeamConfig, Terrain, Vec, VariantRule } from '@/engine/types'
+import { TerrainSwatch } from './TerrainOverlay'
+import { vecKey, type Effect, type MovePattern, type PieceType, type TeamConfig, type Terrain, type Vec, type VariantRule, type WinConditionKind } from '@/engine/types'
+import { ALL8, DIAG, KNIGHT, ORTH } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
 import { useAppStore } from '@/store/useAppStore'
 import { findPack } from '@/lib/soundPacks'
@@ -24,10 +26,10 @@ import { MakerBoard } from './MakerBoard'
 import { PieceGlyph } from './PieceGlyph'
 import { PuzzlePanel } from './PuzzlePanel'
 
-const ORTH_KEY = ['-1,0', '0,-1', '0,1', '1,0'].join('|')
-const DIAG_KEY = ['-1,-1', '-1,1', '1,-1', '1,1'].join('|')
-const ALL8_KEY = ['-1,-1', '-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0', '1,1'].join('|')
-const KNIGHT_KEY = ['-1,-2', '-1,2', '-2,-1', '-2,1', '1,-2', '1,2', '2,-1', '2,1'].join('|')
+const ORTH_KEY = setKey(ORTH)
+const DIAG_KEY = setKey(DIAG)
+const ALL8_KEY = setKey(ALL8)
+const KNIGHT_KEY = setKey(KNIGHT)
 
 const TERRAIN_COPY: Record<Terrain, { name: string; hint: string }> = {
   normal: { name: 'Normal', hint: 'Open ground. Any piece may enter or pass through.' },
@@ -37,7 +39,7 @@ const TERRAIN_COPY: Record<Terrain, { name: string; hint: string }> = {
   oneway: { name: 'One-way portal', hint: 'A portal that only sends pieces in one direction.' },
 }
 
-const WIN_COPY: Record<string, { name: string; hint: string }> = {
+const WIN_COPY: Record<WinConditionKind, { name: string; hint: string }> = {
   checkmate: {
     name: 'Checkmate',
     hint: 'Trap the enemy royal piece so it is attacked and has no legal escape.',
@@ -66,6 +68,10 @@ const WIN_COPY: Record<string, { name: string; hint: string }> = {
   race: {
     name: 'The race',
     hint: 'The first king to reach the far rank wins the game. If White lands there first, Black gets one reply — reaching the far rank with it is a draw.',
+  },
+  predator: {
+    name: 'Slay the Predator',
+    hint: 'Only a king can slay a Predator for good. Win by slaying the enemy one, or — as the Predator — by eating every pawn and minor piece.',
   },
 }
 
@@ -111,10 +117,6 @@ const TURN_VIEW_COPY = {
   pieces:
     'Turn pieces — the squares stay put and the pieces rotate to face the player whose turn it is. Useful when two players share one screen from opposite ends.',
 } as const
-
-function vecKey(v: Vec) {
-  return `${v.x},${v.y}`
-}
 
 function setKey(vectors: Vec[]) {
   return vectors.map(vecKey).sort().join('|')
@@ -325,18 +327,12 @@ export function RulebookView() {
             <CardContent className="space-y-2.5 px-4 text-xs">
               {presentTerrain.map((terrain) => (
                 <div key={terrain} className="flex items-start gap-2">
-                  <span
-                    className={
-                      terrain === 'normal'
-                        ? 'mt-0.5 inline-block size-3 shrink-0 rounded-sm border bg-[repeating-conic-gradient(var(--color-muted)_0%_25%,transparent_0%_50%)] bg-[length:6px_6px]'
-                        : terrain === 'wall'
-                          ? 'mt-0.5 inline-block size-3 shrink-0 rounded-sm border bg-[repeating-linear-gradient(45deg,transparent_0_2px,rgba(0,0,0,0.35)_2px_4px)]'
-                          : terrain === 'void'
-                            ? 'mt-0.5 inline-block size-3 shrink-0 rounded-sm border bg-black'
-                            : 'mt-0.5 inline-block size-3 shrink-0 rounded-sm bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.9),rgba(56,189,248,0.15))]'
-                    }
-                    aria-hidden
-                  />
+                  <TerrainSwatch
+                    terrain={terrain}
+                    className={terrain === 'oneway' ? 'mt-0.5 font-mono text-[8px] text-cyan-100' : 'mt-0.5'}
+                  >
+                    {terrain === 'oneway' ? '1→' : null}
+                  </TerrainSwatch>
                   <span className="min-w-0">
                     <span className="font-medium">
                       {TERRAIN_COPY[terrain].name}

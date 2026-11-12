@@ -1,4 +1,5 @@
 import { RotateCcw } from 'lucide-react'
+import { DEFAULT_POINT_TARGET } from '@/engine/types'
 import { useAppStore } from '@/store/useAppStore'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -123,7 +124,7 @@ export function RulesTab() {
                 type="number"
                 min={1}
                 className="w-24"
-                value={points.threshold ?? 20}
+                value={points.threshold ?? DEFAULT_POINT_TARGET}
                 onChange={(e) => setPointThreshold(Number(e.target.value))}
               />
             </div>

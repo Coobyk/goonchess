@@ -1,5 +1,7 @@
 /** Codes, tokens and hashes. */
 
+import { toBase64Url } from '../src/lib/base64'
+
 /** Base32 without the letters that look like digits, so a code can be read out loud. */
 const ALPHABET = '0123456789abcdefghjkmnpqrstvwxyz'
 const CODE_LENGTH = 10
@@ -17,12 +19,6 @@ export function randomCode(): string {
 /** The secret that a seat is. Never leaves the browser that holds it. */
 export function randomToken(): string {
   return toBase64Url(crypto.getRandomValues(new Uint8Array(24)))
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 /** Only the hash is stored, so a dump of the room is not a set of seats. */

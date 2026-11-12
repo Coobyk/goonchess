@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { TerrainOverlay } from './TerrainOverlay'
 import { BoardShell, tileBackground } from './BoardShell'
-import { PieceGlyph, boardCellSize, useElementWidth } from './PieceGlyph'
+import { PieceGlyph } from './PieceGlyph'
+import { boardCellSize, useElementWidth } from '@/lib/boardMetrics'
 import { EvalBar } from './EvalBar'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
 import { ThreatArrows } from './ThreatArrows'
 import { BestMoveArrow } from './BestMoveArrow'
-import { useAppStore } from '@/store/useAppStore'
-import { getLegalMoves, isInCheck } from '@/engine/rules'
-import { humanSeatFor } from '@/engine/ai/botSettings'
-import { computeThreats, mergeThreats } from '@/engine/threats'
-import type { Move, PieceType, Vec } from '@/engine/types'
+import { useAppStore, selectViewerSeat } from '@/store/useAppStore'
+import { getLegalMoves, isInCheck, squareName } from '@/engine/rules'
+import { threatsFor } from '@/engine/threats'
+import type { Move, PieceType, Vec, Variant} from '@/engine/types'
 import { BLAST_STAGGER, travelMs, useMoveAnimation } from '@/lib/moveAnimation'
 import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
@@ -294,9 +295,6 @@ export function GameBoard() {
   const analysis = useAppStore((s) => s.analysis)
   const threatSettings = useAppStore((s) => s.threats)
   const turnView = useAppStore((s) => s.turnView)
-  const online = useAppStore((s) => s.online)
-  const bot = useAppStore((s) => s.bot)
-  const botSide = useAppStore((s) => s.botSide)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [container, width] = useElementWidth<HTMLDivElement>()
   // The square the keyboard cursor is on. Arrow keys move it, Enter plays.
@@ -387,14 +385,7 @@ export function GameBoard() {
 
   const draggingId = drag?.pieceId
 
-  const threats = useMemo(() => {
-    if (!threatSettings.show) return null
-    const teams =
-      threatSettings.scope === 'both'
-        ? variant.teams.map((team) => team.id)
-        : [turn]
-    return mergeThreats(teams.map((team) => computeThreats(game, team)))
-  }, [game, turn, variant.teams, threatSettings.show, threatSettings.scope])
+  const threats = useMemo(() => threatsFor(game, threatSettings), [game, threatSettings])
 
   const lastRecord = game.moveHistory[game.moveHistory.length - 1]
   const lastMove = lastRecord?.move
@@ -425,7 +416,7 @@ export function GameBoard() {
   // flipping for the side to move.
   // A spectator of a shared game has no seat either, so the bot's side only
   // counts when no room is joined at all.
-  const viewerSeat = online ? online.seat : humanSeatFor(variant, bot, botSide)
+  const viewerSeat = useAppStore(selectViewerSeat)
   const viewerIndex =
     viewerSeat !== null && variant.teams[viewerSeat] ? viewerSeat : sideIndex
   const targetOrientation =
@@ -565,7 +556,15 @@ export function GameBoard() {
   return (
     <div ref={container} className="relative flex w-full items-stretch justify-center gap-2">
       {(analysisMode === 'engine' || analysisMode === 'computer') && (analysisResult || game.winner) && (
-        <EvalBar score={game.winner ? (game.winner === variant.teams[0]?.id ? 1000 : -1000) : (analysisResult?.score ?? 0)} />
+        <EvalBar score={
+            game.winner
+              ? game.winner === 'draw'
+                ? 0
+                : game.winner === variant.teams[0]?.id
+                  ? 1000
+                  : -1000
+              : (analysisResult?.score ?? 0)
+          } />
       )}
       <BoardShell
         width={cols}
@@ -683,19 +682,7 @@ export function GameBoard() {
                 style={{ backgroundColor: tileBackground(x, y) }}
               >
                 {isLast && <span className="absolute inset-0 bg-amber-400/25" />}
-                {tile?.terrain === 'wall' && (
-                  <span className="absolute inset-0 bg-foreground/25 [background-image:repeating-linear-gradient(45deg,transparent_0_5px,rgba(0,0,0,0.25)_5px_7px)]" />
-                )}
-                {tile?.terrain === 'void' && <span className="absolute inset-0 bg-black/75" />}
-                {(tile?.terrain === 'portal' || tile?.terrain === 'oneway') && (
-                  <span
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        'radial-gradient(circle at center, rgba(56,189,248,0.55), rgba(56,189,248,0.12) 60%, transparent 72%)',
-                    }}
-                  />
-                )}
+                <TerrainOverlay terrain={tile?.terrain} />
 
                 {covered && (
                   <span className="threat-coverage pointer-events-none absolute inset-0 z-[5]" />
@@ -787,11 +774,9 @@ function describeSquare(
   y: number,
   piece: { team: string } | null,
   pieceType: { name: string } | null,
-  variant: { board: { width: number; height: number }; teams: { id: string; name: string }[] },
+  variant: Variant,
 ) {
-  const file = String.fromCharCode(97 + x)
-  const rank = variant.board.height - y
-  const name = `${file}${rank}`
+  const name = squareName(variant, x, y)
   if (!piece || !pieceType) return `${name}, empty`
   const team = variant.teams.find((t) => t.id === piece.team)
   return `${name}, ${team?.name ?? piece.team} ${pieceType.name}`.replace(/\s+/g, ' ')

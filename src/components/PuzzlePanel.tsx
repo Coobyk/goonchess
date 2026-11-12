@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Flame, Lightbulb, Loader2, Puzzle as PuzzleIcon, Repeat, SkipForward } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { BotWorker } from '@/lib/bot'
+import { useBotWorker } from '@/lib/bot'
 import { loadPuzzleStats, savePuzzleStats } from '@/lib/persist'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -46,19 +46,12 @@ export function PuzzlePanel() {
   const setVerdict = useAppStore((s) => s.setPuzzleVerdict)
   const setPuzzleStart = useAppStore((s) => s.setPuzzleStart)
   const resetGame = useAppStore((s) => s.resetGame)
-  const worker = useRef<BotWorker | null>(null)
+  const client = useBotWorker()
   const [busy, setBusy] = useState(false)
   const [stats, setStats] = useState(loadPuzzleStats)
   const [streakMode, setStreakMode] = useState(false)
   const streakModeRef = useRef(streakMode)
   streakModeRef.current = streakMode
-
-  useEffect(() => {
-    return () => {
-      worker.current?.dispose()
-      worker.current = null
-    }
-  }, [])
 
   // Another variant means another puzzle. The panel remounts whenever the
   // player comes back from the board, so only a real change of variant — or a
@@ -80,8 +73,6 @@ export function PuzzlePanel() {
   const loadPuzzle = async () => {
     setBusy(true)
     try {
-      const client = worker.current ?? new BotWorker()
-      worker.current = client
       const result = await client.findPuzzle(variant, Math.floor(Math.random() * 1e9))
       if (!result.puzzle) {
         toast.error('No puzzle could be found in this variant.')

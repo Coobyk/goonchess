@@ -17,3 +17,7 @@ export function boardColors(): { light: string; dark: string } {
     dark: styles.getPropertyValue('--board-dark').trim() || BOARD_DARK,
   }
 }
+
+/** The portal glow — every board, legend and exported picture shades portals
+ * the same cyan. */
+export const portalRgba = (alpha: number): string => `rgba(56,189,248,${alpha})`

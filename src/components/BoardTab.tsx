@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Eraser, Grid3x3, Paintbrush } from 'lucide-react'
+import { BOARD_MAX, BOARD_MIN } from '@/engine/types'
 import type { Terrain } from '@/engine/types'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
@@ -57,8 +58,8 @@ export function BoardTab() {
               <Input
                 id="board-w"
                 type="number"
-                min={3}
-                max={16}
+                min={BOARD_MIN}
+                max={BOARD_MAX}
                 className="w-24"
                 value={w}
                 onChange={(e) => setW(Number(e.target.value))}
@@ -69,8 +70,8 @@ export function BoardTab() {
               <Input
                 id="board-h"
                 type="number"
-                min={3}
-                max={16}
+                min={BOARD_MIN}
+                max={BOARD_MAX}
                 className="w-24"
                 value={h}
                 onChange={(e) => setH(Number(e.target.value))}

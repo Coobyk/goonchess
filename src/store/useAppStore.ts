@@ -1,14 +1,32 @@
 import { create } from 'zustand'
-import type { GameState, Move, PieceType, Terrain, Variant, Vec } from '@/engine/types'
+import {
+  BOARD_MAX,
+  BOARD_MIN,
+  DEFAULT_POINT_TARGET,
+  defaultPieceFlags,
+  DICE_SIDES,
+  intentMatches,
+  isPocketSquare,
+  POCKET_SQUARE,
+  type GameState,
+  type Move,
+  type PieceFlags,
+  type PieceType,
+  type Terrain,
+  type Variant,
+  type Vec,
+} from '@/engine/types'
 import { applyMove, createInitialState, dropOptions, getLegalMoves, rollRandomPieces, uid } from '@/engine/rules'
 import { defaultVariant, TEMPLATES } from '@/engine/templates'
 import type { ThreatSettings } from '@/engine/threats'
 import {
   DEFAULT_BOT_SETTINGS,
+  humanSeatFor,
   isBotTeam,
   rollBotSide,
   type BotSettings,
 } from '@/engine/ai/botSettings'
+import { positionKey } from '@/engine/repetition'
 import { variantFromHash } from '@/lib/encoding'
 import { DEFAULT_ANALYSIS_SETTINGS, type AnalysisSettings } from '@/lib/analysis'
 import {
@@ -42,12 +60,16 @@ import {
 } from '@/lib/sound'
 import {
   clockIsOn,
+  flagFell,
   initialClockState,
   NO_CLOCK,
+  projectedClock,
+  settleClock,
+  flagFall,
   type ClockSettings,
   type ClockState,
 } from '@/lib/clock'
-import { pushRoute, routeFromLocation } from '@/lib/router'
+import { pushRoute, routeFromLocation, type MakerTab, type View } from '@/lib/router'
 import { proveWork } from '@/lib/captcha'
 import { toast } from 'sonner'
 import {
@@ -58,9 +80,9 @@ import {
   type CreateResult,
   type ServerMessage,
 } from '@/lib/online'
+import { CHAT_HISTORY } from '@/lib/protocol'
 
-export type MakerTab = 'board' | 'pieces' | 'setup' | 'rules'
-export type View = 'play' | 'maker' | 'rulebook'
+export type { MakerTab, View }
 
 /** How the position is analysed. */
 export type AnalysisMode = 'off' | 'engine' | 'computer'
@@ -115,7 +137,6 @@ interface AppState {
   /** A move that is waiting for the current animation to finish. */
   queuedMove: { move: Move; origin?: Vec; promotionTypeId?: string } | null
   /** While reviewing a finished game's history (graph / undo), bots stay stopped. */
-  reviewingHistory: boolean
   clock: ClockSettings
   clockState: ClockState
   /** Earlier versions of the variant, for undo. */
@@ -269,7 +290,7 @@ function initialVariant(): Variant {
   return defaultVariant()
 }
 
-export function normalizeVariant(input: unknown): Variant | null {
+function normalizeVariant(input: unknown): Variant | null {
   if (!input || typeof input !== 'object') return null
   const v = input as Variant
   if (!v.board || !Array.isArray(v.pieceTypes) || !Array.isArray(v.teams)) return null
@@ -282,19 +303,7 @@ export function normalizeVariant(input: unknown): Variant | null {
     winConditions: Array.isArray(v.winConditions) ? v.winConditions : [],
     pieceTypes: v.pieceTypes.map((p) => ({
       ...p,
-      flags: {
-        jump: false,
-        mustCapture: false,
-        uncapturable: false,
-        royal: false,
-        movesOnce: false,
-        random: false,
-        mirror: true,
-        enPassant: false,
-        dice: false,
-        predator: false,
-        ...((p.flags ?? {}) as Partial<NonNullable<typeof p.flags>>),
-      },
+      flags: defaultPieceFlags(p.flags as Partial<PieceFlags> | undefined),
       effects: p.effects ?? [],
       capture: p.capture ?? [],
       move: p.move ?? [],
@@ -341,22 +350,51 @@ export const useAppStore = create<AppState>((set, get) => {
     return bot.side
   }
 
+  /** A fresh board for a variant: opening position, reset clock, nothing held over. */
+  const freshGame = (variant: Variant) => {
+    const game = createInitialState(variant)
+    return {
+      variant,
+      game,
+      selected: null,
+      legalMoves: [] as Move[],
+      undoStack: [game],
+      clockState: initialClockState(get().clock, variant),
+      botSide: sideFor(get().bot, variant, get().botSide),
+    }
+  }
+
+  /**
+   * Whether the local player may touch the board. In a shared game that means
+   * holding the seat that is to move, with the socket still up.
+   */
+  const mayAct = (online: OnlineGame | null, game: GameState): boolean => {
+    if (!online) return true
+    if (online.seat === null || online.status !== 'playing') return false
+    // A move made while the socket is down would never reach the room.
+    if (!online.connected) {
+      set({ online: { ...online, error: 'offline' } })
+      return false
+    }
+    return game.turn === game.variant.teams[online.seat]?.id
+  }
+
+  /**
+   * A move's position joins the history; a move made after rewinding replaces
+   * what came after it.
+   */
+  const pushHistory = (from: GameState, next: GameState): GameState[] =>
+    [...get().undoStack.slice(0, from.moveHistory.length + 1), next]
+
   const commit = (variant: Variant) => {
     // Editing the variant ends a shared game: the room has its own copy.
     if (get().online) get().leaveOnline()
     saveVariant(variant)
-    const bot = get().bot
     const previous = get().variant
     set({
-      variant,
-      game: createInitialState(variant),
-      selected: null,
-      legalMoves: [],
-      undoStack: [createInitialState(variant)],
-      clockState: initialClockState(get().clock, variant.teams.map((team) => team.id)),
+      ...freshGame(variant),
       variantHistory: [...get().variantHistory, previous].slice(-60),
       variantFuture: [],
-      botSide: sideFor(bot, variant, get().botSide),
     })
   }
 
@@ -364,18 +402,7 @@ export const useAppStore = create<AppState>((set, get) => {
   const commitDirect = (variant: Variant, history: Variant[], future: Variant[]) => {
     if (get().online) get().leaveOnline()
     saveVariant(variant)
-    const bot = get().bot
-    set({
-      variant,
-      game: createInitialState(variant),
-      selected: null,
-      legalMoves: [],
-      undoStack: [],
-      clockState: initialClockState(get().clock, variant.teams.map((team) => team.id)),
-      variantHistory: history,
-      variantFuture: future,
-      botSide: sideFor(bot, variant, get().botSide),
-    })
+    set({ ...freshGame(variant), undoStack: [], variantHistory: history, variantFuture: future })
   }
 
   /**
@@ -396,7 +423,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const clock = message.clock ?? NO_CLOCK
       const clockState =
         rebaseClock(message.clockState) ??
-        initialClockState(clock, message.variant.teams.map((team) => team.id))
+        initialClockState(clock, message.variant)
       set({
         variant: message.variant,
         game,
@@ -407,7 +434,6 @@ export const useAppStore = create<AppState>((set, get) => {
         legalMoves: [],
         pendingPromotion: null,
         queuedMove: null,
-        reviewingHistory: false,
         online: {
           ...online,
           seat: message.you.seat,
@@ -452,7 +478,7 @@ export const useAppStore = create<AppState>((set, get) => {
       set({
         online: {
           ...online,
-          chat: [...online.chat.slice(-29), { from: message.from, text: message.text, at: message.at }],
+          chat: [...online.chat, { from: message.from, text: message.text, at: message.at }].slice(-CHAT_HISTORY),
         },
       })
       return
@@ -503,7 +529,6 @@ export const useAppStore = create<AppState>((set, get) => {
         legalMoves: [],
         pendingPromotion: null,
         queuedMove: null,
-        reviewingHistory: false,
         online: { ...online, error: message.code },
       })
       return
@@ -514,7 +539,7 @@ export const useAppStore = create<AppState>((set, get) => {
     const local = get().game
     const next = message.game
     if (
-      next.moveHistory.length === local.moveHistory.length &&
+      positionKey(next) === positionKey(local) &&
       next.winner === local.winner &&
       next.status === local.status
     ) {
@@ -535,7 +560,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // A move taken back, or a rematch, rewinds the history: the board shows
       // what the room holds, and the take-backs start from there.
       undoStack: fresh
-        ? [...get().undoStack.slice(0, local.moveHistory.length + 1), next]
+        ? pushHistory(local, next)
         : shrank
           ? [next]
           : get().undoStack,
@@ -543,7 +568,6 @@ export const useAppStore = create<AppState>((set, get) => {
       legalMoves: [],
       pendingPromotion: null,
       queuedMove: null,
-      reviewingHistory: false,
       clockState: rebaseClock(message.clockState) ?? get().clockState,
       online: {
         ...online,
@@ -571,7 +595,7 @@ export const useAppStore = create<AppState>((set, get) => {
     botThinking: false,
     opponentOpen: false,
     clock: initialClock,
-    clockState: initialClockState(initialClock, initial.teams.map((t) => t.id)),
+    clockState: initialClockState(initialClock, initial),
     variantHistory: [],
     variantFuture: [],
     selected: null,
@@ -581,7 +605,6 @@ export const useAppStore = create<AppState>((set, get) => {
     pendingPromotion: null,
     boardAnimating: false,
     queuedMove: null,
-    reviewingHistory: false,
     puzzleStart: null,
     puzzle: null,
     puzzleVerdict: null,
@@ -596,7 +619,16 @@ export const useAppStore = create<AppState>((set, get) => {
       pushRoute(view, get().makerTab, view === 'play' ? (get().online?.code ?? null) : null)
     },
     setMakerTab: (makerTab) => {
-      set({ makerTab })
+      const { brush, variant } = get()
+      const next: { makerTab: MakerTab; brush?: Brush } = { makerTab }
+      // The brush follows the tab: terrain paints on the board, pieces land
+      // in setup.
+      if (makerTab === 'setup' && brush.mode === 'terrain') {
+        next.brush = { ...brush, mode: 'piece', typeId: variant.pieceTypes[0]?.id ?? null }
+      } else if (makerTab === 'board' && brush.mode === 'piece') {
+        next.brush = { ...brush, mode: 'terrain' }
+      }
+      set(next)
       if (get().view === 'maker') pushRoute('maker', makerTab)
     },
     applyRoute: ({ view, makerTab, gameCode }) => {
@@ -673,8 +705,8 @@ export const useAppStore = create<AppState>((set, get) => {
 
     resizeBoard: (width, height) => {
       const v = get().variant
-      const w = Math.max(3, Math.min(16, Math.round(width)))
-      const h = Math.max(3, Math.min(16, Math.round(height)))
+      const w = Math.max(BOARD_MIN, Math.min(BOARD_MAX, Math.round(width)))
+      const h = Math.max(BOARD_MIN, Math.min(BOARD_MAX, Math.round(height)))
       const tiles = Array.from({ length: h }, (_, y) =>
         Array.from({ length: w }, (_, x) => v.board.tiles[y]?.[x] ?? { terrain: 'normal' as Terrain }),
       )
@@ -763,19 +795,7 @@ export const useAppStore = create<AppState>((set, get) => {
           { id: uid(), kind: 'leaper', vectors: [{ x: 0, y: -1 }], maxRange: 0 },
         ],
         capture: piece?.capture ?? [],
-        flags: {
-          jump: false,
-          mustCapture: false,
-          uncapturable: false,
-          royal: false,
-          movesOnce: false,
-        random: false,
-          mirror: true,
-          enPassant: false,
-          dice: false,
-          predator: false,
-          ...piece?.flags,
-        },
+        flags: defaultPieceFlags(piece?.flags),
         effects: piece?.effects ?? [],
         promotion: piece?.promotion ?? null,
       }
@@ -838,7 +858,7 @@ export const useAppStore = create<AppState>((set, get) => {
       } else {
         winConditions = [
           ...v.winConditions,
-          { id: uid(), kind, threshold: kind === 'points' ? 20 : undefined },
+          { id: uid(), kind, threshold: kind === 'points' ? DEFAULT_POINT_TARGET : undefined },
         ]
       }
       commit({ ...v, winConditions })
@@ -858,20 +878,11 @@ export const useAppStore = create<AppState>((set, get) => {
       const { game, selected, legalMoves, bot, botSide } = get()
       if (game.winner) return
       // In a shared game only the player whose turn it is may touch the board.
-      const online = get().online
-      if (online) {
-        if (online.seat === null || online.status !== 'playing') return
-        // A move made while the socket is down would never reach the room.
-        if (!online.connected) {
-          set({ online: { ...online, error: 'offline' } })
-          return
-        }
-        if (game.turn !== game.variant.teams[online.seat]?.id) return
-      }
+      if (!mayAct(get().online, game)) return
       // The bot plays its own side — the human cannot touch it.
       if (isBotTeam(bot, game.turn, botSide)) return
       if (selected) {
-        const move = legalMoves.find((m) => m.finalTo.x === x && m.finalTo.y === y)
+        const move = legalMoves.find((m) => intentMatches(m, { finalTo: { x, y } }))
         if (move) {
           const options = move.promotionOptions ?? []
           if (options.length > 1) {
@@ -892,7 +903,7 @@ export const useAppStore = create<AppState>((set, get) => {
           const piece = game.pieceTypes[inst.typeId]
           let position = game
           if (piece?.flags.dice) {
-            const value = 1 + Math.floor(Math.random() * 6)
+            const value = 1 + Math.floor(Math.random() * DICE_SIDES)
             position = { ...game, roll: { pieceId, value } }
             set({ game: position })
           }
@@ -913,25 +924,17 @@ export const useAppStore = create<AppState>((set, get) => {
       const { game, bot, botSide, selected, legalMoves } = get()
       if (game.winner) return
       // The same gates as touching the board: your turn, your side, connected.
-      const online = get().online
-      if (online) {
-        if (online.seat === null || online.status !== 'playing') return
-        if (!online.connected) {
-          set({ online: { ...online, error: 'offline' } })
-          return
-        }
-        if (game.turn !== game.variant.teams[online.seat]?.id) return
-      }
+      if (!mayAct(get().online, game)) return
       if (isBotTeam(bot, game.turn, botSide)) return
       // The pocket piece picked up by the off-board square — no real square is
       // ever selected while a drop is being lined up.
-      const holding = selected && selected.x === -1 && selected.y === -1
+      const holding = selected && isPocketSquare(selected)
       if (holding && (legalMoves[0]?.drop?.typeId ?? null) === typeId) {
         set({ selected: null, legalMoves: [], pendingPromotion: null })
         return
       }
       set({
-        selected: { x: -1, y: -1 },
+        selected: { ...POCKET_SQUARE },
         legalMoves: dropOptions(game, game.turn)
           .filter((option) => option.move.drop?.typeId === typeId)
           .map((option) => option.move),
@@ -969,14 +972,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const clock = get().clock
       const clockState = get().clockState
       if (game.winner) return
-      if (online) {
-        if (online.seat === null || online.status !== 'playing') return
-        if (!online.connected) {
-          set({ online: { ...online, error: 'offline' } })
-          return
-        }
-        if (game.turn !== game.variant.teams[online.seat]?.id) return
-      }
+      if (!mayAct(online, game)) return
       // What the board looked like before this move, so a move the room never
       // accepted can be taken back again.
       const before = { game, undoStack: get().undoStack, clockState }
@@ -988,44 +984,23 @@ export const useAppStore = create<AppState>((set, get) => {
       }
       // The clock runs while the player thinks, so the time is settled first.
       const now = Date.now()
-      let clockNext = clockState
-      if (clockIsOn(clock) && clockState.running && clockState.lastMoveAt !== null) {
-        const mover = game.turn
-        const elapsed = now - clockState.lastMoveAt
-        const left = Math.max(0, (clockState.times[mover] ?? 0) - elapsed)
-        if (left <= 0 && !online) {
-          // The flag fell before the move was made. Online, the room owns the
-          // flag, so the move is still sent and the room decides.
-          const order = game.variant.teams.map((t) => t.id)
-          const index = order.indexOf(mover)
-          set({
-            game: { ...game, winner: order[(index + 1) % order.length], status: 'timeout' },
-            clockState: {
-              ...clockState,
-              times: { ...clockState.times, [mover]: 0 },
-              lastMoveAt: null,
-              running: false,
-            },
-            selected: null,
-            legalMoves: [],
-            pendingPromotion: null,
-          })
-          return
-        }
-        clockNext = {
-          times: { ...clockState.times, [mover]: left + clock.increment * 1000 },
-          lastMoveAt: now,
-          running: true,
-        }
-      } else if (clockIsOn(clock)) {
-        // The first move starts the clock and still earns the increment.
-        const mover = game.turn
-        clockNext = {
-          times: { ...clockState.times, [mover]: (clockState.times[mover] ?? 0) + clock.increment * 1000 },
-          lastMoveAt: now,
-          running: true,
-        }
+      const mover = game.turn
+      if (clockIsOn(clock) && flagFell(clockState, mover, now) && !online) {
+        // The flag fell before the move was made. Online, the room owns the
+        // flag, so the move is still sent and the room decides.
+        const fallen = flagFall(game, clockState, mover)
+        set({
+          game: fallen.game,
+          clockState: fallen.clock,
+          selected: null,
+          legalMoves: [],
+          pendingPromotion: null,
+        })
+        return
       }
+      const clockNext = clockIsOn(clock)
+        ? settleClock(clockState, clock, mover, now)
+        : clockState
 
       const next = applyMove(game, { ...move, promotionTypeId }, { origin, san: true })
       // A piece marked random turns into another kind after every move. The
@@ -1036,11 +1011,9 @@ export const useAppStore = create<AppState>((set, get) => {
         selected: null,
         legalMoves: [],
         pendingPromotion: null,
-        // The position the move leads to joins the history. A move made
-        // after the game was moved back replaces what came after it.
-        undoStack: [...get().undoStack.slice(0, game.moveHistory.length + 1), next],
+        // The position the move leads to joins the history.
+        undoStack: pushHistory(game, next),
         clockState: clockNext,
-        reviewingHistory: false,
       })
 
       // The board already shows the move; the room validates it and sends the
@@ -1107,7 +1080,7 @@ export const useAppStore = create<AppState>((set, get) => {
         undoStack: [],
         queuedMove: null,
         pendingPromotion: null,
-        clockState: initialClockState(get().clock, variant.teams.map((t) => t.id)),
+        clockState: initialClockState(get().clock, variant),
         // A new game means a new side for a bot that plays at random.
         botSide: sideFor(get().bot, variant, get().botSide),
       })
@@ -1127,9 +1100,6 @@ export const useAppStore = create<AppState>((set, get) => {
       const total = undoStack.length - 1
       const target = Math.max(0, Math.min(Math.floor(ply), total))
       const last = undoStack[total]
-      // Reviewing a finished game's history — bots must stay stopped so the
-      // position can be analysed without pieces moving under you.
-      const reviewing = last && last.status !== 'active' && target < total
       if (target === total) {
         set({
           game: last,
@@ -1137,7 +1107,6 @@ export const useAppStore = create<AppState>((set, get) => {
           legalMoves: [],
           pendingPromotion: null,
           queuedMove: null,
-          reviewingHistory: false,
         })
         return
       }
@@ -1149,7 +1118,6 @@ export const useAppStore = create<AppState>((set, get) => {
         legalMoves: [],
         pendingPromotion: null,
         queuedMove: null,
-        reviewingHistory: reviewing,
       })
     },
 
@@ -1161,7 +1129,7 @@ export const useAppStore = create<AppState>((set, get) => {
         makerTab: 'board',
         // The room's own time control arrives with the hello.
         clock: NO_CLOCK,
-        clockState: initialClockState(NO_CLOCK, get().variant.teams.map((team) => team.id)),
+        clockState: initialClockState(NO_CLOCK, get().variant),
         online: {
           code,
           seat: null,
@@ -1197,7 +1165,7 @@ export const useAppStore = create<AppState>((set, get) => {
       set({
         online: null,
         clock,
-        clockState: initialClockState(clock, get().variant.teams.map((team) => team.id)),
+        clockState: initialClockState(clock, get().variant),
       })
     },
 
@@ -1248,14 +1216,19 @@ export const useAppStore = create<AppState>((set, get) => {
       if (before && isBotTeam(bot, before.turn, botSide) && target >= 1) target -= 1
       const prev = undoStack[target]
       if (!prev) return
+      const { clockState } = get()
       set({
         game: prev,
         undoStack: undoStack.slice(0, target + 1),
+        // The side now to move thinks again — the time spent reviewing is not
+        // charged to it, the same as when a room grants the take-back.
+        ...(clockState.running
+          ? { clockState: { ...clockState, lastMoveAt: Date.now() } }
+          : {}),
         selected: null,
         legalMoves: [],
         queuedMove: null,
         pendingPromotion: null,
-        reviewingHistory: false,
       })
     },
 
@@ -1289,7 +1262,7 @@ export const useAppStore = create<AppState>((set, get) => {
       saveClockSettings(settings)
       set({
         clock: settings,
-        clockState: initialClockState(settings, get().variant.teams.map((t) => t.id)),
+        clockState: initialClockState(settings, get().variant),
       })
     },
 
@@ -1298,39 +1271,26 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!clockIsOn(clock) || game.winner) return
       if (!clockState.running || clockState.lastMoveAt === null) return
       const now = Date.now()
-      const elapsed = now - clockState.lastMoveAt
+      const elapsed = now - clockState.lastMoveAt!
       if (elapsed <= 0) return
       const side = game.turn
-      const left = (clockState.times[side] ?? 0) - elapsed
-      if (left <= 0) {
+      if (flagFell(clockState, side, now)) {
         if (get().online) {
           // The room calls the flag; the display just holds at zero until it
           // says so.
-          set({
-            clockState: { ...clockState, times: { ...clockState.times, [side]: 0 }, lastMoveAt: now },
-          })
+          set({ clockState: projectedClock(clockState, side, now) })
           return
         }
-        // The flag fell: the other side wins.
-        const order = game.variant.teams.map((t) => t.id)
-        const index = order.indexOf(side)
-        const winner = order[(index + 1) % order.length]
-        const times = { ...clockState.times, [side]: 0 }
+        const fallen = flagFall(game, clockState, side)
         set({
-          clockState: { ...clockState, times, lastMoveAt: null, running: false },
-          game: { ...game, winner, status: 'timeout' },
+          clockState: fallen.clock,
+          game: fallen.game,
           selected: null,
           legalMoves: [],
         })
         return
       }
-      set({
-        clockState: {
-          ...clockState,
-          times: { ...clockState.times, [side]: left },
-          lastMoveAt: now,
-        },
-      })
+      set({ clockState: projectedClock(clockState, side, now) })
     },
 
     addCurrentToLibrary: (name) => {
@@ -1373,6 +1333,18 @@ export const useAppStore = create<AppState>((set, get) => {
     exportVariant: () => JSON.stringify(get().variant, null, 2),
   }
 })
+
+/**
+ * The position the game is actually on — the top of the history, not the one
+ * being reviewed. Read it through `useAppStore(selectLatestGame)`.
+ */
+export const selectLatestGame = (s: AppState): GameState =>
+  s.undoStack[s.undoStack.length - 1] ?? s.game
+
+/** The seat the human plays from — online or against the bot — or null for a
+ * spectator, who watches every side. */
+export const selectViewerSeat = (s: AppState): number | null =>
+  s.online ? s.online.seat : humanSeatFor(s.variant, s.bot, s.botSide)
 
 function applyThemeToDom(theme: Theme) {
   const root = document.documentElement

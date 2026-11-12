@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BrainCircuit, LineChart, Loader2, ShieldAlert } from 'lucide-react'
-import { useAppStore } from '@/store/useAppStore'
-import { BotWorker, type BotResult } from '@/lib/bot'
+import { useAppStore, selectLatestGame } from '@/store/useAppStore'
+import { useBotWorker, type BotResult } from '@/lib/bot'
+import { mateIn } from '@/engine/ai/score'
 import { replayStates } from '@/lib/replay'
-import { computeThreats, mergeThreats, threatSummary } from '@/engine/threats'
+import { threatSummary, threatsFor } from '@/engine/threats'
 import { AnalysisGraph } from './AnalysisGraph'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -32,27 +33,18 @@ export function AnalysisPanel() {
   const setMode = useAppStore((s) => s.setAnalysisMode)
   const setAnalysisResult = useAppStore((s) => s.setAnalysisResult)
   const jumpToPly = useAppStore((s) => s.jumpToPly)
-  const undoStack = useAppStore((s) => s.undoStack)
   const threatSettings = useAppStore((s) => s.threats)
   const setThreats = useAppStore((s) => s.setThreats)
   const [result, setResult] = useState<BotResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [graph, setGraph] = useState<number[] | null>(null)
   const [graphBusy, setGraphBusy] = useState(false)
-  const worker = useRef<BotWorker | null>(null)
+  const client = useBotWorker()
 
   // The game with every move played, even when the board is showing an earlier
   // position. Its result is whether the game is over.
-  const full = undoStack[undoStack.length - 1] ?? game
+  const full = useAppStore(selectLatestGame)
   const over = full.status !== 'active'
-
-  useEffect(() => {
-    return () => {
-      worker.current?.dispose()
-      worker.current = null
-    }
-  }, [])
-
   // The graph belongs to a finished game, so a game being played again — a new
   // one, or one taken back — drops the picture of the old one.
   useEffect(() => {
@@ -67,8 +59,6 @@ export function AnalysisPanel() {
       setAnalysisResult(null)
       return
     }
-    const client = worker.current ?? new BotWorker()
-    worker.current = client
     setBusy(true)
     void client
       .think(game, game.turn, 'normal', {
@@ -88,24 +78,21 @@ export function AnalysisPanel() {
         const best = reply.move ? { from: reply.move.from, to: reply.move.finalTo } : null
         setAnalysisResult({ score, depth: reply.depth, best })
       })
-  }, [mode, analysis.showLine, game, game.winner, setAnalysisResult])
+  }, [mode, analysis.showLine, game, game.winner, setAnalysisResult, client])
 
   // The whole game, position by position.
   const analyseGame = async () => {
-    const client = worker.current ?? new BotWorker()
-    worker.current = client
     setGraphBusy(true)
     try {
       // The whole game, even when the board has been moved back.
-      const latest = useAppStore.getState()
-      const finished = latest.undoStack[latest.undoStack.length - 1] ?? latest.game
-      const states = replayStates(finished)
+      const finished = selectLatestGame(useAppStore.getState())
       const firstTeam = finished.variant.teams[0]
-      const reply = await client.analyseGame(states, firstTeam?.id ?? 'white')
+      if (!firstTeam) return
+      const states = replayStates(finished)
+      const reply = await client.analyseGame(states, firstTeam.id)
       // If the game was taken back while the scores were being worked out,
       // they are scores of a game that no longer exists.
-      const now = useAppStore.getState()
-      const nowGame = now.undoStack[now.undoStack.length - 1] ?? now.game
+      const nowGame = selectLatestGame(useAppStore.getState())
       if (nowGame !== finished) return
       const raw = reply.scores ?? []
       // Every score is from the side to move; the graph is from the first army.
@@ -121,22 +108,19 @@ export function AnalysisPanel() {
   }
 
   // What the other side can attack.
-  const threatReport = useMemo(() => {
-    if (!threatSettings.show) return null
-    const teams =
-      threatSettings.scope === 'both' ? variant.teams.map((t) => t.id) : [game.turn]
-    return mergeThreats(teams.map((team) => computeThreats(game, team)))
-  }, [game, variant.teams, threatSettings.show, threatSettings.scope])
+  const threatReport = useMemo(
+    () => threatsFor(game, threatSettings),
+    [game, threatSettings],
+  )
   const summary = threatReport ? threatSummary(threatReport, game) : null
 
   const firstTeam = game.variant.teams[0]
   const mover = game.turn
   const raw = result?.score ?? 0
   const score = mover === firstTeam?.id ? raw : -raw
-  const mate = Math.abs(score) > 90_000
-  const label = mate
-    ? `M${Math.max(1, Math.ceil((100_000 - Math.abs(score)) / 100))}`
-    : `${score >= 0 ? '+' : '−'}${(Math.abs(score) / 100).toFixed(1)}`
+  const inMoves = mateIn(score)
+  const label =
+    inMoves !== null ? `M${inMoves}` : `${score >= 0 ? '+' : '−'}${(Math.abs(score) / 100).toFixed(1)}`
 
   return (
     <Card className="py-4">

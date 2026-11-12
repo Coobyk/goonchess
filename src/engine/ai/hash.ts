@@ -1,4 +1,9 @@
 import type { GameState, Variant } from '../types'
+import { enPassantRight } from '../repetition'
+
+/** Whether an en passant capture could be on — positions where the rules
+ * look at the last move are left out of the table rather than mixed up. */
+export const enPassantSensitive = (state: GameState): boolean => enPassantRight(state) !== null
 
 /**
  * The fingerprint of a position.
@@ -22,7 +27,7 @@ export interface Fingerprint {
 }
 
 /** The table size. A power of two, so the slot is a mask away. */
-export const TABLE_BITS = 17
+const TABLE_BITS = 17
 export const TABLE_SIZE = 1 << TABLE_BITS
 
 interface Indices {
@@ -71,42 +76,6 @@ function indicesFor(variant: Variant): Indices {
   indexCache.set(variant, indices)
   return indices
 }
-
-/**
- * Whether an en passant capture could be on.
- *
- * The rules look at the last move to decide this, so two positions that look
- * the same on the board can still differ. The search leaves such positions
- * out of its table rather than risk mixing them up.
- */
-export function enPassantSensitive(state: GameState): boolean {
-  const last = state.moveHistory[state.moveHistory.length - 1]
-  if (!last) return false
-  const dx = last.move.finalTo.x - last.move.from.x
-  const dy = last.move.finalTo.y - last.move.from.y
-  if (Math.abs(dx) + Math.abs(dy) !== 2 || (dx !== 0 && dy !== 0)) return false
-  const x = last.move.finalTo.x
-  const y = last.move.finalTo.y
-  for (let i = 0; i < 4; i++) {
-    const nx = x + NEIGHBOURS[i][0]
-    const ny = y + NEIGHBOURS[i][1]
-    if (nx < 0 || ny < 0) continue
-    if (nx >= state.variant.board.width || ny >= state.variant.board.height) continue
-    const id = state.board[ny][nx]
-    if (!id) continue
-    const inst = state.pieces[id]
-    if (inst.team === state.turn) continue
-    if (state.pieceTypes[inst.typeId]?.flags.enPassant) return true
-  }
-  return false
-}
-
-const NEIGHBOURS = [
-  [-1, -1],
-  [1, -1],
-  [-1, 1],
-  [1, 1],
-]
 
 /**
  * Works out the fingerprint of a position.

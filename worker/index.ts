@@ -1,7 +1,9 @@
 import { allowCreate, issueChallenge, verifyChallenge } from './captcha'
 import { GameRoom } from './game-room'
+import { CREATE_PATH, json } from './http'
 import { CODE_PATTERN, randomCode, randomToken } from './ids'
-import type { Variant } from '../src/engine/types'
+import { BOARD_MAX, BOARD_MIN, type Variant } from '../src/engine/types'
+import { createInitialState } from '../src/engine/rules'
 
 export { GameRoom }
 
@@ -49,7 +51,6 @@ async function createGame(request: Request, env: Env): Promise<Response> {
   if (!secret) return json({ error: 'captcha_unconfigured' }, 503)
 
   const ip = request.headers.get('CF-Connecting-IP') ?? 'local'
-  if (!allowCreate(ip)) return json({ error: 'rate_limited' }, 429)
 
   const raw = await request.text()
   if (raw.length > MAX_BODY) return json({ error: 'too_large' }, 413)
@@ -74,10 +75,14 @@ async function createGame(request: Request, env: Env): Promise<Response> {
   const check = await verifyChallenge(secret, body?.captcha?.challenge, body?.captcha?.solution)
   if (!check.ok) return json({ error: check.reason }, 403)
 
+  // The proof-of-work comes first: a request that cannot solve it must not
+  // spend a slot of the address's quota.
+  if (!allowCreate(ip)) return json({ error: 'rate_limited' }, 429)
+
   const code = randomCode()
   const token = randomToken()
   const stub = env.GAME.get(env.GAME.idFromName(code))
-  const created = await stub.fetch('https://room.internal/create', {
+  const created = await stub.fetch(`https://room.internal${CREATE_PATH}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ code, token, variant, clock: body.clock, seat: body.seat }),
@@ -101,16 +106,29 @@ function isPlayableVariant(value: unknown): value is Variant {
   if (!board || typeof board !== 'object') return false
   const { width, height, tiles } = board
   if (!Number.isInteger(width) || !Number.isInteger(height)) return false
-  if (width < 3 || height < 3 || width > 16 || height > 16) return false
+  if (
+    width < BOARD_MIN ||
+    height < BOARD_MIN ||
+    width > BOARD_MAX ||
+    height > BOARD_MAX
+  ) {
+    return false
+  }
   if (!Array.isArray(tiles) || tiles.length !== height) return false
-  return variant.teams.every(
-    (team) => !!team && typeof team.id === 'string' && typeof team.name === 'string',
-  )
+  if (
+    !variant.teams.every(
+      (team) => !!team && typeof team.id === 'string' && typeof team.name === 'string',
+    )
+  ) {
+    return false
+  }
+  // The shape says little about whether the engine can stand the variant up —
+  // the real check is asking it to.
+  try {
+    createInitialState(variant as Variant)
+  } catch {
+    return false
+  }
+  return true
 }
 
-function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', ...headers },
-  })
-}

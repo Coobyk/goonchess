@@ -1,8 +1,11 @@
-import { applyMove, hasAnyLegalMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank } from '../rules'
+import { applyMove, hasAnyLegalMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank, teamHasPieces, teamHasRoyal } from '../rules'
 import { evaluate } from './evaluate'
 import { bookMove } from './book'
 import { enPassantSensitive, hashPosition, TABLE_SIZE, type Fingerprint } from './hash'
-import type { GameState, Move, Variant } from '../types'
+import { moveKey } from '../repetition'
+import { mulberry32 } from '../rand'
+import { isMateScore, MATE } from './score'
+import { DICE_SIDES, type GameState, type Move, type Variant } from '../types'
 
 /**
  * A small but real chess engine: negamax with alpha-beta pruning, iterative
@@ -16,6 +19,10 @@ import type { GameState, Move, Variant } from '../types'
 export type BotLevel = 'casual' | 'normal' | 'strong'
 
 export interface LevelProfile {
+  /** What the level is called. */
+  label: string
+  /** One line on how it plays, shown in the opponent picker. */
+  hint: string
   /** Deepest search the bot will attempt. */
   maxDepth: number
   /** How long it may think, in milliseconds. */
@@ -38,6 +45,8 @@ export interface LevelProfile {
 
 export const LEVELS: Record<BotLevel, LevelProfile> = {
   casual: {
+    label: 'Casual',
+    hint: 'Looks one move ahead and blunders now and then. Fine for learning the rules.',
     maxDepth: 1,
     timeBudgetMs: 300,
     quiescence: 0,
@@ -47,6 +56,8 @@ export const LEVELS: Record<BotLevel, LevelProfile> = {
     minThinkMs: 350,
   },
   normal: {
+    label: 'Normal',
+    hint: 'Looks a few moves ahead and prefers safe moves.',
     maxDepth: 3,
     timeBudgetMs: 900,
     quiescence: 2,
@@ -56,6 +67,8 @@ export const LEVELS: Record<BotLevel, LevelProfile> = {
     minThinkMs: 450,
   },
   strong: {
+    label: 'Strong',
+    hint: 'Searches as deep as the clock allows and punishes loose pieces.',
     maxDepth: 6,
     timeBudgetMs: 2200,
     quiescence: 3,
@@ -64,18 +77,6 @@ export const LEVELS: Record<BotLevel, LevelProfile> = {
     randomSlop: 0,
     minThinkMs: 500,
   },
-}
-
-export const LEVEL_LABELS: Record<BotLevel, string> = {
-  casual: 'Casual',
-  normal: 'Normal',
-  strong: 'Strong',
-}
-
-export const LEVEL_HINTS: Record<BotLevel, string> = {
-  casual: 'Looks one move ahead and blunders now and then. Fine for learning the rules.',
-  normal: 'Looks a few moves ahead and prefers safe moves.',
-  strong: 'Searches as deep as the clock allows and punishes loose pieces.',
 }
 
 export interface SearchOptions {
@@ -109,7 +110,8 @@ export interface SearchResult {
   book?: boolean
 }
 
-const MATE = 1_000_000
+/** Two packed board squares — boards are well under 256 wide. */
+const packSquares = (a: number, b: number) => a * 65536 + b
 
 /** How the score in the table was found. */
 const EXACT = 1
@@ -217,10 +219,6 @@ const table = new TranspositionTable()
  * nothing about another — but a fresh table keeps the memory small and the
  * search honest.
  */
-export function clearSearchTable() {
-  table.clear()
-}
-
 /* ------------------------------------------------------------- the search */
 
 interface SearchContext {
@@ -256,32 +254,8 @@ interface SearchContext {
   history: Map<number, number>
 }
 
-/** Small deterministic random generator, so a seed gives a repeatable game. */
-function mulberry32(seed: number) {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
 
-function hasTeam(state: GameState, teamId: string) {
-  for (const id in state.pieces) {
-    if (state.pieces[id].team === teamId) return true
-  }
-  return false
-}
 
-function hasRoyal(state: GameState, teamId: string) {
-  for (const id in state.pieces) {
-    const inst = state.pieces[id]
-    if (inst.team !== teamId) continue
-    if (state.pieceTypes[inst.typeId]?.flags.royal) return true
-  }
-  return false
-}
 
 /** Which teams start the game with a royal piece of their own. */
 function royalTeamsOf(variant: Variant): string[] {
@@ -326,7 +300,7 @@ function allLegalMoves(state: GameState): Move[] {
   // A piece that rolls a die is tried with every roll.
   const rolledStates: GameState[] = dicePieces.length
     ? dicePieces.flatMap((piece) =>
-        [1, 2, 3, 4, 5, 6].map((value) => ({
+        Array.from({ length: DICE_SIDES }, (_, i) => i + 1).map((value) => ({
           ...state,
           roll: { pieceId: piece.id, value },
         })),
@@ -419,7 +393,7 @@ function orderMoves(moves: Move[], state: GameState, ctx: SearchContext, ply: nu
           }
         }
       }
-      const history = ctx.history.get(from * 65536 + to)
+      const history = ctx.history.get(packSquares(from, to))
       if (history) score += Math.min(history, 700_000)
     }
     weights[i] = score
@@ -448,10 +422,10 @@ function terminalScore(state: GameState, ply: number, ctx: SearchContext): numbe
   // The royal piece is gone: that side has lost. In atomic a blast that
   // takes the mover's own king loses the game the same way.
   if (ctx.kingCaptureWins) {
-    if (ctx.royalTeams.includes(state.turn) && !hasRoyal(state, state.turn)) return -MATE + ply
+    if (ctx.royalTeams.includes(state.turn) && !teamHasRoyal(state, state.turn)) return -MATE + ply
     for (const team of ctx.teams) {
       if (team === state.turn || !ctx.royalTeams.includes(team)) continue
-      if (!hasRoyal(state, team)) return MATE - ply
+      if (!teamHasRoyal(state, team)) return MATE - ply
     }
   }
   // The third check has been given: whoever gave it has won.
@@ -463,12 +437,12 @@ function terminalScore(state: GameState, ply: number, ctx: SearchContext): numbe
   }
   // Losing chess: the side with nothing left on the board has won — it is
   // the side to move that has just run out.
-  if (ctx.antichessWins && !hasTeam(state, state.turn)) return MATE - ply
+  if (ctx.antichessWins && !teamHasPieces(state, state.turn)) return MATE - ply
   // Everybody else is wiped out: the side to move has won.
   if (ctx.eliminationWins) {
     for (const team of ctx.teams) {
       if (team === state.turn) continue
-      if (!hasTeam(state, team)) return MATE - ply
+      if (!teamHasPieces(state, team)) return MATE - ply
     }
   }
   // Racing Kings: a king on the far rank. The side moving second answers it,
@@ -502,12 +476,12 @@ function outOfTime(ctx: SearchContext) {
  * read back at any depth.
  */
 function toStored(score: number, ply: number) {
-  if (score >= MATE - 1000 || score <= -MATE + 1000) return score + ply
+  if (isMateScore(score)) return score + ply
   return score
 }
 
 function fromStored(stored: number, ply: number) {
-  if (stored >= MATE - 1000 || stored <= -MATE + 1000) return stored - ply
+  if (isMateScore(stored)) return stored - ply
   return stored
 }
 
@@ -652,7 +626,7 @@ function negamax(
         const killers = ctx.killers[ply] ?? (ctx.killers[ply] = [null, null])
         killers[1] = killers[0]
         killers[0] = { from: bestMoveUsed, to: bestToUsed }
-        const key = bestMoveUsed * 65536 + bestToUsed
+        const key = packSquares(bestMoveUsed, bestToUsed)
         ctx.history.set(key, (ctx.history.get(key) ?? 0) + depth * depth)
       }
       break
@@ -687,7 +661,7 @@ function searchRoot(state: GameState, depth: number, ctx: SearchContext): RootMo
   for (let i = 0; i < ordered.length; i++) {
     const move = ordered[i]
     // Some moves are off the table — repeating a position is a draw.
-    if (ctx.exclude?.has(moveName(move))) continue
+    if (ctx.exclude?.has(moveKey(move))) continue
     const next = applyMove(state, move, { compute: false, search: true })
     let score: number
     if (reachedPointTarget(state, next, ctx)) {
@@ -709,9 +683,6 @@ function searchRoot(state: GameState, depth: number, ctx: SearchContext): RootMo
 }
 
 /** A short name for a move, so the search can be told to leave it alone. */
-function moveName(move: Move) {
-  return `${move.from.x},${move.from.y}->${move.finalTo.x},${move.finalTo.y}`
-}
 
 /**
  * The move that ends the game at once, if there is one.
@@ -725,7 +696,7 @@ function moveName(move: Move) {
 function immediateMate(state: GameState, ctx: SearchContext): Move | null {
   if (!ctx.checkmateWins) return null
   for (const move of allLegalMoves(state)) {
-    if (ctx.exclude?.has(moveName(move))) continue
+    if (ctx.exclude?.has(moveKey(move))) continue
     const next = applyMove(state, move, { compute: false, search: true })
     if (hasAnyLegalMove(next, next.turn)) continue
     if (!isInCheck(next, next.turn)) continue
@@ -781,7 +752,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   // position, so the openings are not all the same and not all bad.
   if (!options.analyze) {
     const fromBook = bookMove(state, options.seed ?? 0)
-    if (fromBook && !options.exclude?.includes(moveName(fromBook))) {
+    if (fromBook && !options.exclude?.includes(moveKey(fromBook))) {
       return {
         move: fromBook,
         score: 0,
@@ -820,7 +791,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
   if (!rootResults.length) {
     // Nothing was searched — fall back to any legal move.
     const all = allLegalMoves(state)
-    const fallback = all.filter((m) => !ctx.exclude?.has(moveName(m)))
+    const fallback = all.filter((m) => !ctx.exclude?.has(moveKey(m)))
     const pool = fallback.length ? fallback : all
     return {
       move: pool.length ? pool[0] : null,
@@ -842,7 +813,7 @@ export function searchBestMove(state: GameState, options: SearchOptions): Search
     !options.analyze && profile.randomness > 0 && random() < profile.randomness
   if (wantsRandom && profile.randomSlop === Infinity) {
     // Casual stays careless on purpose: any legal move will do.
-    const any = allLegalMoves(state).filter((m) => !ctx.exclude?.has(moveName(m)))
+    const any = allLegalMoves(state).filter((m) => !ctx.exclude?.has(moveKey(m)))
     if (any.length) chosen = { move: any[Math.floor(random() * any.length)], score: 0 }
   } else if (wantsRandom || (!options.analyze && profile.slop > 0 && sorted.length > 1)) {
     // The scores of the moves that were cut off are only upper bounds, so the

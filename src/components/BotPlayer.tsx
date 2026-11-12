@@ -1,13 +1,13 @@
 import { useEffect, useReducer, useRef } from 'react'
 import { useAppStore } from '@/store/useAppStore'
-import { BotWorker } from '@/lib/bot'
+import { useBotWorker } from '@/lib/bot'
 import { LEVELS } from '@/engine/ai/search'
 import { botLevelFor, isBotTeam } from '@/engine/ai/botSettings'
 import { clockIsOn } from '@/lib/clock'
-import { wouldRepeat } from '@/lib/repetition'
+import { wouldRepeat } from '@/lib/replay'
 import { moveKey } from '@/engine/repetition'
 import { dropOptions, getLegalMoves, legalOptionsForTeam } from '@/engine/rules'
-import type { GameState, Move } from '@/engine/types'
+import { intentMatches, type GameState, type Move } from '@/engine/types'
 
 /**
  * Plays the bot's side.
@@ -28,25 +28,18 @@ export function BotPlayer() {
   const clock = useAppStore((s) => s.clock)
   const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
-  const worker = useRef<BotWorker | null>(null)
+  const client = useBotWorker()
   const running = useRef(false)
   // Bumped when a search finished on a position that is no longer current, so
   // the bot starts over on the new one.
   const [retry, bump] = useReducer((n: number) => n + 1, 0)
 
   useEffect(() => {
-    return () => {
-      worker.current?.dispose()
-      worker.current = null
-    }
-  }, [])
-
-  useEffect(() => {
     const team = game.turn
     const isLatest = game.moveHistory.length === (undoStack[undoStack.length-1]?.moveHistory ?? game.moveHistory).length
     const botTurn = !online && !opponentOpen && isLatest && isBotTeam(bot, team, botSide)
     if (!botTurn || game.winner) {
-      worker.current?.cancel()
+      client.cancel()
       running.current = false
       setBotThinking(false)
       return
@@ -55,8 +48,6 @@ export function BotPlayer() {
     running.current = true
     setBotThinking(true)
 
-    const client = worker.current ?? new BotWorker()
-    worker.current = client
     const level = botLevelFor(bot, team)
     const state = game
     const seed = Math.floor(Math.random() * 1e9)
@@ -97,7 +88,7 @@ export function BotPlayer() {
           useAppStore.getState().playMove(move)
         }, wait)
       })
-  }, [bot, botSide, game, retry, setBotThinking, opponentOpen, online])
+  }, [bot, botSide, game, retry, setBotThinking, opponentOpen, online, client])
 
   return null
 }
@@ -108,10 +99,5 @@ function legalMoveFor(state: GameState, wanted: Move): Move | undefined {
   const pool: Move[] = wanted.drop
     ? dropOptions(state, state.turn).map((option) => option.move)
     : getLegalMoves(state, wanted.from.x, wanted.from.y)
-  return pool.find(
-    (m) =>
-      m.pieceId === wanted.pieceId &&
-      m.finalTo.x === wanted.finalTo.x &&
-      m.finalTo.y === wanted.finalTo.y,
-  )
+  return pool.find((m) => intentMatches(m, wanted))
 }
