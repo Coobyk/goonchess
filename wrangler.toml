@@ -3,6 +3,11 @@ account_id = "bde77f9c2a0a3740e0f502b18fd5c2c6"
 compatibility_date = "2026-10-12"
 main = "./worker/index.ts"
 
+# The Worker bundle pulls in src/ files that import via "@/..."; this tsconfig
+# is the only one that maps the alias for the worker side, so esbuild must see
+# it instead of the root references file.
+tsconfig = "./tsconfig.worker.json"
+
 # Static assets stay on the asset layer, which is free and unmetered. Only the
 # API goes through the Worker: sending the whole site through it would put every
 # page view against the daily request quota, and the site is far bigger than
