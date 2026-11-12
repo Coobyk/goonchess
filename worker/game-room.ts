@@ -139,14 +139,19 @@ export class GameRoom {
     token: string
     variant: Variant
     clock?: unknown
+    /** The seat the link's creator takes; anything unexpected defaults to the first. */
+    seat?: unknown
   }): Promise<Response> {
     if (await this.ctx.storage.get('meta')) return json({ error: 'exists' }, 409)
 
+    const creatorSeat = body.seat === 1 ? 1 : 0
+    const seats: (string | null)[] = [null, null]
+    seats[creatorSeat] = await hashToken(body.token)
     const meta: Meta = {
       code: body.code,
       variant: body.variant,
       createdAt: Date.now(),
-      seats: [await hashToken(body.token), null],
+      seats,
       startedAt: null,
       clock: normalizeClock(body.clock),
     }

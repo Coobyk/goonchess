@@ -7,6 +7,7 @@ import { ThreatArrows } from './ThreatArrows'
 import { BestMoveArrow } from './BestMoveArrow'
 import { useAppStore } from '@/store/useAppStore'
 import { getLegalMoves, isInCheck } from '@/engine/rules'
+import { humanSeatFor } from '@/engine/ai/botSettings'
 import { computeThreats, mergeThreats } from '@/engine/threats'
 import type { Move, PieceType, Vec } from '@/engine/types'
 import { BLAST_STAGGER, travelMs, useMoveAnimation } from '@/lib/moveAnimation'
@@ -293,7 +294,9 @@ export function GameBoard() {
   const analysis = useAppStore((s) => s.analysis)
   const threatSettings = useAppStore((s) => s.threats)
   const turnView = useAppStore((s) => s.turnView)
-  const onlineSeat = useAppStore((s) => s.online?.seat ?? null)
+  const online = useAppStore((s) => s.online)
+  const bot = useAppStore((s) => s.bot)
+  const botSide = useAppStore((s) => s.botSide)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [container, width] = useElementWidth<HTMLDivElement>()
   // The square the keyboard cursor is on. Arrow keys move it, Enter plays.
@@ -416,21 +419,25 @@ export function GameBoard() {
 
   // Flip the view or rotate the pieces only after the move animation lands.
   const sideIndex = variant.teams.findIndex((team) => team.id === turn)
-  // In a shared game each browser holds a seat: that team's pieces always sit
-  // at the bottom of its own board, whatever turnView says. Without a seat the
-  // turnView rule decides, flipping for the side to move.
+  // The seat the viewer holds: a shared game's seat, or the human's side
+  // against a single bot. That team's pieces always sit at the bottom of the
+  // board, whatever turnView says. Without a seat the turnView rule decides,
+  // flipping for the side to move.
+  // A spectator of a shared game has no seat either, so the bot's side only
+  // counts when no room is joined at all.
+  const viewerSeat = online ? online.seat : humanSeatFor(variant, bot, botSide)
   const viewerIndex =
-    onlineSeat !== null && variant.teams[onlineSeat] ? onlineSeat : sideIndex
+    viewerSeat !== null && variant.teams[viewerSeat] ? viewerSeat : sideIndex
   const targetOrientation =
-    (onlineSeat !== null || turnView !== 'off') && viewerIndex % 2 === 1 ? 1 : 0
+    (viewerSeat !== null || turnView !== 'off') && viewerIndex % 2 === 1 ? 1 : 0
   const [orientation, setOrientation] = useState(targetOrientation)
   useEffect(() => {
     if (orientation === targetOrientation) return
     const timer = window.setTimeout(() => setOrientation(targetOrientation), moveDuration + 120)
     return () => window.clearTimeout(timer)
   }, [orientation, targetOrientation, moveDuration])
-  const flipBoard = (onlineSeat !== null || turnView === 'board') && orientation === 1
-  const rotatePieces = onlineSeat === null && turnView === 'pieces' && orientation === 1
+  const flipBoard = (viewerSeat !== null || turnView === 'board') && orientation === 1
+  const rotatePieces = viewerSeat === null && turnView === 'pieces' && orientation === 1
 
   // Play a blast animation when a *new* move sets off an explosion (not on undo).
   const [blast, setBlast] = useState<{ id: number; x: number; y: number; radius: number } | null>(null)

@@ -213,8 +213,8 @@ interface AppState {
   /** Connects to a shared game, claiming a free seat if there is one. */
   joinOnline: (code: string) => void
   leaveOnline: () => void
-  /** Creates a room behind the hidden captcha and joins it. */
-  startOnlineGame: () => Promise<CreateResult>
+  /** Creates a room behind the hidden captcha and joins it, in the chosen seat. */
+  startOnlineGame: (seat?: number) => Promise<CreateResult>
   resignOnline: () => void
   /** Offers and answers, and the room's chat. */
   offerOnlineUndo: () => void
@@ -1201,13 +1201,13 @@ export const useAppStore = create<AppState>((set, get) => {
       })
     },
 
-    startOnlineGame: async () => {
+    startOnlineGame: async (seat) => {
       const variant = get().variant
       if (variant.teams.length !== 2) throw new Error('needs_two_teams')
       // The proof is the only thing standing between a script and a thousand
       // rooms, so it is asked for before the request goes out.
       const proof = await proveWork()
-      const created = await createRoom(variant, proof, get().clock)
+      const created = await createRoom(variant, proof, get().clock, seat)
       writeSeatToken(created.code, created.token)
       get().joinOnline(created.code)
       return created

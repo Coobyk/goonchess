@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Textarea } from './ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Label } from './ui/label'
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 
 export function ShareDialog({
   open,
@@ -34,6 +35,8 @@ export function ShareDialog({
   const [pgnError, setPgnError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [playError, setPlayError] = useState<string | null>(null)
+  /** Which side the link's creator plays, as a seat index or 'random'. */
+  const [seatChoice, setSeatChoice] = useState('0')
   const twoTeams = variant.teams.length === 2
 
   const json = exportVariant()
@@ -55,7 +58,8 @@ export function ShareDialog({
     setPlayError(null)
     setCreating(true)
     try {
-      const created = await startOnlineGame()
+      const seat = seatChoice === 'random' ? Math.floor(Math.random() * 2) : Number(seatChoice)
+      const created = await startOnlineGame(seat)
       // The link is the whole invitation, so it goes to the clipboard before
       // the dialog closes. A browser that refuses still has the copy button on
       // the bar above the board.
@@ -123,6 +127,26 @@ export function ShareDialog({
             <p className="text-sm text-muted-foreground">
               The first person to open it becomes the opponent; everyone after that can watch.
             </p>
+            {twoTeams && (
+              <div className="space-y-2">
+                <Label className="text-sm">You play</Label>
+                <ToggleGroup
+                  type="single"
+                  className="w-full"
+                  value={seatChoice}
+                  onValueChange={(value) => value && setSeatChoice(value)}
+                >
+                  {variant.teams.map((team, index) => (
+                    <ToggleGroupItem key={team.id} value={String(index)} className="flex-1 py-1 px-2">
+                      {team.name}
+                    </ToggleGroupItem>
+                  ))}
+                  <ToggleGroupItem value="random" className="flex-1 py-1 px-2">
+                    Random
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            )}
             {playError && <p className="text-destructive text-sm">{playError}</p>}
             <Button onClick={createGame} disabled={creating || !twoTeams}>
               {creating ? <Loader2 className="animate-spin" /> : <Users />}

@@ -57,6 +57,7 @@ async function createGame(request: Request, env: Env): Promise<Response> {
   let body: {
     variant?: unknown
     clock?: unknown
+    seat?: unknown
     captcha?: { challenge?: unknown; solution?: unknown }
   }
   try {
@@ -79,7 +80,7 @@ async function createGame(request: Request, env: Env): Promise<Response> {
   const created = await stub.fetch('https://room.internal/create', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code, token, variant, clock: body.clock }),
+    body: JSON.stringify({ code, token, variant, clock: body.clock, seat: body.seat }),
   })
   if (!created.ok) return json({ error: 'create_failed' }, 502)
 

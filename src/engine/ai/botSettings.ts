@@ -41,6 +41,21 @@ export function botLevelFor(settings: BotSettings, teamId: string): BotLevel {
   return settings.level
 }
 
+/**
+ * The seat the human holds against a single bot: the side that is not the
+ * bot's, in a two-team game. Anything else — two players, bots on every side,
+ * or more than two teams — has no single human side.
+ */
+export function humanSeatFor(
+  variant: Variant,
+  settings: BotSettings,
+  botSide: string | null,
+): number | null {
+  if (settings.mode !== 'one' || botSide === null || variant.teams.length !== 2) return null
+  if (!variant.teams.some((team) => team.id === botSide)) return null
+  return variant.teams.findIndex((team) => team.id !== botSide)
+}
+
 /** Picks a side for the bot at random. */
 export function rollBotSide(variant: Variant, current: string | null): string | null {
   const teams = variant.teams.map((team) => team.id)

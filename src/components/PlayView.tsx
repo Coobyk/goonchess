@@ -18,11 +18,13 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Textarea } from './ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import { useMediaQuery } from '@/lib/mediaQuery'
 import { useAppStore } from '@/store/useAppStore'
 import { OnlineBar } from './OnlineBar'
 import { cn } from '@/lib/utils'
 import { LEVEL_HINTS, LEVEL_LABELS, type BotLevel } from '@/engine/ai/search'
-import { botLevelFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
+import { botLevelFor, humanSeatFor, isBotTeam, type BotSettings } from '@/engine/ai/botSettings'
 import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
 import { toFen } from '@/lib/fen'
 import { toPgn } from '@/lib/pgn'
@@ -70,6 +72,84 @@ function StrengthButtons({
   )
 }
 
+/**
+ * The score sheet: every move of the game, clickable to go back to that
+ * position. It is its own component so it can sit in the sidebar on a wide
+ * screen and in a tab on a narrow one.
+ */
+function MoveHistoryCard() {
+  const game = useAppStore((s) => s.game)
+  const variant = useAppStore((s) => s.variant)
+  const undoStack = useAppStore((s) => s.undoStack)
+  const jumpToPly = useAppStore((s) => s.jumpToPly)
+  // The moves of the whole game, even when the board has been moved back to an
+  // earlier position.
+  const fullMoves = undoStack[undoStack.length - 1]?.moveHistory ?? game.moveHistory
+  const currentPly = game.moveHistory.length
+  const moveHistoryRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = moveHistoryRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+  }, [fullMoves.length])
+
+  return (
+    <Card className="py-4">
+      <CardHeader className="px-4">
+        <CardTitle className="text-sm">Move history</CardTitle>
+      </CardHeader>
+      <CardContent className="px-4">
+        <Separator className="mb-2" />
+        <div ref={moveHistoryRef} className="h-48 overflow-y-auto pr-2">
+          {fullMoves.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No moves yet.</p>
+          ) : (
+            <ol className="space-y-1">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => jumpToPly(0)}
+                  className={cn(
+                    'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
+                    currentPly === 0 && 'bg-accent',
+                  )}
+                >
+                  <span className="w-5 text-right text-muted-foreground">0</span>
+                  <span className="w-10 truncate text-muted-foreground">start</span>
+                  <span className="text-muted-foreground">the opening position</span>
+                </button>
+              </li>
+              {fullMoves.map((rec, i) => {
+                const ply = i + 1
+                const current = ply === currentPly
+                return (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      onClick={() => jumpToPly(ply)}
+                      title="Go to this position"
+                      className={cn(
+                        'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
+                        current && 'bg-accent',
+                        i % 2 === 0 ? 'dark:bg-white/5' : 'bg-black/5 dark:bg-transparent',
+                      )}
+                    >
+                      <span className="w-5 text-right text-muted-foreground">{ply}</span>
+                      <span className="w-10 truncate text-muted-foreground">
+                        {variant.teams.find((t) => t.id === rec.team)?.name ?? rec.team}
+                      </span>
+                      <span>{rec.notation}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function PlayView() {
   const game = useAppStore((s) => s.game)
   const theme = useAppStore((s) => s.theme)
@@ -88,21 +168,21 @@ export function PlayView() {
   const pocketOf = (teamId: string) =>
     Object.entries(game.hands?.[teamId] ?? {}).filter(([, count]) => count > 0)
   const resetGame = useAppStore((s) => s.resetGame)
-  const jumpToPly = useAppStore((s) => s.jumpToPly)
-  const undoStack = useAppStore((s) => s.undoStack)
   const undo = useAppStore((s) => s.undo)
   const online = useAppStore((s) => s.online)
   // A shared game cannot be taken back: the other player already saw the move.
   const canUndo = useAppStore((s) => s.undoStack.length > 1) && !online
-  // In a shared game the viewer's team sits at the bottom of the board, so the
-  // nameplates follow the flip: own team below, opponent above.
-  const seatFlipped = online?.seat !== null && online?.seat !== undefined && online.seat % 2 === 1
-  const topTeamIndex = seatFlipped ? 0 : 1
-  const bottomTeamIndex = seatFlipped ? 1 : 0
   const turnView = useAppStore((s) => s.turnView)
   const setTurnView = useAppStore((s) => s.setTurnView)
   const bot = useAppStore((s) => s.bot)
   const botSide = useAppStore((s) => s.botSide)
+  // The viewer's team sits at the bottom of the board — a shared game's seat,
+  // or the human's side against a single bot — so the nameplates follow the
+  // flip: own team below, opponent above.
+  const viewerSeat = online ? online.seat : humanSeatFor(variant, bot, botSide)
+  const seatFlipped = viewerSeat !== null && viewerSeat % 2 === 1
+  const topTeamIndex = seatFlipped ? 0 : 1
+  const bottomTeamIndex = seatFlipped ? 1 : 0
   const setBot = useAppStore((s) => s.setBot)
   const clock = useAppStore((s) => s.clock)
   const setClock = useAppStore((s) => s.setClock)
@@ -129,15 +209,9 @@ export function PlayView() {
     }
   }, [game.winner, game.status])
 
-  // The moves of the whole game, even when the board has been moved back to an
-  // earlier position.
-  const fullMoves = undoStack[undoStack.length - 1]?.moveHistory ?? game.moveHistory
-  const currentPly = game.moveHistory.length
-  const moveHistoryRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = moveHistoryRef.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-  }, [fullMoves.length])
+  // Wide screens get the whole sidebar; narrow ones get a tab strip, so the
+  // page is not one long column under the board.
+  const wide = useMediaQuery('(min-width: 1024px)')
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -441,22 +515,59 @@ export function PlayView() {
 
                 {bot.mode === 'one' && (
                   <div className="space-y-2">
-                    <Label className="text-sm">The bot plays</Label>
-                    <ToggleGroup
-                      type="single"
-                      className="w-full"
-                      value={bot.side ?? ''}
-                      onValueChange={(value) => value && setBot({ side: value })}
-                    >
-                      {variant.teams.map((team) => (
-                        <ToggleGroupItem key={team.id} value={team.id} className="flex-1 py-1 px-2">
-                          {team.name}
-                        </ToggleGroupItem>
-                      ))}
-                      <ToggleGroupItem value="random" className="flex-1 py-1 px-2">
-                        Random
-                      </ToggleGroupItem>
-                    </ToggleGroup>
+                    {variant.teams.length === 2 ? (
+                      <>
+                        <Label className="text-sm">You play</Label>
+                        <ToggleGroup
+                          type="single"
+                          className="w-full"
+                          // The bot holds the other side, so the pick is read
+                          // and written as the bot's team.
+                          value={
+                            bot.side === 'random'
+                              ? 'random'
+                              : (variant.teams.find((t) => t.id !== bot.side)?.id ?? '')
+                          }
+                          onValueChange={(value) => {
+                            if (!value) return
+                            setBot({
+                              side:
+                                value === 'random'
+                                  ? 'random'
+                                  : (variant.teams.find((t) => t.id !== value)?.id ?? null),
+                            })
+                          }}
+                        >
+                          {variant.teams.map((team) => (
+                            <ToggleGroupItem key={team.id} value={team.id} className="flex-1 py-1 px-2">
+                              {team.name}
+                            </ToggleGroupItem>
+                          ))}
+                          <ToggleGroupItem value="random" className="flex-1 py-1 px-2">
+                            Random
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </>
+                    ) : (
+                      <>
+                        <Label className="text-sm">The bot plays</Label>
+                        <ToggleGroup
+                          type="single"
+                          className="w-full"
+                          value={bot.side ?? ''}
+                          onValueChange={(value) => value && setBot({ side: value })}
+                        >
+                          {variant.teams.map((team) => (
+                            <ToggleGroupItem key={team.id} value={team.id} className="flex-1 py-1 px-2">
+                              {team.name}
+                            </ToggleGroupItem>
+                          ))}
+                          <ToggleGroupItem value="random" className="flex-1 py-1 px-2">
+                            Random
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </>
+                    )}
                     {bot.side === 'random' && (
                       <p className="text-xs text-muted-foreground">
                         {botSide
@@ -667,64 +778,36 @@ export function PlayView() {
 
       <aside className="flex flex-col gap-4">
         <LiveAnnouncer />
-        <AnalysisPanel />
-
-        <Card className="py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="text-sm">Move history</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4">
-            <Separator className="mb-2" />
-            <div ref={moveHistoryRef} className="h-48 overflow-y-auto pr-2">
-              {fullMoves.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No moves yet.</p>
-              ) : (
-                <ol className="space-y-1">
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => jumpToPly(0)}
-                      className={cn(
-                        'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
-                        currentPly === 0 && 'bg-accent',
-                      )}
-                    >
-                      <span className="w-5 text-right text-muted-foreground">0</span>
-                      <span className="w-10 truncate text-muted-foreground">start</span>
-                      <span className="text-muted-foreground">the opening position</span>
-                    </button>
-                  </li>
-                  {fullMoves.map((rec, i) => {
-                    const ply = i + 1
-                    const current = ply === currentPly
-                    return (
-                      <li key={i}>
-                        <button
-                          type="button"
-                          onClick={() => jumpToPly(ply)}
-                          title="Go to this position"
-                          className={cn(
-                            'flex w-full items-baseline gap-2 rounded px-1 py-0.5 text-left font-mono text-[11px] transition-colors hover:bg-accent',
-                            current && 'bg-accent',
-                            i % 2 === 0 ? 'dark:bg-white/5' : 'bg-black/5 dark:bg-transparent',
-                          )}
-                        >
-                          <span className="w-5 text-right text-muted-foreground">{ply}</span>
-                          <span className="w-10 truncate text-muted-foreground">
-                            {variant.teams.find((t) => t.id === rec.team)?.name ?? rec.team}
-                          </span>
-                          <span>{rec.notation}</span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ol>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <StatsPanel />
+        {wide ? (
+          <>
+            <AnalysisPanel />
+            <MoveHistoryCard />
+            <StatsPanel />
+          </>
+        ) : (
+          <Tabs defaultValue="moves">
+            <TabsList className="w-full">
+              <TabsTrigger value="moves" className="flex-1">
+                Moves
+              </TabsTrigger>
+              <TabsTrigger value="analysis" className="flex-1">
+                Analysis
+              </TabsTrigger>
+              <TabsTrigger value="stats" className="flex-1">
+                Stats
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="moves">
+              <MoveHistoryCard />
+            </TabsContent>
+            <TabsContent value="analysis">
+              <AnalysisPanel />
+            </TabsContent>
+            <TabsContent value="stats">
+              <StatsPanel />
+            </TabsContent>
+          </Tabs>
+        )}
       </aside>
     </div>
   )

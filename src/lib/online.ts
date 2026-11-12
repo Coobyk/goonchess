@@ -103,11 +103,12 @@ export async function createRoom(
   variant: Variant,
   captcha: { challenge: string; solution: string },
   clock: ClockSettings,
+  seat?: number,
 ): Promise<CreateResult> {
   const response = await fetch('/api/games', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ variant, captcha, clock }),
+    body: JSON.stringify({ variant, captcha, clock, seat }),
   })
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string }
