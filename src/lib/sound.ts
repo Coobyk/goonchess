@@ -10,7 +10,7 @@ export type SoundName =
   | 'win'
   | 'draw'
 
-const VOLUME: Record<SoundName, number> = {
+export const VOLUME: Record<SoundName, number> = {
   move: 0.5,
   capture: 0.6,
   check: 0.55,
