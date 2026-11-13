@@ -39,7 +39,7 @@ export function ShareDialog({
   const [creating, setCreating] = useState(false)
   const [playError, setPlayError] = useState<string | null>(null)
   /** Which side the link's creator plays, as a seat index or 'random'. */
-  const [seatChoice, setSeatChoice] = useState('0')
+  const [seatChoice, setSeatChoice] = useState('random')
   const twoTeams = variant.teams.length === 2
 
   const json = exportVariant()
