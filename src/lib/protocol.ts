@@ -53,6 +53,11 @@ export type ServerMessage =
       chat?: ChatLine[]
     }
   | { t: 'state'; game: GameState; clockState?: ClockState | null }
+  /**
+   * A room made with random sides deals them again for every game: this is
+   * the seat the browser holds for the new one.
+   */
+  | { t: 'seat'; seat: number }
   | { t: 'presence'; presence: boolean[]; watchers: number }
   /** Another seat offers to take a move back, or to play again. */
   | { t: 'offer'; kind: OfferKind; seat: number }

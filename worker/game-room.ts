@@ -46,6 +46,8 @@ interface Meta {
   startedAt: number | null
   /** The time control the room enforces, chosen by whoever made the link. */
   clock: ClockSettings
+  /** A link made with "random" sides deals them again for every game. */
+  randomSide?: boolean
 }
 
 /** The board and its clock travel in one row, so a move writes one record. */
@@ -132,12 +134,16 @@ export class GameRoom {
     token: string
     variant: Variant
     clock?: unknown
-    /** The seat the link's creator takes; anything unexpected defaults to the first. */
+    /**
+     * The seat the link's creator takes, or 'random' to deal it again for
+     * every game. Anything unexpected defaults to the first seat.
+     */
     seat?: unknown
   }): Promise<Response> {
     if (await this.ctx.storage.get('meta')) return json({ error: 'exists' }, 409)
 
-    const creatorSeat = body.seat === 1 ? 1 : 0
+    const randomSide = body.seat === 'random'
+    const creatorSeat = randomSide ? Math.floor(Math.random() * 2) : body.seat === 1 ? 1 : 0
     const seats: (string | null)[] = [null, null]
     seats[creatorSeat] = await hashToken(body.token)
     const meta: Meta = {
@@ -147,6 +153,7 @@ export class GameRoom {
       seats,
       startedAt: null,
       clock: normalizeClock(body.clock),
+      randomSide,
     }
     await this.ctx.storage.put('meta', meta)
     await this.ctx.storage.setAlarm(Date.now() + EMPTY_ROOM_TTL)
@@ -405,11 +412,24 @@ export class GameRoom {
     this.broadcast({ t: 'state', game: rebuilt, clockState: clock })
   }
 
-  /** The same rooms, the same seats, the whole game from the start again. */
+  /** The same room, the whole game from the start again. */
   private async rematch(): Promise<void> {
     const loaded = await this.load()
     if (!loaded?.game?.winner) return
     const { meta } = loaded
+    // A link made with random sides deals them again: half the time the
+    // players trade seats for the new game, half the time they stay.
+    if (meta.randomSide && Math.random() < 0.5) {
+      meta.seats.reverse()
+      await this.ctx.storage.put('meta', meta)
+      for (const ws of this.ctx.getWebSockets()) {
+        const attachment = ws.deserializeAttachment() as Attachment | null
+        if (attachment?.seat === null || attachment?.seat === undefined) continue
+        const seat = 1 - attachment.seat
+        ws.serializeAttachment({ seat } satisfies Attachment)
+        send(ws, { t: 'seat', seat })
+      }
+    }
     const fresh = createInitialState(meta.variant)
     const clock = clockIsOn(meta.clock)
       ? initialClockState(meta.clock, fresh.variant)

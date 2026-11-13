@@ -235,7 +235,7 @@ interface AppState {
   joinOnline: (code: string) => void
   leaveOnline: () => void
   /** Creates a room behind the hidden captcha and joins it, in the chosen seat. */
-  startOnlineGame: (seat?: number) => Promise<CreateResult>
+  startOnlineGame: (seat?: number | 'random') => Promise<CreateResult>
   resignOnline: () => void
   /** Offers and answers, and the room's chat. */
   offerOnlineUndo: () => void
@@ -506,6 +506,14 @@ export const useAppStore = create<AppState>((set, get) => {
     if (message.t === 'offer-declined') {
       set({ online: { ...online, offer: null } })
       toast('The offer was declined.')
+      return
+    }
+
+    if (message.t === 'seat') {
+      // A random-side rematch dealt this browser a new side for the new game.
+      set({ online: { ...online, seat: message.seat } })
+      const team = get().variant.teams[message.seat]?.name
+      if (team) toast(`You are ${team} this game.`)
       return
     }
 

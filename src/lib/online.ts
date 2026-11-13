@@ -40,7 +40,7 @@ export async function createRoom(
   variant: Variant,
   captcha: { challenge: string; solution: string },
   clock: ClockSettings,
-  seat?: number,
+  seat?: number | 'random',
 ): Promise<CreateResult> {
   const response = await fetch('/api/games', {
     method: 'POST',

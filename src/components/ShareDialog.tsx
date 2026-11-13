@@ -54,8 +54,9 @@ export function ShareDialog({
     setPlayError(null)
     setCreating(true)
     try {
-      const seat = seatChoice === 'random' ? Math.floor(Math.random() * 2) : Number(seatChoice)
-      const created = await startOnlineGame(seat)
+      const created = await startOnlineGame(
+        seatChoice === 'random' ? 'random' : Number(seatChoice),
+      )
       // The link is the whole invitation, so it goes to the clipboard before
       // the dialog closes. A browser that refuses still has the copy button on
       // the bar above the board.

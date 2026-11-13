@@ -51,6 +51,15 @@ describe('Play again in online games', () => {
     expect(store().online?.status).toBe('playing')
     expect(store().online?.offer).toBeNull()
   })
+  it('takes the seat the room deals on a random-side rematch', () => {
+    finish(0)
+    receive({ t: 'seat', seat: 1 })
+    expect(store().online?.seat).toBe(1)
+    const fresh = createInitialState(store().variant)
+    receive({ t: 'state', game: fresh, clockState: null })
+    expect(store().online?.status).toBe('playing')
+    expect(store().online?.seat).toBe(1)
+  })
   it('does not re-offer while its offer is pending; permits retry after decline', () => {
     const game = finish()
     receive({ t: 'offer', kind: 'rematch', seat: 0 })
