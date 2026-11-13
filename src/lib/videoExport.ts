@@ -161,7 +161,7 @@ export async function exportGameVideo(
   const rows = variant.board.height
   const teamIndex = (id: string) => variant.teams.findIndex((t) => t.id === id)
 
-  const cell = Math.max(48, Math.min(84, Math.round(800 / Math.max(cols, rows))))
+  const cell = Math.max(48, Math.min(96, Math.round(980 / Math.max(cols, rows))))
   const pad = Math.round(cell * 0.42)
   const W = cols * cell + pad * 2
   const H = rows * cell + pad * 2 + Math.round(cell * 0.6)
@@ -597,6 +597,20 @@ export async function exportGameVideo(
   }
 
   // ---------- capture ----------
+  // The video is a square 1080×1080; the board scene renders at its natural
+  // size and is blitted centred into it every frame.
+  const OUT = 1080
+  const output = document.createElement('canvas')
+  output.width = output.height = OUT
+  const outCtx = output.getContext('2d')
+  if (!outCtx) throw new Error('Canvas unavailable')
+  outCtx.imageSmoothingQuality = 'high'
+  const fit = Math.min(OUT / W, OUT / H)
+  const dw = W * fit
+  const dh = H * fit
+  const dx = (OUT - dw) / 2
+  const dy = (OUT - dh) / 2
+
   const mime = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
@@ -604,7 +618,7 @@ export async function exportGameVideo(
     'video/mp4',
   ].find((m) => MediaRecorder.isTypeSupported(m))
   if (!mime) throw new Error('This browser cannot record video')
-  const stream = canvas.captureStream(60)
+  const stream = output.captureStream(60)
   if (dest) for (const track of dest.stream.getAudioTracks()) stream.addTrack(track)
   const recorder = new MediaRecorder(stream, {
     mimeType: mime,
@@ -630,6 +644,9 @@ export async function exportGameVideo(
     const frame = () => {
       const t = performance.now() - t0
       drawFrame(t)
+      outCtx.fillStyle = '#0c0c0e'
+      outCtx.fillRect(0, 0, OUT, OUT)
+      outCtx.drawImage(canvas, dx, dy, dw, dh)
       const progress = Math.floor((t / total) * 100)
       if (progress !== lastProgress) {
         lastProgress = progress
