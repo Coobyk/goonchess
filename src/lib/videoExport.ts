@@ -11,6 +11,7 @@ import { boardColors, portalRgba } from './palette'
 import { artToUri, rainbowUri, SHAPE_OF_ICON } from './pieceArt'
 import { findPack } from './soundPacks'
 import { VOLUME, type SoundName } from './sound'
+import { Muxer, ArrayBufferTarget } from 'webm-muxer'
 
 /**
  * Turns a finished game's history into a video. The frames are drawn on an
@@ -110,7 +111,7 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
 }
 
 /** Decode every sound of the pack into buffers for the mix. */
-async function loadBuffers(ctx: AudioContext, packId: string) {
+async function loadBuffers(ctx: BaseAudioContext, packId: string) {
   const dir = findPack(packId).dir
   const buffers = new Map<SoundName, AudioBuffer>()
   await Promise.all(
@@ -260,22 +261,6 @@ export async function exportGameVideo(
     sounds.push({ at: cursor, name: last.winner === 'draw' ? 'draw' : 'win' })
   }
   const total = cursor + (last.winner ? END_CARD_MS : 300)
-
-  // ---------- audio ----------
-  if (audio && dest) {
-    const buffers = await loadBuffers(audio, options.packId)
-    const t0 = audio.currentTime + 0.08
-    for (const { at, name } of sounds) {
-      const buffer = buffers.get(name)
-      if (!buffer) continue
-      const src = audio.createBufferSource()
-      const gain = audio.createGain()
-      gain.gain.value = VOLUME[name]
-      src.buffer = buffer
-      src.connect(gain).connect(dest)
-      src.start(t0 + at / 1000)
-    }
-  }
 
   // ---------- drawing helpers ----------
   const colors = boardColors()
@@ -613,6 +598,176 @@ export async function exportGameVideo(
   const dx = (OUT - dw) / 2
   const dy = (OUT - dh) / 2
 
+  const blitOutput = () => {
+    outCtx.fillStyle = '#0c0c0e'
+    outCtx.fillRect(0, 0, OUT, OUT)
+    outCtx.drawImage(canvas, dx, dy, dw, dh)
+  }
+
+  // ---------- encode (WebCodecs) ----------
+  // When the browser offers WebCodecs, frames are stamped exactly 1/60s
+  // apart — a true 60 fps no matter how long a frame takes to draw — the
+  // encoder prefers the GPU ('prefer-hardware'), and the sound pack is
+  // mixed offline and encoded to opus, all muxed into one webm. As a bonus
+  // the render no longer runs in real time: it finishes as fast as it can.
+  const encodeWebm = async (): Promise<Blob | null> => {
+    try {
+      if (
+        typeof VideoEncoder === 'undefined' ||
+        typeof AudioEncoder === 'undefined' ||
+        typeof OfflineAudioContext === 'undefined' ||
+        typeof VideoFrame === 'undefined' ||
+        typeof AudioData === 'undefined'
+      ) {
+        return null
+      }
+
+      let videoConfig: VideoEncoderConfig | null = null
+      for (const codec of ['vp09.00.40.08', 'vp09.00.10.08', 'vp8']) {
+        const config: VideoEncoderConfig = {
+          codec,
+          width: OUT,
+          height: OUT,
+          bitrate: 8_000_000,
+          framerate: 60,
+          hardwareAcceleration: 'prefer-hardware',
+        }
+        if ((await VideoEncoder.isConfigSupported(config)).supported) {
+          videoConfig = config
+          break
+        }
+      }
+      if (!videoConfig) return null
+
+      // The sound mix renders offline, faster than real time, then to opus.
+      const audioConfig: AudioEncoderConfig = {
+        codec: 'opus',
+        sampleRate: 48_000,
+        numberOfChannels: 2,
+        bitrate: 128_000,
+      }
+      let mixed: AudioBuffer | null = null
+      if ((await AudioEncoder.isConfigSupported(audioConfig)).supported) {
+        const offline = new OfflineAudioContext(
+          2,
+          Math.ceil((48_000 * (total + 1_000)) / 1000),
+          48_000,
+        )
+        const buffers = await loadBuffers(offline, options.packId)
+        for (const { at, name } of sounds) {
+          const buffer = buffers.get(name)
+          if (!buffer) continue
+          const src = offline.createBufferSource()
+          const gain = offline.createGain()
+          gain.gain.value = VOLUME[name]
+          src.buffer = buffer
+          src.connect(gain).connect(offline.destination)
+          src.start(at / 1000)
+        }
+        mixed = await offline.startRendering()
+      }
+
+      const muxer = new Muxer({
+        target: new ArrayBufferTarget(),
+        video: {
+          codec: videoConfig.codec.startsWith('vp09') ? 'V_VP9' : 'V_VP8',
+          width: OUT,
+          height: OUT,
+          frameRate: 60,
+        },
+        audio: mixed
+          ? { codec: 'A_OPUS', sampleRate: 48_000, numberOfChannels: 2 }
+          : undefined,
+      })
+
+      let failed = false
+      const encoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: () => {
+          failed = true
+        },
+      })
+      encoder.configure(videoConfig)
+      const frameUs = Math.round(1_000_000 / 60)
+      const frames = Math.max(1, Math.ceil((total * 60) / 1000))
+      for (let i = 0; i < frames; i++) {
+        drawFrame(Math.min(total, (i * 1000) / 60))
+        blitOutput()
+        const frame = new VideoFrame(output, { timestamp: i * frameUs, duration: frameUs })
+        encoder.encode(frame)
+        frame.close()
+        if (encoder.encodeQueueSize > 8) {
+          await new Promise((r) => encoder.addEventListener('dequeue', r, { once: true }))
+        }
+        if (i % 10 === 0) {
+          options.onProgress?.(i / frames)
+          await new Promise((r) => setTimeout(r, 0))
+        }
+      }
+      await encoder.flush()
+      encoder.close()
+      if (failed) return null
+
+      if (mixed) {
+        const audioEncoder = new AudioEncoder({
+          output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+          error: () => {
+            failed = true
+          },
+        })
+        audioEncoder.configure(audioConfig)
+        for (let off = 0; off < mixed.length; off += 48_000) {
+          const n = Math.min(48_000, mixed.length - off)
+          const planes = new Float32Array(n * 2)
+          mixed.copyFromChannel(planes.subarray(0, n), 0, off)
+          mixed.copyFromChannel(planes.subarray(n, n * 2), 1, off)
+          const data = new AudioData({
+            format: 'f32-planar',
+            sampleRate: 48_000,
+            numberOfChannels: 2,
+            numberOfFrames: n,
+            timestamp: Math.round((off * 1e6) / 48_000),
+            data: planes,
+          })
+          audioEncoder.encode(data)
+          data.close()
+        }
+        await audioEncoder.flush()
+        audioEncoder.close()
+      }
+      if (failed) return null
+      options.onProgress?.(1)
+      muxer.finalize()
+      return new Blob([muxer.target.buffer], { type: 'video/webm' })
+    } catch {
+      return null
+    }
+  }
+
+  const webm = await encodeWebm()
+  if (webm) {
+    audio?.close().catch(() => {})
+    return webm
+  }
+
+  // ---------- capture (MediaRecorder fallback) ----------
+  // Without WebCodecs the game records the old way: the canvas streams into
+  // MediaRecorder in real time, with the sounds scheduled on the live context.
+  if (audio && dest) {
+    const buffers = await loadBuffers(audio, options.packId)
+    const t0 = audio.currentTime + 0.08
+    for (const { at, name } of sounds) {
+      const buffer = buffers.get(name)
+      if (!buffer) continue
+      const src = audio.createBufferSource()
+      const gain = audio.createGain()
+      gain.gain.value = VOLUME[name]
+      src.buffer = buffer
+      src.connect(gain).connect(dest)
+      src.start(t0 + at / 1000)
+    }
+  }
+
   const mime = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
@@ -646,9 +801,7 @@ export async function exportGameVideo(
     const frame = () => {
       const t = performance.now() - t0
       drawFrame(t)
-      outCtx.fillStyle = '#0c0c0e'
-      outCtx.fillRect(0, 0, OUT, OUT)
-      outCtx.drawImage(canvas, dx, dy, dw, dh)
+      blitOutput()
       const progress = Math.floor((t / total) * 100)
       if (progress !== lastProgress) {
         lastProgress = progress
