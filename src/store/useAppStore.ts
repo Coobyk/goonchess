@@ -193,7 +193,7 @@ interface AppState {
   pendingPromotion: { move: Move; origin?: Vec } | null
   choosePromotion: (typeId: string) => void
   cancelPromotion: () => void
-  loadPosition: (state: GameState) => void
+  loadPosition: (state: GameState, history?: GameState[]) => void
   resetGame: () => void
   /** The position a puzzle started from, so the puzzle can be set up again. */
   puzzleStart: GameState | null
@@ -961,12 +961,14 @@ export const useAppStore = create<AppState>((set, get) => {
 
     cancelPromotion: () => set({ pendingPromotion: null }),
 
-    loadPosition: (state) => {
+    loadPosition: (state, history) => {
       set({
         game: state,
         selected: null,
         legalMoves: [],
-        undoStack: [],
+        // A loaded game may come with every position it passed through, so
+        // the move list and the graph can step back through them.
+        undoStack: history ?? [],
         pendingPromotion: null,
       })
     },

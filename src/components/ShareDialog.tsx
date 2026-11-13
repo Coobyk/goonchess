@@ -272,7 +272,9 @@ export function ShareDialog({
                     setPgnError('Those moves cannot be played out as written.')
                     return
                   }
-                  loadPosition(result.game)
+                  // The states the sheet passed through become the game's
+                  // history, so the move list and graph can be stepped through.
+                  loadPosition(result.game, result.states)
                   setView('play')
                   toast.success('Game imported')
                   setPgnText('')
