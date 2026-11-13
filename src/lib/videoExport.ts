@@ -83,11 +83,6 @@ interface Segment {
   end: number
 }
 
-interface PieceSprite {
-  img: HTMLImageElement | null
-  letter: string | null
-}
-
 /** The picture a skin would show for this piece, or null for a letter. */
 function spriteFor(piece: PieceType, teamIndex: number): { src: string | null; letter: string } {
   const shape = piece.flags?.random ? SHAPE_OF_ICON[piece.icon] : undefined
@@ -166,7 +161,7 @@ export async function exportGameVideo(
   const rows = variant.board.height
   const teamIndex = (id: string) => variant.teams.findIndex((t) => t.id === id)
 
-  const cell = Math.max(56, Math.round(920 / Math.max(cols, rows)))
+  const cell = Math.max(48, Math.min(84, Math.round(800 / Math.max(cols, rows))))
   const pad = Math.round(cell * 0.42)
   const W = cols * cell + pad * 2
   const H = rows * cell + pad * 2 + Math.round(cell * 0.6)
@@ -176,6 +171,7 @@ export async function exportGameVideo(
   canvas.height = H
   const ctx = canvas.getContext('2d', { alpha: false })
   if (!ctx) throw new Error('Canvas unavailable')
+  ctx.imageSmoothingQuality = 'high'
 
   // The context is created and resumed before any await, so the click that
   // started the export still counts as the user gesture it needs.
@@ -191,27 +187,47 @@ export async function exportGameVideo(
   }
 
   // ---------- sprites ----------
-  const sprites = new Map<string, PieceSprite>()
-  const jobs: Promise<void>[] = []
+  const wanted = new Map<string, { src: string | null; letter: string; light: boolean }>()
   for (const state of states) {
     for (const type of Object.values(state.pieceTypes)) {
       for (let ti = 0; ti < variant.teams.length; ti++) {
         const key = `${type.id}:${ti}`
-        if (sprites.has(key)) continue
+        if (wanted.has(key)) continue
         const { src, letter } = spriteFor(type, ti)
-        const sprite: PieceSprite = { img: null, letter: letter || null }
-        sprites.set(key, sprite)
-        if (src) {
-          jobs.push(
-            loadImage(src).then((img) => {
-              sprite.img = img
-            }),
-          )
-        }
+        wanted.set(key, { src, letter, light: ti === 0 })
       }
     }
   }
-  await Promise.all(jobs)
+  // Each sprite is drawn once into its own bitmap at twice the square size,
+  // so a frame is a handful of blits and pieces stay crisp even mid-lift.
+  const spritePx = Math.round(cell * 0.78 * 2)
+  const sprites = new Map<string, HTMLCanvasElement | null>()
+  await Promise.all(
+    [...wanted].map(async ([key, want]) => {
+      const img = want.src ? await loadImage(want.src) : null
+      let canvas: HTMLCanvasElement | null = null
+      if (img || want.letter) {
+        canvas = document.createElement('canvas')
+        canvas.width = canvas.height = spritePx
+        const g = canvas.getContext('2d')
+        if (g) {
+          if (img) {
+            const iw = img.width || spritePx
+            const ih = img.height || spritePx
+            const fit = Math.min(spritePx / iw, spritePx / ih)
+            g.drawImage(img, (spritePx - iw * fit) / 2, (spritePx - ih * fit) / 2, iw * fit, ih * fit)
+          } else {
+            g.fillStyle = want.light ? '#f8fafc' : '#111827'
+            g.font = `600 ${Math.round(spritePx * 0.82)}px ui-sans-serif, system-ui, sans-serif`
+            g.textAlign = 'center'
+            g.textBaseline = 'middle'
+            g.fillText(want.letter, spritePx / 2, spritePx * 0.54)
+          }
+        }
+      }
+      sprites.set(key, canvas)
+    }),
+  )
 
   // ---------- timeline ----------
   const segments: Segment[] = []
@@ -269,6 +285,7 @@ export async function exportGameVideo(
   const sx = (v: Vec | { x: number; y: number }) => x0 + v.x * cell
   const sy = (v: Vec | { x: number; y: number }) => y0 + v.y * cell
 
+  const pieceSize = cell * 0.78
   const drawPiece = (
     typeId: string,
     team: string,
@@ -277,55 +294,49 @@ export async function exportGameVideo(
     scale: number,
     alpha: number,
   ) => {
-    const type = first.pieceTypes[typeId] ?? last.pieceTypes[typeId]
     const sprite = sprites.get(`${typeId}:${teamIndex(team)}`)
-    if (!type || !sprite) return
-    const size = cell * 0.8
+    if (!sprite) return
     ctx.save()
     ctx.translate(cx, cy)
     ctx.scale(scale, scale)
     ctx.globalAlpha *= Math.max(0, Math.min(1, alpha))
-    if (sprite.img) {
-      // A picture of its own may not be square: fit it inside the square.
-      const iw = sprite.img.width || size
-      const ih = sprite.img.height || size
-      const fit = Math.min(size / iw, size / ih)
-      ctx.drawImage(sprite.img, (-iw * fit) / 2, (-ih * fit) / 2, iw * fit, ih * fit)
-    } else if (sprite.letter) {
-      ctx.fillStyle = teamIndex(team) === 0 ? '#f8fafc' : '#111827'
-      ctx.font = `600 ${Math.round(size * 0.82)}px ui-sans-serif, system-ui, sans-serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(sprite.letter, 0, size * 0.04)
-    }
+    ctx.drawImage(sprite, -pieceSize / 2, -pieceSize / 2, pieceSize, pieceSize)
     ctx.restore()
   }
 
-  const drawTerrainAndSquares = (highlight: { from: Vec; finalTo: Vec } | null) => {
-    ctx.save()
-    roundRectPath(ctx, x0, y0, cols * cell, rows * cell, radius)
-    ctx.clip()
+  // Everything that never moves — backdrop, squares, terrain, border and the
+  // rank/file labels — is painted once and blitted under the pieces per frame.
+  const boardBase = document.createElement('canvas')
+  boardBase.width = W
+  boardBase.height = H
+  const base = boardBase.getContext('2d')
+  if (base) {
+    base.fillStyle = '#0c0c0e'
+    base.fillRect(0, 0, W, H)
+    base.save()
+    roundRectPath(base, x0, y0, cols * cell, rows * cell, radius)
+    base.clip()
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
-        ctx.fillStyle = (x + y) % 2 === 0 ? colors.light : colors.dark
-        ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
+        base.fillStyle = (x + y) % 2 === 0 ? colors.light : colors.dark
+        base.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
         const tile = variant.board.tiles[y]?.[x]
         if (tile?.terrain === 'wall') {
-          ctx.fillStyle = 'rgba(0,0,0,0.28)'
-          ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
-          ctx.strokeStyle = 'rgba(0,0,0,0.3)'
-          ctx.lineWidth = 2
+          base.fillStyle = 'rgba(0,0,0,0.28)'
+          base.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
+          base.strokeStyle = 'rgba(0,0,0,0.3)'
+          base.lineWidth = 2
           for (let d = -cell; d < cell * 2; d += 7) {
-            ctx.beginPath()
-            ctx.moveTo(x0 + x * cell + d, y0 + y * cell + cell)
-            ctx.lineTo(x0 + x * cell + d + cell, y0 + y * cell)
-            ctx.stroke()
+            base.beginPath()
+            base.moveTo(x0 + x * cell + d, y0 + y * cell + cell)
+            base.lineTo(x0 + x * cell + d + cell, y0 + y * cell)
+            base.stroke()
           }
         } else if (tile?.terrain === 'void') {
-          ctx.fillStyle = 'rgba(0,0,0,0.75)'
-          ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
+          base.fillStyle = 'rgba(0,0,0,0.75)'
+          base.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
         } else if (tile?.terrain === 'portal' || tile?.terrain === 'oneway') {
-          const g = ctx.createRadialGradient(
+          const g = base.createRadialGradient(
             x0 + x * cell + cell / 2,
             y0 + y * cell + cell / 2,
             0,
@@ -336,20 +347,39 @@ export async function exportGameVideo(
           g.addColorStop(0, portalRgba(0.55))
           g.addColorStop(0.6, portalRgba(0.12))
           g.addColorStop(0.72, 'rgba(56,189,248,0)')
-          ctx.fillStyle = g
-          ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
-        }
-        if (highlight && ((highlight.from.x === x && highlight.from.y === y) || (highlight.finalTo.x === x && highlight.finalTo.y === y))) {
-          ctx.fillStyle = 'rgba(251,191,36,0.28)'
-          ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
+          base.fillStyle = g
+          base.fillRect(x0 + x * cell, y0 + y * cell, cell, cell)
         }
       }
     }
-    ctx.restore()
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)'
-    ctx.lineWidth = 2
-    roundRectPath(ctx, x0 + 1, y0 + 1, cols * cell - 2, rows * cell - 2, radius)
-    ctx.stroke()
+    base.restore()
+    base.strokeStyle = 'rgba(255,255,255,0.14)'
+    base.lineWidth = 2
+    roundRectPath(base, x0 + 1, y0 + 1, cols * cell - 2, rows * cell - 2, radius)
+    base.stroke()
+
+    base.fillStyle = 'rgba(255,255,255,0.55)'
+    base.font = `${Math.round(cell * 0.3)}px ui-monospace, monospace`
+    base.textAlign = 'center'
+    base.textBaseline = 'middle'
+    for (let x = 0; x < cols; x++) {
+      const letter = String.fromCharCode(97 + x)
+      base.fillText(letter, x0 + x * cell + cell / 2, y0 + rows * cell + pad * 0.55)
+      base.fillText(letter, x0 + x * cell + cell / 2, y0 - pad * 0.5)
+    }
+    for (let y = 0; y < rows; y++) {
+      const rank = String(rows - y)
+      base.fillText(rank, x0 - pad * 0.55, y0 + y * cell + cell / 2)
+      base.fillText(rank, x0 + cols * cell + pad * 0.55, y0 + y * cell + cell / 2)
+    }
+  }
+
+  const drawLastMove = (move: { from: Vec; finalTo: Vec }) => {
+    ctx.fillStyle = 'rgba(251,191,36,0.28)'
+    ctx.fillRect(sx(move.from), sy(move.from), cell, cell)
+    if (move.finalTo.x !== move.from.x || move.finalTo.y !== move.from.y) {
+      ctx.fillRect(sx(move.finalTo), sy(move.finalTo), cell, cell)
+    }
   }
 
   const drawStaticPieces = (state: GameState, skip: Set<string>) => {
@@ -448,15 +478,13 @@ export async function exportGameVideo(
   }
 
   const drawFrame = (t: number) => {
-    // Page backdrop, then the board with its labels.
-    ctx.fillStyle = '#0c0c0e'
-    ctx.fillRect(0, 0, W, H)
+    ctx.drawImage(boardBase, 0, 0)
 
     const seg = segments.find((s) => t < s.end) ?? segments[segments.length - 1]
     const record = seg?.next.moveHistory[seg.next.moveHistory.length - 1]
     const inAnim = seg && t >= seg.start
 
-    drawTerrainAndSquares(inAnim ? (record?.move ?? null) : null)
+    if (inAnim && record?.move) drawLastMove(record.move)
 
     if (!seg) return
 
@@ -550,22 +578,6 @@ export async function exportGameVideo(
       if (t >= seg.landing) drawCheckRing(seg.next)
     }
 
-    // Rank and file labels.
-    ctx.fillStyle = 'rgba(255,255,255,0.55)'
-    ctx.font = `${Math.round(cell * 0.3)}px ui-monospace, monospace`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    for (let x = 0; x < cols; x++) {
-      const letter = String.fromCharCode(97 + x)
-      ctx.fillText(letter, x0 + x * cell + cell / 2, y0 + rows * cell + pad * 0.55)
-      ctx.fillText(letter, x0 + x * cell + cell / 2, y0 - pad * 0.5)
-    }
-    for (let y = 0; y < rows; y++) {
-      const rank = String(rows - y)
-      ctx.fillText(rank, x0 - pad * 0.55, y0 + y * cell + cell / 2)
-      ctx.fillText(rank, x0 + cols * cell + pad * 0.55, y0 + y * cell + cell / 2)
-    }
-
     // The result card, while the win/draw sting plays.
     if (last.winner && t >= cursor) {
       const label = last.winner === 'draw' ? 'Draw' : `${variant.teams.find((tm) => tm.id === last.winner)?.name ?? last.winner} wins`
@@ -594,7 +606,10 @@ export async function exportGameVideo(
   if (!mime) throw new Error('This browser cannot record video')
   const stream = canvas.captureStream(60)
   if (dest) for (const track of dest.stream.getAudioTracks()) stream.addTrack(track)
-  const recorder = new MediaRecorder(stream, { mimeType: mime })
+  const recorder = new MediaRecorder(stream, {
+    mimeType: mime,
+    videoBitsPerSecond: 8_000_000,
+  })
   const chunks: Blob[] = []
   recorder.ondataavailable = (e) => {
     if (e.data.size) chunks.push(e.data)
