@@ -103,7 +103,7 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
   },
   loyalty: {
     name: 'Loyalty',
-    hint: 'The king is jealous of his queen. If she looks the enemy king in the eye — however the line opened — he explodes where he stands, and her side loses the game on the spot.',
+    hint: 'The king is jealous of his queen. If she looks the enemy king in the eye — however the line opened — he explodes where he stands, and her side loses the game on the spot. Her gaze is a trap too: a king may step into it on purpose, and a pinned piece may unveil him, to blow up the king who owns her.',
   },
   hypergamy: {
     name: 'Hypergamy',

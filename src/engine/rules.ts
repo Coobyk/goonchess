@@ -560,6 +560,30 @@ export function isInCheck(state: GameState, teamId: string): boolean {
   return false
 }
 
+/**
+ * Loyalty Chess: whether an enemy queen looks this side's royal in the eye —
+ * the gaze that detonates the queen's own king and wins the game for the side
+ * that was seen.
+ */
+function queenFindsKing(state: GameState, teamId: string): boolean {
+  for (let y = 0; y < state.board.length; y++) {
+    for (let x = 0; x < state.board[y].length; x++) {
+      const id = state.board[y][x]
+      if (!id) continue
+      const inst = state.pieces[id]
+      if (!inst || inst.team === teamId) continue
+      if (state.pieceTypes[inst.typeId]?.icon !== 'queen') continue
+      for (const m of movesFor(state, x, y)) {
+        const prey = m.capturedId ? state.pieces[m.capturedId] : undefined
+        if (prey?.team === teamId && state.pieceTypes[prey.typeId]?.flags.royal) {
+          return true
+        }
+      }
+    }
+  }
+  return false
+}
+
 export function findPiece(state: GameState, pieceId: string): Vec | null {
   for (let y = 0; y < state.board.length; y++) {
     for (let x = 0; x < state.board[y].length; x++) {
@@ -803,6 +827,9 @@ function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
   // Atomic: a blast can remove a blocker as well as a king, so every move is
   // put through the proper check rather than the fast one.
   const atomic = state.variant.rules?.includes('atomic')
+  // Loyalty: the king may stand in the enemy queen's sight on purpose — the
+  // gaze that finds him blows her king up, so walking into it can win.
+  const loyalty = state.variant.rules?.includes('loyalty')
   for (const move of movesFor(state, x, y)) {
     if (predatorKeys) {
       if (!predatorKeys.has(predatorKey(move)) && !slaysPredator(state, move)) continue
@@ -813,7 +840,12 @@ function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
     if (!castlingIsLegal(state, move, inst)) continue
     const next = applyMove(state, move, { compute: false })
     const free = takesPredator(state, move)
-    if (isInCheck(next, inst.team) && !free && !(atomic && wonByBlast(state, next, inst.team))) continue
+    if (
+      isInCheck(next, inst.team) &&
+      !free &&
+      !(loyalty && queenFindsKing(next, inst.team)) &&
+      !(atomic && wonByBlast(state, next, inst.team))
+    ) continue
     if (noCheck && !free && isInCheck(next, next.turn)) continue
     options.push({ move, next })
   }
@@ -1126,6 +1158,9 @@ function collectTeamMoves(
   // Atomic: a blast can remove a blocker as well as a king, so the fast path
   // cannot follow what a capture does to the board.
   const atomic = state.variant.rules?.includes('atomic')
+  // Loyalty: the enemy queen's gaze is a check worth standing in — it takes
+  // her king down, not yours.
+  const loyalty = state.variant.rules?.includes('loyalty')
   const attacked = takeScratch(size)
   if (enemyTeams.size) fillAttackedSquares(state, enemyTeams, attacked)
   const royalIds = new Set(royals.map((r) => r.id))
@@ -1171,7 +1206,12 @@ function collectTeamMoves(
         // This move has to be looked at properly, so the state is built now.
         const next = applyMove(state, move, { compute: false, search })
         const free = takesPredator(state, move)
-        if (isInCheck(next, inst.team) && !free && !(atomic && wonByBlast(state, next, teamId))) continue
+        if (
+          isInCheck(next, inst.team) &&
+          !free &&
+          !(loyalty && queenFindsKing(next, inst.team)) &&
+          !(atomic && wonByBlast(state, next, teamId))
+        ) continue
         if (noCheck && !free && isInCheck(next, next.turn)) continue
         moves.push(move)
         states.push(next)

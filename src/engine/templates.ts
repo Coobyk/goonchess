@@ -497,8 +497,9 @@ export function predatorChess(): Variant {
  * Classic chess with a jealous king. A queen that looks the enemy king in the
  * eye — however the line opened — enrages her own king, and he explodes where
  * he stands: the side whose queen gave the check loses the game on the spot,
- * army intact. So a queen may never check, and a king hides from his own
- * queen's sight as much as from the enemy's.
+ * army intact. So a queen may never check — but her gaze is a trap too. A
+ * king may step into it on purpose, and a pinned piece may unveil him to it:
+ * the king who owns her pays for what she saw.
  */
 export function loyaltyChess(): Variant {
   const base = classicChess()
@@ -507,7 +508,7 @@ export function loyaltyChess(): Variant {
     id: 'loyalty',
     name: 'Loyalty Chess',
     description:
-      'The king is jealous: if his queen checks the enemy king, he explodes in a rage and loses the game.',
+      'The king is jealous: if his queen checks the enemy king, he explodes in a rage and loses the game — so stepping into her gaze can win it.',
     rules: ['loyalty'],
     winConditions: [
       { id: uid(), kind: 'checkmate' },

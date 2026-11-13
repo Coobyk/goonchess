@@ -113,6 +113,58 @@ describe('loyalty chess', () => {
     expect(next.status).toBe('jealousy')
   })
 
+  it('lets the king walk into her gaze — her king pays for it', () => {
+    const game = bare()
+    place(game, 'King', 'white', 3, 7) // d1
+    place(game, 'Queen', 'black', 4, 4) // e5, watching the e-file
+    place(game, 'King', 'black', 0, 0) // a8
+    place(game, 'Rook', 'white', 0, 7) // a1
+
+    // Ke1 — a deliberate step into her sight: the black king explodes.
+    const move = getLegalMoves(game, 3, 7).find(
+      (m) => m.finalTo.x === 4 && m.finalTo.y === 7,
+    )
+    expect(move).toBeTruthy()
+    const next = applyMove(game, move!)
+    expect(royalOf(next, 'white')).toBeTruthy()
+    expect(royalOf(next, 'black')).toBeUndefined()
+    expect(next.winner).toBe('white')
+    expect(next.status).toBe('jealousy')
+  })
+
+  it('lets a pinned piece step aside and show its king to her', () => {
+    const game = bare()
+    place(game, 'King', 'white', 4, 7) // e1
+    place(game, 'Knight', 'white', 4, 5) // e3, pinned on the e-file
+    place(game, 'Queen', 'black', 4, 1) // e7, staring down it
+    place(game, 'King', 'black', 0, 0) // a8
+    place(game, 'Rook', 'white', 0, 7) // a1
+
+    // The knight hops off the file — the black queen finds the white king,
+    // and the king who owns her explodes. White wins.
+    const move = getLegalMoves(game, 4, 5).find(
+      (m) => m.finalTo.x === 6 && m.finalTo.y === 4,
+    )
+    expect(move).toBeTruthy()
+    const next = applyMove(game, move!)
+    expect(royalOf(next, 'black')).toBeUndefined()
+    expect(royalOf(next, 'white')).toBeTruthy()
+    expect(next.winner).toBe('white')
+    expect(next.status).toBe('jealousy')
+  })
+
+  it('still forbids walking into a check that wins nothing', () => {
+    const game = bare()
+    place(game, 'King', 'white', 3, 7) // d1
+    place(game, 'Rook', 'black', 4, 4) // e5 — a rook's stare, not a queen's
+    place(game, 'King', 'black', 0, 0) // a8
+
+    // No gaze to exploit: stepping onto the e-file stays forbidden ground.
+    const moves = getLegalMoves(game, 3, 7).map((m) => `${m.finalTo.x},${m.finalTo.y}`)
+    expect(moves).not.toContain('4,7')
+    expect(moves).not.toContain('4,6')
+  })
+
   it('keeps the turn and the move list honest after the explosion', () => {
     const game = bare()
     place(game, 'King', 'white', 4, 7) // e1
