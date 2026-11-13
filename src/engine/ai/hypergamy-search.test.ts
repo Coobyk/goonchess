@@ -38,15 +38,16 @@ describe('the bot under hypergamy', () => {
     expect(result.score).toBeGreaterThan(500_000)
   })
 
-  it('finds Qb7# — mate that only stands because the king cannot take', () => {
+  it('finds Qb7# — the guarded queen is beyond the king', () => {
     const game = bare()
     place(game, 'King', 'white', 0, 0) // a8
     place(game, 'King', 'black', 7, 0) // h8
+    place(game, 'Bishop', 'black', 0, 2) // a6, guarding b7
     place(game, 'Queen', 'black', 5, 1) // f7, on b7's rank
     game.turn = 'black'
 
-    // In classic chess Kxb7 refutes this unless the queen is defended; under
-    // hypergamy the king can never take, so Qb7 is mate on its own.
+    // The king may take anyone, but the bishop on a6 watches b7, so Kxb7 is
+    // off the table and Qb7 is mate on its own.
     const result = searchBestMove(game, { team: 'black', level: 'normal', seed: 1 })
     expect(result.move?.finalTo).toEqual({ x: 1, y: 1 }) // b7
     expect(result.score).toBeGreaterThan(500_000)
@@ -57,11 +58,13 @@ describe('the bot under hypergamy', () => {
     place(game, 'King', 'white', 0, 0) // a8
     place(game, 'Rook', 'white', 2, 0) // c8, watching b8 but powerless
     place(game, 'King', 'black', 7, 3) // h5, clear of the rook
+    place(game, 'Bishop', 'black', 0, 2) // a6, guarding b7
     place(game, 'Queen', 'black', 4, 1) // e7
     game.turn = 'black'
 
-    // Nobody may take the queen on b7: the king may not, and the rook is
-    // beneath her. The mate the old rules would call a blunder.
+    // Nobody may take the queen on b7: the bishop holds her against the
+    // king, and the rook is beneath her. The mate the old rules would call
+    // a blunder.
     const result = searchBestMove(game, { team: 'black', level: 'normal', seed: 1 })
     expect(result.move?.finalTo).toEqual({ x: 1, y: 1 }) // b7
     expect(result.score).toBeGreaterThan(500_000)
@@ -72,6 +75,7 @@ describe('the bot under hypergamy', () => {
     place(game, 'King', 'white', 0, 0) // a8
     place(game, 'Rook', 'white', 2, 0) // c8, watching b8 but powerless
     place(game, 'King', 'black', 7, 3) // h5
+    place(game, 'Bishop', 'black', 0, 2) // a6, guarding b7
     place(game, 'Queen', 'black', 4, 1) // e7
     game.turn = 'black'
 

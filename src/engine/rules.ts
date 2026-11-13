@@ -280,11 +280,10 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     const occPiece = state.pieceTypes[occInst.typeId]
     if (occPiece?.flags.uncapturable) return
     // Hypergamy: a piece only ever takes its equals or its betters — a pawn
-    // takes anything, a queen only another queen. The king, worth nothing,
-    // can take no one; and a royal piece is beneath nobody, so the king
-    // himself may always be captured, whoever asks.
+    // takes anything, a queen only another queen. The king stands outside
+    // the order: worth nothing, he may take anyone; and a royal piece is
+    // beneath nobody, so the king himself may always be captured too.
     if (hypergamy && occPiece) {
-      if (piece.flags.royal && !occPiece.flags.royal) return
       if (!occPiece.flags.royal && occPiece.value < piece.value) return
     }
     // Atomic: a king's capture would set off the blast on top of the king
@@ -497,7 +496,6 @@ function enPassantMove(
   if (!jumpedPiece?.flags.enPassant || jumpedPiece.flags.uncapturable) return null
   // The same law of appetite holds over the skipped square.
   if (state.variant.rules?.includes('hypergamy')) {
-    if (piece.flags.royal && !jumpedPiece.flags.royal) return null
     if (!jumpedPiece.flags.royal && jumpedPiece.value < piece.value) return null
   }
 

@@ -117,25 +117,26 @@ describe('hypergamy', () => {
     expect(next.status).toBe('royal-captured')
   })
 
-  it('leaves the king unable to capture anyone', () => {
+  it('lets the king take anyone, high or low', () => {
     const game = bare()
     place(game, 'King', 'white', 4, 7) // e1
     place(game, 'King', 'black', 0, 0) // a8
     place(game, 'Pawn', 'black', 5, 6) // f2, beside the white king
+    place(game, 'Queen', 'black', 3, 7) // d1, on his other side
 
-    const kingsMoves = getLegalMoves(game, 4, 7)
-    expect(kingsMoves.find((m) => m.finalTo.x === 5 && m.finalTo.y === 6)).toBeUndefined()
-    expect(kingsMoves.some((m) => !!m.capturedId)).toBe(false)
+    const targets = captureTargets(game, 4, 7)
+    expect(targets).toContain('5,6')
+    expect(targets).toContain('3,7')
   })
 
-  it('lets a checked king escape by stepping aside, though he cannot take', () => {
+  it('lets a checked king escape by stepping aside, or by taking her', () => {
     const game = bare()
     place(game, 'King', 'white', 4, 7) // e1
     place(game, 'King', 'black', 7, 0) // h8
     place(game, 'Queen', 'black', 3, 0) // d8
     game.turn = 'black'
 
-    // Qe7+ — the white king may not take her, but d2 is open to him.
+    // Qe7+ — too far away to take, but d2 is open to him.
     const check = getLegalMoves(game, 3, 0).find((m) => m.finalTo.x === 4 && m.finalTo.y === 1)!
     expect(check).toBeTruthy()
     const next = applyMove(game, check)

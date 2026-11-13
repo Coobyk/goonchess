@@ -523,8 +523,8 @@ export function loyaltyChess(): Variant {
  * as much as itself or more. A pawn can take anything, knights and bishops
  * hunt each other, a rook reaches rooks and queens — and the queen, at the
  * top of the order, can only ever be taken down by another queen. The king
- * is beneath nobody and may always be captured, but he himself, worth
- * nothing, can take no one.
+ * stands outside the order: worth nothing, he may take anyone, and being
+ * beneath nobody, anyone may take him.
  */
 export function hypergamyChess(): Variant {
   const base = classicChess()
@@ -533,7 +533,7 @@ export function hypergamyChess(): Variant {
     id: 'hypergamy',
     name: 'Hypergamy',
     description:
-      'A piece may only capture pieces of equal or higher value: a pawn takes all, a queen only queens.',
+      'A piece may only capture pieces of equal or higher value: a pawn takes all, a queen only queens — but the king takes anyone.',
     rules: ['hypergamy'],
     winConditions: [
       { id: uid(), kind: 'checkmate' },

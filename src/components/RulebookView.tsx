@@ -107,7 +107,7 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
   },
   hypergamy: {
     name: 'Hypergamy',
-    hint: 'A piece may only take a piece worth as much as itself or more. A pawn takes anything, knights and bishops hunt each other, a rook reaches rooks and queens — and the queen can only ever be taken down by another queen. The king is beneath nobody: every piece may take him, but he, worth nothing, can take no one.',
+    hint: 'A piece may only take a piece worth as much as itself or more. A pawn takes anything, knights and bishops hunt each other, a rook reaches rooks and queens — and the queen can only ever be taken down by another queen. The king stands outside the order: worth nothing, he may take anyone, and being beneath nobody, anyone may take him.',
   },
 }
 
