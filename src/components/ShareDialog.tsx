@@ -125,14 +125,14 @@ export function ShareDialog({
                   value={seatChoice}
                   onValueChange={(value) => value && setSeatChoice(value)}
                 >
+                  <ToggleGroupItem value="random" className="flex-1 py-1 px-2">
+                    Random
+                  </ToggleGroupItem>
                   {variant.teams.map((team, index) => (
                     <ToggleGroupItem key={team.id} value={String(index)} className="flex-1 py-1 px-2">
                       {team.name}
                     </ToggleGroupItem>
                   ))}
-                  <ToggleGroupItem value="random" className="flex-1 py-1 px-2">
-                    Random
-                  </ToggleGroupItem>
                 </ToggleGroup>
               </div>
             )}
