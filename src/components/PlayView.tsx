@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from 'sonner'
-import { Bot, ClipboardCopy, Download, FileText, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, FlipHorizontal2, Timer } from 'lucide-react'
+import { Bot, ClipboardCopy, Download, FileText, Film, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
@@ -30,6 +30,7 @@ import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
 import { toFen } from '@/lib/fen'
 import { toPgn } from '@/lib/pgn'
 import { downloadBlob, fileNameFor, positionName, renderBoardImage } from '@/lib/image'
+import { exportGameVideo } from '@/lib/videoExport'
 import { playSound } from '@/lib/sound'
 import { isPocketSquare, type GameState, type TeamConfig, type Variant } from '@/engine/types'
 
@@ -307,8 +308,12 @@ export function PlayView() {
   const setClock = useAppStore((s) => s.setClock)
   const botThinking = useAppStore((s) => s.botThinking)
   const setOpponentOpen = useAppStore((s) => s.setOpponentOpen)
+  const undoStack = useAppStore((s) => s.undoStack)
+  const soundPack = useAppStore((s) => s.soundPack)
   const [exportOpen, setExportOpen] = useState(false)
   const [pgnExport, setPgnExport] = useState<{ text: string; filename: string } | null>(null)
+  /** Fraction of the game video already rendered, while it records. */
+  const [rendering, setRendering] = useState<number | null>(null)
   const exportTriggerRef = useRef<HTMLButtonElement>(null)
 
   const prevWinner = useRef(game.winner)
@@ -655,6 +660,40 @@ export function PlayView() {
                   }}
                 >
                   <FileText /> View game as PGN
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  disabled={rendering !== null}
+                  onClick={async () => {
+                    const states = undoStack.length ? undoStack : [game]
+                    if (states.length < 2) {
+                      toast.error('Play some moves first — there is nothing to film yet.')
+                      return
+                    }
+                    setRendering(0)
+                    try {
+                      const blob = await exportGameVideo(states, {
+                        packId: soundPack,
+                        onProgress: setRendering,
+                      })
+                      const ext = blob.type === 'video/mp4' ? 'mp4' : 'webm'
+                      downloadBlob(blob, fileNameFor(positionName(game), ext))
+                      toast.success('Video saved')
+                    } catch (cause) {
+                      toast.error(
+                        cause instanceof Error ? cause.message : 'Video export failed',
+                      )
+                    } finally {
+                      setRendering(null)
+                    }
+                  }}
+                >
+                  {rendering !== null ? <Loader2 className="animate-spin" /> : <Film />}
+                  {rendering !== null
+                    ? `Rendering video… ${Math.round(rendering * 100)}%`
+                    : 'Save game as video'}
                 </Button>
                 <Button
                   variant="ghost"

@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { ClipboardType, Copy, Download, FileJson, FileText, Film, Link2, Loader2, Upload, Users } from 'lucide-react'
+import { ClipboardType, Copy, Download, FileJson, FileText, Link2, Loader2, Upload, Users } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { captchaMessage } from '@/lib/captcha'
 import { copyText } from '@/lib/clipboard'
-import { downloadBlob, fileNameFor } from '@/lib/image'
-import { exportGameVideo } from '@/lib/videoExport'
+import { fileNameFor } from '@/lib/image'
 import { gameToHash, variantToHash } from '@/lib/encoding'
 import { fromFen, toFen } from '@/lib/fen'
 import { fromPgn, toPgn } from '@/lib/pgn'
@@ -25,8 +24,6 @@ export function ShareDialog({
 }) {
   const variant = useAppStore((s) => s.variant)
   const game = useAppStore((s) => s.game)
-  const undoStack = useAppStore((s) => s.undoStack)
-  const soundPack = useAppStore((s) => s.soundPack)
   const exportVariant = useAppStore((s) => s.exportVariant)
   const importVariant = useAppStore((s) => s.importVariant)
   const loadVariantIntoMaker = useAppStore((s) => s.loadVariantIntoMaker)
@@ -41,8 +38,6 @@ export function ShareDialog({
   const [pgnError, setPgnError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [playError, setPlayError] = useState<string | null>(null)
-  /** Fraction of the video already rendered, while it records. */
-  const [rendering, setRendering] = useState<number | null>(null)
   /** Which side the link's creator plays, as a seat index or 'random'. */
   const [seatChoice, setSeatChoice] = useState('random')
   const twoTeams = variant.teams.length === 2
@@ -73,27 +68,6 @@ export function ShareDialog({
       setPlayError(captchaMessage(code))
     } finally {
       setCreating(false)
-    }
-  }
-
-  /** The game plus every position it passed through — what the video replays. */
-  const states = undoStack.length ? undoStack : [game]
-  const hasMoves = states.length >= 2
-
-  const exportVideo = async () => {
-    setRendering(0)
-    try {
-      const blob = await exportGameVideo(states, {
-        packId: soundPack,
-        onProgress: setRendering,
-      })
-      const ext = blob.type === 'video/mp4' ? 'mp4' : 'webm'
-      downloadBlob(blob, fileNameFor(variant.name, ext))
-      toast.success('Video saved')
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : 'Video export failed')
-    } finally {
-      setRendering(null)
     }
   }
 
@@ -135,9 +109,6 @@ export function ShareDialog({
             </TabsTrigger>
             <TabsTrigger value="pgn">
               <FileText /> PGN
-            </TabsTrigger>
-            <TabsTrigger value="video">
-              <Film /> Video
             </TabsTrigger>
           </TabsList>
 
@@ -338,25 +309,6 @@ export function ShareDialog({
               variant when the moves fit it, on classic chess otherwise — and lands on the board
               ready to step through.
             </p>
-          </TabsContent>
-
-          <TabsContent value="video" className="space-y-3 pt-3">
-            <p className="text-sm text-muted-foreground">
-              The game rendered as a video — pieces glide to their squares, explosions go off and
-              every move plays its sound. It records in real time, so a long game takes a little
-              while.
-            </p>
-            <Button onClick={exportVideo} disabled={rendering !== null || !hasMoves}>
-              {rendering !== null ? <Loader2 className="animate-spin" /> : <Film />}
-              {rendering !== null
-                ? `Rendering… ${Math.round(rendering * 100)}%`
-                : 'Export video'}
-            </Button>
-            {!hasMoves && (
-              <p className="text-muted-foreground text-xs">
-                Play or import a game first — there is nothing to film yet.
-              </p>
-            )}
           </TabsContent>
         </Tabs>
       </DialogContent>
