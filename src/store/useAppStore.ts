@@ -27,7 +27,7 @@ import {
   type BotSettings,
 } from '@/engine/ai/botSettings'
 import { positionKey } from '@/engine/repetition'
-import { variantFromHash } from '@/lib/encoding'
+import { clearHash, gameFromHash, variantFromHash } from '@/lib/encoding'
 import { DEFAULT_ANALYSIS_SETTINGS, type AnalysisSettings } from '@/lib/analysis'
 import {
   loadAnalysisSettings,
@@ -70,6 +70,7 @@ import {
   type ClockState,
 } from '@/lib/clock'
 import { pushRoute, routeFromLocation, type MakerTab, type View } from '@/lib/router'
+import { fromPgn } from '@/lib/pgn'
 import { proveWork } from '@/lib/captcha'
 import { toast } from 'sonner'
 import {
@@ -268,26 +269,29 @@ export interface Brush {
   typeId: string | null
 }
 
-function initialVariant(): Variant {
+/**
+ * The game this page opens with. A shared variant — or a shared variant plus
+ * the game the URL carries — wins over the saved one. The hash is consumed
+ * when it held only a variant, so later edits persist; a game that played
+ * back out of the hash keeps it, so a reload plays the game again.
+ */
+function initialSetup(): { variant: Variant; game: GameState; stack: GameState[] } {
   const fromHash = variantFromHash()
-  if (fromHash) {
-    const normalized = normalizeVariant(fromHash)
-    if (normalized) {
-      // The shared variant was just consumed; drop it so later edits persist.
-      try {
-        history.replaceState(null, '', window.location.pathname + window.location.search)
-      } catch {
-        /* ignore */
-      }
-      return normalized
-    }
+  let variant = fromHash ? normalizeVariant(fromHash) : null
+  if (!variant) {
+    const saved = loadVariant()
+    if (saved) variant = normalizeVariant(saved)
   }
-  const saved = loadVariant()
-  if (saved) {
-    const normalized = normalizeVariant(saved)
-    if (normalized) return normalized
+  if (!variant) variant = defaultVariant()
+
+  const pgn = gameFromHash()
+  const imported = pgn ? (fromPgn(pgn, variant) ?? fromPgn(pgn)) : null
+  if (imported) {
+    return { variant: imported.game.variant, game: imported.game, stack: imported.states }
   }
-  return defaultVariant()
+  if (fromHash || pgn) clearHash()
+  const game = createInitialState(variant)
+  return { variant, game, stack: [game] }
 }
 
 function normalizeVariant(input: unknown): Variant | null {
@@ -327,7 +331,8 @@ function normalizePromotion(promotion: unknown): { typeIds: string[] } | null {
 }
 
 export const useAppStore = create<AppState>((set, get) => {
-  const initial = initialVariant()
+  const setup = initialSetup()
+  const initial = setup.variant
   const initialRoute = routeFromLocation()
   applyThemeToDom(loadTheme())
 
@@ -587,7 +592,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
   return {
     variant: initial,
-    game: createInitialState(initial),
+    game: setup.game,
     view: initialRoute.view,
     makerTab: initialRoute.makerTab,
     theme: loadTheme(),
@@ -609,7 +614,7 @@ export const useAppStore = create<AppState>((set, get) => {
     selected: null,
     legalMoves: [],
     // Every position the game has been in, the opening one first.
-    undoStack: [createInitialState(initial)],
+    undoStack: setup.stack,
     pendingPromotion: null,
     boardAnimating: false,
     queuedMove: null,
@@ -1342,6 +1347,18 @@ export const useAppStore = create<AppState>((set, get) => {
 
     exportVariant: () => JSON.stringify(get().variant, null, 2),
   }
+})
+
+/**
+ * A game the URL carries is kept only while it is still the game on the
+ * board. Stepping through its moves is still that game; the first move off
+ * the sheet — or another variant or game entirely — drops it from the hash.
+ */
+useAppStore.subscribe((state, prev) => {
+  if (state.game === prev.game) return
+  if (positionKey(state.game) === positionKey(prev.game)) return
+  if (prev.undoStack.includes(state.game)) return
+  clearHash()
 })
 
 /**

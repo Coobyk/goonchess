@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { decodeGame, encodeGame } from '@/lib/encoding'
 import { fromPgn } from '@/lib/pgn'
 
 vi.hoisted(() => { vi.stubGlobal('document', { documentElement: { classList: { toggle() {} }, style: {} } }) })
@@ -24,5 +25,12 @@ describe('imported games keep their history', () => {
     expect(store().game.moveHistory).toHaveLength(0)
     store().jumpToPly(5)
     expect(store().game.moveHistory).toHaveLength(5)
+  })
+
+  it('round-trips the move list through the URL encoding', () => {
+    const result = fromPgn('1. e4 e5 2. Nf3 Nc6 3. Bb5 a6')
+    expect(result).toBeTruthy()
+    const replayed = fromPgn(decodeGame(encodeGame(result!.game)))
+    expect(replayed?.game.moveHistory).toHaveLength(6)
   })
 })

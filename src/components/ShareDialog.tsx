@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { captchaMessage } from '@/lib/captcha'
 import { copyText } from '@/lib/clipboard'
 import { fileNameFor } from '@/lib/image'
-import { variantToHash } from '@/lib/encoding'
+import { gameToHash, variantToHash } from '@/lib/encoding'
 import { fromFen, toFen } from '@/lib/fen'
 import { fromPgn, toPgn } from '@/lib/pgn'
 import { Button } from './ui/button'
@@ -275,6 +275,16 @@ export function ShareDialog({
                   // The states the sheet passed through become the game's
                   // history, so the move list and graph can be stepped through.
                   loadPosition(result.game, result.states)
+                  // And the game goes into the URL, so a reload plays it again.
+                  try {
+                    history.replaceState(
+                      null,
+                      '',
+                      window.location.pathname + window.location.search + gameToHash(result.game),
+                    )
+                  } catch {
+                    /* history is unavailable in some embedded contexts */
+                  }
                   setView('play')
                   toast.success('Game imported')
                   setPgnText('')
