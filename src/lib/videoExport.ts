@@ -557,8 +557,10 @@ export async function exportGameVideo(
         }
         for (const p of anim.pops) {
           const local = tau - p.delay
-          if (local < 0 || local > POP_MS) continue
-          const e = EASE_EMERGE(local / POP_MS)
+          if (local < 0) continue
+          // The pop settles at full size: once the grow is done it keeps
+          // standing, since the static pass still skips it.
+          const e = EASE_EMERGE(Math.min(1, local / POP_MS))
           drawPiece(
             p.typeId,
             p.team,
