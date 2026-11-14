@@ -38,6 +38,7 @@
     "lucide-react": "^1.59.0",
     "medeo-font": "^1.0.0-rc.3",
     "motion": "^14.5.0",
+    "mp4-muxer": "^5.2.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "sonner": "^2.0.8",

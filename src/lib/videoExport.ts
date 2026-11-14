@@ -12,6 +12,7 @@ import { artToUri, rainbowUri, SHAPE_OF_ICON } from './pieceArt'
 import { findPack } from './soundPacks'
 import { VOLUME, type SoundName } from './sound'
 import { Muxer, ArrayBufferTarget } from 'webm-muxer'
+import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer'
 
 /**
  * Turns a finished game's history into a video. The frames are drawn on an
@@ -608,9 +609,86 @@ export async function exportGameVideo(
   // When the browser offers WebCodecs, frames are stamped exactly 1/60s
   // apart — a true 60 fps no matter how long a frame takes to draw — the
   // encoder prefers the GPU ('prefer-hardware'), and the sound pack is
-  // mixed offline and encoded to opus, all muxed into one webm. As a bonus
-  // the render no longer runs in real time: it finishes as fast as it can.
-  const encodeWebm = async (): Promise<Blob | null> => {
+  // mixed offline and encoded alongside, all muxed into one file. As a
+  // bonus the render no longer runs in real time: it finishes as fast as
+  // it can. MP4 (H.264 + AAC) is what people expect to share, so it's
+  // tried first; webm stays as the codec fallback.
+  interface ChunkMuxer {
+    addVideoChunk(chunk: EncodedVideoChunk, meta?: EncodedVideoChunkMetadata): void
+    addAudioChunk(chunk: EncodedAudioChunk, meta?: EncodedAudioChunkMetadata): void
+    finalize(): void
+  }
+
+  const encodeTracks = async (
+    videoConfig: VideoEncoderConfig,
+    audioConfig: AudioEncoderConfig | null,
+    muxer: ChunkMuxer,
+    target: { buffer: ArrayBuffer },
+    mime: string,
+    mixed: AudioBuffer | null,
+  ): Promise<Blob | null> => {
+    let failed = false
+    const encoder = new VideoEncoder({
+      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+      error: () => {
+        failed = true
+      },
+    })
+    encoder.configure(videoConfig)
+    const frameUs = Math.round(1_000_000 / 60)
+    const frames = Math.max(1, Math.ceil((total * 60) / 1000))
+    for (let i = 0; i < frames; i++) {
+      drawFrame(Math.min(total, (i * 1000) / 60))
+      blitOutput()
+      const frame = new VideoFrame(output, { timestamp: i * frameUs, duration: frameUs })
+      encoder.encode(frame)
+      frame.close()
+      if (encoder.encodeQueueSize > 8) {
+        await new Promise((r) => encoder.addEventListener('dequeue', r, { once: true }))
+      }
+      if (i % 10 === 0) {
+        options.onProgress?.(i / frames)
+        await new Promise((r) => setTimeout(r, 0))
+      }
+    }
+    await encoder.flush()
+    encoder.close()
+    if (failed) return null
+
+    if (mixed && audioConfig) {
+      const audioEncoder = new AudioEncoder({
+        output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+        error: () => {
+          failed = true
+        },
+      })
+      audioEncoder.configure(audioConfig)
+      for (let off = 0; off < mixed.length; off += 48_000) {
+        const n = Math.min(48_000, mixed.length - off)
+        const planes = new Float32Array(n * 2)
+        mixed.copyFromChannel(planes.subarray(0, n), 0, off)
+        mixed.copyFromChannel(planes.subarray(n, n * 2), 1, off)
+        const data = new AudioData({
+          format: 'f32-planar',
+          sampleRate: 48_000,
+          numberOfChannels: 2,
+          numberOfFrames: n,
+          timestamp: Math.round((off * 1e6) / 48_000),
+          data: planes,
+        })
+        audioEncoder.encode(data)
+        data.close()
+      }
+      await audioEncoder.flush()
+      audioEncoder.close()
+    }
+    if (failed) return null
+    options.onProgress?.(1)
+    muxer.finalize()
+    return new Blob([target.buffer], { type: mime })
+  }
+
+  const encodeFile = async (): Promise<Blob | null> => {
     try {
       if (
         typeof VideoEncoder === 'undefined' ||
@@ -622,132 +700,100 @@ export async function exportGameVideo(
         return null
       }
 
-      let videoConfig: VideoEncoderConfig | null = null
-      for (const codec of ['vp09.00.40.08', 'vp09.00.10.08', 'vp8']) {
-        const config: VideoEncoderConfig = {
+      const base = {
+        width: OUT,
+        height: OUT,
+        bitrate: 8_000_000,
+        framerate: 60,
+        hardwareAcceleration: 'prefer-hardware' as const,
+      }
+      const candidates = [
+        ...['avc1.640034', 'avc1.64002a', 'avc1.4d002a', 'avc1.42002a', 'avc1.640028'].map(
+          (codec) => ({ codec, container: 'mp4' as const }),
+        ),
+        ...['vp09.00.40.08', 'vp09.00.10.08', 'vp8'].map((codec) => ({
           codec,
-          width: OUT,
-          height: OUT,
-          bitrate: 8_000_000,
-          framerate: 60,
-          hardwareAcceleration: 'prefer-hardware',
-        }
-        if ((await VideoEncoder.isConfigSupported(config)).supported) {
-          videoConfig = config
-          break
-        }
-      }
-      if (!videoConfig) return null
+          container: 'webm' as const,
+        })),
+      ]
+      for (const { codec, container } of candidates) {
+        const videoConfig: VideoEncoderConfig =
+          container === 'mp4' ? { ...base, codec, avc: { format: 'avc' } } : { ...base, codec }
+        if (!(await VideoEncoder.isConfigSupported(videoConfig)).supported) continue
 
-      // The sound mix renders offline, faster than real time, then to opus.
-      const audioConfig: AudioEncoderConfig = {
-        codec: 'opus',
-        sampleRate: 48_000,
-        numberOfChannels: 2,
-        bitrate: 128_000,
-      }
-      let mixed: AudioBuffer | null = null
-      if ((await AudioEncoder.isConfigSupported(audioConfig)).supported) {
-        const offline = new OfflineAudioContext(
-          2,
-          Math.ceil((48_000 * (total + 1_000)) / 1000),
-          48_000,
-        )
-        const buffers = await loadBuffers(offline, options.packId)
-        for (const { at, name } of sounds) {
-          const buffer = buffers.get(name)
-          if (!buffer) continue
-          const src = offline.createBufferSource()
-          const gain = offline.createGain()
-          gain.gain.value = VOLUME[name]
-          src.buffer = buffer
-          src.connect(gain).connect(offline.destination)
-          src.start(at / 1000)
-        }
-        mixed = await offline.startRendering()
-      }
-
-      const muxer = new Muxer({
-        target: new ArrayBufferTarget(),
-        video: {
-          codec: videoConfig.codec.startsWith('vp09') ? 'V_VP9' : 'V_VP8',
-          width: OUT,
-          height: OUT,
-          frameRate: 60,
-        },
-        audio: mixed
-          ? { codec: 'A_OPUS', sampleRate: 48_000, numberOfChannels: 2 }
-          : undefined,
-      })
-
-      let failed = false
-      const encoder = new VideoEncoder({
-        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-        error: () => {
-          failed = true
-        },
-      })
-      encoder.configure(videoConfig)
-      const frameUs = Math.round(1_000_000 / 60)
-      const frames = Math.max(1, Math.ceil((total * 60) / 1000))
-      for (let i = 0; i < frames; i++) {
-        drawFrame(Math.min(total, (i * 1000) / 60))
-        blitOutput()
-        const frame = new VideoFrame(output, { timestamp: i * frameUs, duration: frameUs })
-        encoder.encode(frame)
-        frame.close()
-        if (encoder.encodeQueueSize > 8) {
-          await new Promise((r) => encoder.addEventListener('dequeue', r, { once: true }))
-        }
-        if (i % 10 === 0) {
-          options.onProgress?.(i / frames)
-          await new Promise((r) => setTimeout(r, 0))
-        }
-      }
-      await encoder.flush()
-      encoder.close()
-      if (failed) return null
-
-      if (mixed) {
-        const audioEncoder = new AudioEncoder({
-          output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-          error: () => {
-            failed = true
-          },
-        })
-        audioEncoder.configure(audioConfig)
-        for (let off = 0; off < mixed.length; off += 48_000) {
-          const n = Math.min(48_000, mixed.length - off)
-          const planes = new Float32Array(n * 2)
-          mixed.copyFromChannel(planes.subarray(0, n), 0, off)
-          mixed.copyFromChannel(planes.subarray(n, n * 2), 1, off)
-          const data = new AudioData({
-            format: 'f32-planar',
+        let audioConfig: AudioEncoderConfig | null = null
+        for (const audioCodec of container === 'mp4' ? ['mp4a.40.2', 'opus'] : ['opus']) {
+          const config: AudioEncoderConfig = {
+            codec: audioCodec,
             sampleRate: 48_000,
             numberOfChannels: 2,
-            numberOfFrames: n,
-            timestamp: Math.round((off * 1e6) / 48_000),
-            data: planes,
-          })
-          audioEncoder.encode(data)
-          data.close()
+            bitrate: 128_000,
+          }
+          if ((await AudioEncoder.isConfigSupported(config)).supported) {
+            audioConfig = config
+            break
+          }
         }
-        await audioEncoder.flush()
-        audioEncoder.close()
+
+        // The sound mix renders offline, faster than real time.
+        let mixed: AudioBuffer | null = null
+        if (audioConfig) {
+          const offline = new OfflineAudioContext(
+            2,
+            Math.ceil((48_000 * (total + 1_000)) / 1000),
+            48_000,
+          )
+          const buffers = await loadBuffers(offline, options.packId)
+          for (const { at, name } of sounds) {
+            const buffer = buffers.get(name)
+            if (!buffer) continue
+            const src = offline.createBufferSource()
+            const gain = offline.createGain()
+            gain.gain.value = VOLUME[name]
+            src.buffer = buffer
+            src.connect(gain).connect(offline.destination)
+            src.start(at / 1000)
+          }
+          mixed = await offline.startRendering()
+        }
+
+        const audioTrack = { sampleRate: 48_000, numberOfChannels: 2 }
+        if (container === 'mp4') {
+          const target = new Mp4Target()
+          const muxer = new Mp4Muxer({
+            target,
+            video: { codec: 'avc', width: OUT, height: OUT },
+            audio:
+              mixed && audioConfig
+                ? { codec: audioConfig.codec === 'opus' ? 'opus' : 'aac', ...audioTrack }
+                : undefined,
+            fastStart: 'in-memory',
+          })
+          return await encodeTracks(videoConfig, audioConfig, muxer, target, 'video/mp4', mixed)
+        }
+        const target = new ArrayBufferTarget()
+        const muxer = new Muxer({
+          target,
+          video: {
+            codec: videoConfig.codec.startsWith('vp09') ? 'V_VP9' : 'V_VP8',
+            width: OUT,
+            height: OUT,
+            frameRate: 60,
+          },
+          audio: mixed ? { codec: 'A_OPUS', ...audioTrack } : undefined,
+        })
+        return await encodeTracks(videoConfig, audioConfig, muxer, target, 'video/webm', mixed)
       }
-      if (failed) return null
-      options.onProgress?.(1)
-      muxer.finalize()
-      return new Blob([muxer.target.buffer], { type: 'video/webm' })
+      return null
     } catch {
       return null
     }
   }
 
-  const webm = await encodeWebm()
-  if (webm) {
+  const file = await encodeFile()
+  if (file) {
     audio?.close().catch(() => {})
-    return webm
+    return file
   }
 
   // ---------- capture (MediaRecorder fallback) ----------
@@ -769,10 +815,11 @@ export async function exportGameVideo(
   }
 
   const mime = [
+    'video/mp4;codecs=avc1,mp4a',
+    'video/mp4',
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm',
-    'video/mp4',
   ].find((m) => MediaRecorder.isTypeSupported(m))
   if (!mime) throw new Error('This browser cannot record video')
   const stream = output.captureStream(60)
