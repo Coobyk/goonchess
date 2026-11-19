@@ -23,6 +23,7 @@ export function CommunityPanel() {
   const game = useAppStore((s) => s.game)
   const variant = useAppStore((s) => s.variant)
   const puzzle = useAppStore((s) => s.puzzle)
+  const online = useAppStore((s) => !!s.online)
   const [sharing, setSharing] = useState(loadSharing)
   const [explorer, setExplorer] = useState<{ games: number; moves: ExplorerMove[] } | null>(null)
   const [summary, setSummary] = useState<VariantSummary | null>(null)
@@ -36,11 +37,20 @@ export function CommunityPanel() {
     return () => abort.abort()
   }, [game, puzzle, stored])
 
+  // An online game is stored by its room, a moment after it ends; the
+  // numbers are asked for again once the room has had time to do it.
+  const finished = !!game.winner
   useEffect(() => {
     const abort = new AbortController()
-    fetchVariantSummary(variant, abort.signal).then(setSummary, () => setSummary(null))
-    return () => abort.abort()
-  }, [variant, stored])
+    const timer = setTimeout(
+      () => fetchVariantSummary(variant, abort.signal).then(setSummary, () => setSummary(null)),
+      finished && online ? 1500 : 0,
+    )
+    return () => {
+      clearTimeout(timer)
+      abort.abort()
+    }
+  }, [variant, stored, finished, online])
 
   const total = explorer?.games ?? 0
   const teams = variant.teams
