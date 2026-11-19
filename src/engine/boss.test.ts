@@ -221,7 +221,7 @@ describe('Boss Fight and generic lives', () => {
     const variant = bossFight()
     variant.pieceTypes[0].images = ['https://example.com/a.svg', '//example.com/a.svg']
     const packed = packVariant(variant)
-    expect(unpackVariant(packed).pieceTypes[0].images).toEqual(['', ''])
+    expect(unpackVariant(packed).pieceTypes[0].images).toEqual([])
     const old = packed as unknown[]
     old[5] = (old[5] as unknown[][]).map((p) => p.slice(0, 10))
     const decoded = unpackVariant(old)

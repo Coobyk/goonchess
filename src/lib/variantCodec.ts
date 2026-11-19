@@ -118,8 +118,9 @@ export function packVariant(variant: Variant): unknown {
         ? p.promotion.typeIds.map((id) => pieceIndex.get(id) ?? -1).filter((i) => i >= 0)
         : [],
       (p.art ?? []).map(packArtLayer),
-      p.lives ?? 1,
-      (p.images ?? []).map((src) => /^\/pieces\/[\w/.-]+$/.test(src) ? src : ''),
+      ...((p.images ?? []).some((src) => /^\/pieces\/[\w/.-]+$/.test(src))
+        ? [p.lives ?? 1, p.images!.map((src) => /^\/pieces\/[\w/.-]+$/.test(src) ? src : '')]
+        : (p.lives ?? 1) > 1 ? [p.lives] : []),
     ]),
     variant.setup.map((s) => [pieceIndex.get(s.typeId) ?? -1, teamIndex.get(s.team) ?? 0, s.x, s.y]),
     variant.winConditions.map((w) =>
