@@ -89,7 +89,7 @@ export function CommunityPanel() {
           <div className="text-muted-foreground space-y-1 border-t pt-2 font-mono text-[11px]">
             <p>
               {summary.games} {summary.games === 1 ? 'game' : 'games'} of {variant.name} · ~
-              {Math.round(summary.averagePlies)} plies
+              {Math.round(summary.averagePlies)} {Math.round(summary.averagePlies) === 1 ? 'ply' : 'plies'}
             </p>
             <p>
               {teams[0]?.name ?? 'First'} {summary.wins[0]} · {teams[1]?.name ?? 'Second'} {summary.wins[1]} · drawn{' '}
