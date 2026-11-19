@@ -28,3 +28,13 @@ class_name = "GameRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+# The archive of finished games behind the move statistics: a single object
+# for the whole site, with its own SQLite database.
+[[durable_objects.bindings]]
+name = "ARCHIVE"
+class_name = "GameArchive"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["GameArchive"]

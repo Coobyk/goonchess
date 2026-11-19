@@ -11,8 +11,8 @@
  * Everything is stored in two keys, one row each, because the number of rows
  * written is the tightest part of the free plan.
  */
-import { applyMove, createInitialState, dropOptions, getLegalMoves, rollRandomPieces } from '../src/engine/rules'
-import { DICE_SIDES, intentMatches, type GameState, type Variant, type Vec } from '../src/engine/types'
+import { applyMove, createInitialState, rollRandomPieces } from '../src/engine/rules'
+import type { GameState, Variant, Vec } from '../src/engine/types'
 import {
   clockIsOn,
   flagFell,
@@ -24,7 +24,9 @@ import {
   type ClockSettings,
   type ClockState,
 } from '../src/lib/clock'
-import { replayMoves } from '../src/lib/replay'
+import { replayMoves, replayStates, resolveMove } from '../src/lib/replay'
+import { archiveEntry } from '../src/lib/archive'
+import { ARCHIVE_RECORD_URL, archiveStub } from './archive'
 import { CHAT_HISTORY, CHAT_MAX_LENGTH, type ChatLine, type ClientMessage as Message, type OfferKind } from '../src/lib/protocol'
 import { hashToken, randomToken } from './ids'
 import { CREATE_PATH, json } from './http'
@@ -63,6 +65,7 @@ interface Attachment {
 
 export class GameRoom {
   private ctx: DurableObjectState
+  private env: Env
   private meta: Meta | null = null
   private game: GameState | null = null
   private clock: ClockState | null = null
@@ -71,8 +74,9 @@ export class GameRoom {
   /** The last few chat lines. They live in memory: a restart loses them. */
   private chat: ChatLine[] = []
 
-  constructor(ctx: DurableObjectState) {
+  constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
+    this.env = env
   }
 
   private async load(): Promise<{
@@ -291,39 +295,22 @@ export class GameRoom {
     const finalTo = vec(message.finalTo)
     if (!from || !to || !finalTo) return this.reject(seat, 'bad_move', game, refusedClock)
 
-    // The die of a piece that rolls to move is part of the position, so the
-    // legal moves are worked out with the roll the player saw.
-    const pieceId = game.board[from.y]?.[from.x]
-    const roll =
-      pieceId && Number.isInteger(message.roll) && message.roll! >= 1 && message.roll! <= DICE_SIDES
-        ? { pieceId, value: message.roll! }
-        : undefined
-
-    const position = roll ? { ...game, roll } : game
-    // A drop comes out of the pocket, so there is no piece under `from` to
-    // ask — the legal drops are worked out instead.
-    const legal = message.drop
-      ? dropOptions(position, game.turn).map((option) => option.move)
-      : getLegalMoves(position, from.x, from.y)
-    const move = legal.find((candidate) =>
-      intentMatches(candidate, { to, finalTo, drop: message.drop }),
-    )
-    if (!move) return this.reject(seat, 'illegal_move', game, refusedClock)
-
-    const options = move.promotionOptions ?? []
-    let promotionTypeId = message.promotionTypeId
-    if (options.length) {
-      if (!promotionTypeId) promotionTypeId = options[0]
-      if (!options.includes(promotionTypeId)) return this.reject(seat, 'bad_promotion', game, refusedClock)
-    } else {
-      promotionTypeId = undefined
-    }
+    const resolved = resolveMove(game, {
+      from,
+      to,
+      finalTo,
+      drop: message.drop,
+      promotionTypeId: message.promotionTypeId,
+      roll: message.roll,
+    })
+    if ('error' in resolved) return this.reject(seat, resolved.error, game, refusedClock)
+    const { move } = resolved
 
     if (clock && clockIsOn(meta.clock)) clock = settleClock(clock, meta.clock, game.turn, now)
 
     const origin = message.origin && vec(message.origin) ? message.origin : undefined
     const next = rollRandomPieces(
-      applyMove(game, { ...move, promotionTypeId }, { origin, san: true }),
+      applyMove(game, move, { origin, san: true }),
       move.pieceId,
     )
     // A game that ends here stops the clock.
@@ -334,6 +321,7 @@ export class GameRoom {
     await this.save()
     await this.scheduleAlarm(meta, next, clock)
     this.broadcast({ t: 'state', game: next, clockState: clock })
+    if (next.winner) await this.archive(meta, next)
   }
 
   private async resign(seat: number): Promise<void> {
@@ -350,6 +338,7 @@ export class GameRoom {
     await this.save()
     await this.scheduleAlarm(meta, next, clock)
     this.broadcast({ t: 'state', game: next, clockState: clock })
+    await this.archive(meta, next)
   }
 
   /**
@@ -542,6 +531,26 @@ export class GameRoom {
     await this.save()
     await this.scheduleAlarm(meta, next, nextClock)
     this.broadcast({ t: 'state', game: next, clockState: nextClock })
+    await this.archive(meta, next)
+  }
+
+  /**
+   * Hands a finished game to the archive for the move statistics. The room
+   * already checked every move, so the game goes in as it was played. A
+   * failure here never touches the game itself.
+   */
+  private async archive(meta: Meta, game: GameState): Promise<void> {
+    try {
+      const entry = await archiveEntry(meta.variant, replayStates(game), game.moveHistory, game, 'online')
+      if (!entry) return
+      await archiveStub(this.env).fetch(ARCHIVE_RECORD_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(entry),
+      })
+    } catch {
+      /* the statistics are not worth losing a game over */
+    }
   }
 
   async alarm(): Promise<void> {

@@ -5,6 +5,7 @@ import { GameBoard } from './GameBoard'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
 import { StatsPanel } from './StatsPanel'
+import { CommunityPanel } from './CommunityPanel'
 import { BotPlayer } from './BotPlayer'
 import { ClockFor, ClockTicker } from './ClockTicker'
 import { PieceGlyph } from './PieceGlyph'
@@ -804,6 +805,7 @@ export function PlayView() {
           <>
             <AnalysisPanel />
             <MoveHistoryCard />
+            <CommunityPanel />
             <StatsPanel />
           </>
         ) : (
@@ -826,7 +828,10 @@ export function PlayView() {
               <AnalysisPanel />
             </TabsContent>
             <TabsContent value="stats">
-              <StatsPanel />
+              <div className="space-y-3">
+                <CommunityPanel />
+                <StatsPanel />
+              </div>
             </TabsContent>
           </Tabs>
         )}

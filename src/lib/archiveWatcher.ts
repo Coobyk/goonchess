@@ -1,0 +1,25 @@
+import { useAppStore } from '@/store/useAppStore'
+import { loadSharing, submitGame } from '@/lib/archiveClient'
+
+/**
+ * Sends each game played in this browser to the archive at the moment it
+ * ends. Only the step from a running game to a finished one counts, so a
+ * finished game that is merely shown again — opened from a link, or seen
+ * after a reload or a change of view — is never sent twice. Online games
+ * are stored by their room, puzzles are not games.
+ */
+export function watchFinishedGames(): () => void {
+  return useAppStore.subscribe((state, prev) => {
+    const { game } = state
+    if (game === prev.game || !game.winner || prev.game.winner) return
+    if (!continues(prev.game.moveHistory, game.moveHistory)) return
+    if (state.online || state.puzzle || !loadSharing()) return
+    void submitGame(game, state.bot.mode === 'off' ? 'local' : 'bot')
+  })
+}
+
+/** Whether `next` is `prev` with at most one more move: the same game, ending. */
+function continues<T>(prev: T[], next: T[]): boolean {
+  if (next.length !== prev.length && next.length !== prev.length + 1) return false
+  return prev.every((record, i) => record === next[i])
+}

@@ -1,6 +1,13 @@
-import { applyMove, createInitialState, rollRandomPieces, type ApplyOptions } from '@/engine/rules'
+import {
+  applyMove,
+  createInitialState,
+  dropOptions,
+  getLegalMoves,
+  rollRandomPieces,
+  type ApplyOptions,
+} from '@/engine/rules'
 import { countPosition, positionKey } from '@/engine/repetition'
-import type { GameState, Move, MoveRecord, Variant } from '@/engine/types'
+import { DICE_SIDES, intentMatches, type GameState, type Move, type MoveRecord, type Variant, type Vec } from '@/engine/types'
 
 // A random piece is rolled anew after every move, the same way it was when
 // the game was played. The piece that has just moved keeps its kind.
@@ -45,4 +52,65 @@ export function replayMoves(
 export function wouldRepeat(state: GameState, move: Move): boolean {
   const next = applyMove(state, move, { compute: false })
   return countPosition(next, positionKey(next)) > 0
+}
+
+/** What a player asks for: this piece to that square, with the choices made on the way. */
+export interface MoveRequest {
+  from: Vec
+  to: Vec
+  finalTo: Vec
+  drop?: { typeId: string }
+  promotionTypeId?: string
+  /** The die the player saw, for a piece that rolls to move. */
+  roll?: number
+}
+
+/**
+ * Turns a request into the legal move it names, or says why it is not one.
+ * The room checks every online move with it, and the archive checks every
+ * game it is sent the same way.
+ */
+export function resolveMove(
+  game: GameState,
+  request: MoveRequest,
+): { move: Move } | { error: 'illegal_move' | 'bad_promotion' } {
+  const { from, to, finalTo } = request
+  // The die of a piece that rolls to move is part of the position, so the
+  // legal moves are worked out with the roll the player saw.
+  const pieceId = game.board[from.y]?.[from.x]
+  const roll =
+    pieceId && Number.isInteger(request.roll) && request.roll! >= 1 && request.roll! <= DICE_SIDES
+      ? { pieceId, value: request.roll! }
+      : undefined
+  const position = roll ? { ...game, roll } : game
+  // A drop comes out of the pocket, so there is no piece under `from` to
+  // ask — the legal drops are worked out instead.
+  const legal = request.drop
+    ? dropOptions(position, game.turn).map((option) => option.move)
+    : getLegalMoves(position, from.x, from.y)
+  const move = legal.find((candidate) => intentMatches(candidate, { to, finalTo, drop: request.drop }))
+  if (!move) return { error: 'illegal_move' }
+
+  const options = move.promotionOptions ?? []
+  let promotionTypeId = request.promotionTypeId
+  if (options.length) {
+    if (!promotionTypeId) promotionTypeId = options[0]
+    if (!options.includes(promotionTypeId)) return { error: 'bad_promotion' }
+  } else {
+    promotionTypeId = undefined
+  }
+  return { move: { ...move, promotionTypeId } }
+}
+
+/** The request that played a recorded move, so a game can be checked again elsewhere. */
+export function requestFor(record: MoveRecord): MoveRequest {
+  const { move } = record
+  return {
+    from: move.from,
+    to: move.to,
+    finalTo: move.finalTo,
+    drop: move.drop,
+    promotionTypeId: move.promotionTypeId,
+    roll: move.roll,
+  }
 }

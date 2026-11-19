@@ -4,6 +4,7 @@
 interface __BaseEnv_Env {
 	ASSETS: Fetcher;
 	GAME: DurableObjectNamespace /* GameRoom */;
+	ARCHIVE: DurableObjectNamespace /* GameArchive */;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_Env {}

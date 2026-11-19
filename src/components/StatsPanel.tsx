@@ -20,8 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 /**
  * Keeps track of how the games went.
  *
- * The numbers never leave the browser — they are only a small tally of what
- * was played on this device.
+ * This tally stays in the browser — it is only what was played on this
+ * device. The site-wide move statistics are in `CommunityPanel`.
  */
 export function StatsPanel() {
   const game = useAppStore((s) => s.game)
