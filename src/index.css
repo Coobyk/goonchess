@@ -5,6 +5,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes boss-hit {
+  0%, 35% { filter: drop-shadow(0 0 12px #ff283e) brightness(2); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+  100% { filter: none; transform: none; }
+}
+.boss-hit { animation: boss-hit 700ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .boss-hit { animation: none; }
+}
+
 @theme inline {
   --font-sans: 'Medeo Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;

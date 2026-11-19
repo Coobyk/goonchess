@@ -136,7 +136,7 @@ export function createInitialState(variant: Variant): GameState {
     // The id only depends on where the piece stands, so a game can be rebuilt
     // from its start — that is what the replay and the exports need.
     const id = `${s.typeId}|${s.team}|${s.x},${s.y}`
-    pieces[id] = { id, typeId: s.typeId, team: s.team, hasMoved: false }
+    pieces[id] = { id, typeId: s.typeId, team: s.team, hasMoved: false, lives: pt.lives ?? 1 }
     board[s.y][s.x] = id
   }
 
@@ -799,6 +799,14 @@ function takesPredator(state: GameState, move: Move): boolean {
   return !!victim && !!state.pieceTypes[victim.typeId]?.flags.predator
 }
 
+function sacrificesRoyal(state: GameState, move: Move): boolean {
+  const victim = move.capturedId ? state.pieces[move.capturedId] : undefined
+  const mover = state.pieces[move.pieceId]
+  return !!victim && !!mover && !!state.pieceTypes[mover.typeId]?.flags.royal &&
+    (victim.lives ?? state.pieceTypes[victim.typeId]?.lives ?? 1) > 1 &&
+    !move.effects.some((e) => e.kind === 'swap')
+}
+
 /**
  * The one move that outranks the hunt: a royal piece taking the Predator.
  * The whole variant turns on that capture, so no compulsion stands in its
@@ -837,7 +845,7 @@ function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
       continue
     }
     if (forced && !move.capturedId) continue
-    if (!castlingIsLegal(state, move, inst)) continue
+    if (sacrificesRoyal(state, move) || !castlingIsLegal(state, move, inst)) continue
     const next = applyMove(state, move, { compute: false })
     const free = takesPredator(state, move)
     if (
@@ -1147,6 +1155,7 @@ function collectTeamMoves(
     }
   }
   const size = state.variant.board.width * state.variant.board.height
+  const hasLives = state.variant.pieceTypes.some((p) => (p.lives ?? 1) > 1)
   // Losing chess: with a capture on the board, only captures are allowed.
   const forced = captureIsForced(state, teamId)
   // Predator Chess: with prey in a Predator's sight, only its captures remain.
@@ -1188,8 +1197,9 @@ function collectTeamMoves(
           continue
         }
         if (forced && !move.capturedId) continue
-        if (!castlingIsLegal(state, move, inst)) continue
+        if (sacrificesRoyal(state, move) || !castlingIsLegal(state, move, inst)) continue
         const fast =
+          !hasLives &&
           !inCheck &&
           exposed !== null &&
           !exposed[move.from.y * state.variant.board.width + move.from.x] &&
@@ -1323,6 +1333,7 @@ export function applyMove(
     next.pieces[move.pieceId] = {
       id: move.pieceId,
       typeId: move.drop.typeId,
+      lives: next.pieceTypes[move.drop.typeId]?.lives ?? 1,
       team: state.turn,
       hasMoved: false,
     }
@@ -1346,11 +1357,40 @@ export function applyMove(
   // king that never stood on the square anyone aimed at.
   const royalTeams = new Set<string>()
 
+  const wound = (id: string): boolean => {
+    const victim = next.pieces[id]
+    if (!victim) return false
+    const lives = victim.lives ?? next.pieceTypes[victim.typeId]?.lives ?? 1
+    if (lives <= 1) return false
+    touch(id)
+    next.pieces[id].lives = lives - 1
+    return true
+  }
+  const hit = !!(move.capturedId && capturedInst && !hasSwap && wound(move.capturedId))
+  const pocketBlastVictim = (id: string) => {
+    const victim = next.pieces[id]
+    if (!next.hands || !victim || victim.team === inst.team) return
+    const pocket = next.hands[inst.team] ?? (next.hands[inst.team] = {})
+    const held = victim.promotedFrom ?? victim.typeId
+    pocket[held] = (pocket[held] ?? 0) + 1
+  }
+
   const fx = move.finalTo.x
   const fy = move.finalTo.y
 
   if (move.capturedId && capturedInst) {
-    if (hasSwap) {
+    if (hit) {
+      delete next.pieces[move.pieceId]
+      if (next.board[move.from.y]?.[move.from.x] === move.pieceId) next.board[move.from.y][move.from.x] = null
+      if (piece.flags.royal) royalTeams.add(inst.team)
+      if (!options.search) next.captured.push({ team: inst.team, typeId: inst.typeId, by: capturedInst.team })
+      next.scores[capturedInst.team] = (next.scores[capturedInst.team] ?? 0) + piece.value
+      if (next.hands) {
+        const pocket = next.hands[capturedInst.team] ?? (next.hands[capturedInst.team] = {})
+        const held = inst.promotedFrom ?? inst.typeId
+        pocket[held] = (pocket[held] ?? 0) + 1
+      }
+    } else if (hasSwap) {
       // Swap positions instead of capturing.
       next.board[fy][fx] = null
       touch(move.capturedId)
@@ -1379,54 +1419,56 @@ export function applyMove(
     }
   }
 
-  // Remove from origin, place on destination.
-  if (next.board[move.from.y]?.[move.from.x] === move.pieceId) {
-    next.board[move.from.y][move.from.x] = null
-  }
-  // The castling rook leaves its square first: the king may be landing on it,
-  // or the two may be crossing on their way to their own files.
-  if (move.castle && next.board[move.castle.rookFrom.y]?.[move.castle.rookFrom.x] === move.castle.rookId) {
-    next.board[move.castle.rookFrom.y][move.castle.rookFrom.x] = null
-  }
-  if (next.board[fy][fx] && next.board[fy][fx] !== move.pieceId) {
-    const leftover = next.board[fy][fx] as string
-    const leftoverInst = next.pieces[leftover]
-    if (leftoverInst) {
-      const leftoverPiece = next.pieceTypes[leftoverInst.typeId]
-      if (!options.search) {
-        next.captured.push({ team: leftoverInst.team, typeId: leftoverInst.typeId, by: inst.team })
-      }
-      if (leftoverPiece) {
-        next.scores[inst.team] = (next.scores[inst.team] ?? 0) + leftoverPiece.value
-      }
-      delete next.pieces[leftover]
+  if (!hit) {
+    // Remove from origin, place on destination.
+    if (next.board[move.from.y]?.[move.from.x] === move.pieceId) {
+      next.board[move.from.y][move.from.x] = null
     }
-  }
-  next.board[fy][fx] = move.pieceId
-  touch(move.pieceId)
-  if (move.drop) {
-    // A pawn dropped on its own second rank still has the two-square step in
-    // front of it; anything dropped anywhere else has already used its first
-    // move — a dropped rook, among them, never castles.
-    const forward = teamById(next.variant, inst.team)?.forward ?? 'up'
-    const secondRank = forward === 'down' ? 1 : next.variant.board.height - 2
-    next.pieces[move.pieceId].hasMoved = !(piece.icon === 'pawn' && fy === secondRank)
-  } else {
-    next.pieces[move.pieceId].hasMoved = true
-  }
-
-  // Castling moves the rook in the same turn, once the king has landed.
-  if (move.castle) {
-    const { rookId, rookTo } = move.castle
-    next.board[rookTo.y][rookTo.x] = rookId
-    if (next.pieces[rookId]) {
-      touch(rookId)
-      next.pieces[rookId].hasMoved = true
+    // The castling rook leaves its square first: the king may be landing on it,
+    // or the two may be crossing on their way to their own files.
+    if (move.castle && next.board[move.castle.rookFrom.y]?.[move.castle.rookFrom.x] === move.castle.rookId) {
+      next.board[move.castle.rookFrom.y][move.castle.rookFrom.x] = null
     }
-  }
+    if (next.board[fy][fx] && next.board[fy][fx] !== move.pieceId) {
+      const leftover = next.board[fy][fx] as string
+      const leftoverInst = next.pieces[leftover]
+      if (leftoverInst) {
+        const leftoverPiece = next.pieceTypes[leftoverInst.typeId]
+        if (!options.search) {
+          next.captured.push({ team: leftoverInst.team, typeId: leftoverInst.typeId, by: inst.team })
+        }
+        if (leftoverPiece) {
+          next.scores[inst.team] = (next.scores[inst.team] ?? 0) + leftoverPiece.value
+        }
+        delete next.pieces[leftover]
+      }
+    }
+    next.board[fy][fx] = move.pieceId
+    touch(move.pieceId)
+    if (move.drop) {
+      // A pawn dropped on its own second rank still has the two-square step in
+      // front of it; anything dropped anywhere else has already used its first
+      // move — a dropped rook, among them, never castles.
+      const forward = teamById(next.variant, inst.team)?.forward ?? 'up'
+      const secondRank = forward === 'down' ? 1 : next.variant.board.height - 2
+      next.pieces[move.pieceId].hasMoved = !(piece.icon === 'pawn' && fy === secondRank)
+    } else {
+      next.pieces[move.pieceId].hasMoved = true
+    }
 
-  if (hasSwap && move.capturedId) {
-    next.board[move.from.y][move.from.x] = move.capturedId
+    // Castling moves the rook in the same turn, once the king has landed.
+    if (move.castle) {
+      const { rookId, rookTo } = move.castle
+      next.board[rookTo.y][rookTo.x] = rookId
+      if (next.pieces[rookId]) {
+        touch(rookId)
+        next.pieces[rookId].hasMoved = true
+      }
+    }
+
+    if (hasSwap && move.capturedId) {
+      next.board[move.from.y][move.from.x] = move.capturedId
+    }
   }
 
   // Every blast this move caused, for the animation to draw.
@@ -1439,8 +1481,11 @@ export function applyMove(
   const atomic = next.variant.rules?.includes('atomic')
   if (atomic && move.capturedId && !hasSwap) {
     const victims: Vec[] = []
-    if (next.board[fy][fx] === move.pieceId) next.board[fy][fx] = null
-    delete next.pieces[move.pieceId]
+    if (!hit && !wound(move.pieceId)) {
+      if (piece.flags.royal) royalTeams.add(inst.team)
+      if (next.board[fy][fx] === move.pieceId) next.board[fy][fx] = null
+      delete next.pieces[move.pieceId]
+    }
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue
@@ -1454,6 +1499,7 @@ export function applyMove(
         const oPiece = next.pieceTypes[oInst.typeId]
         // Pawns shrug off the blast; everything else is destroyed.
         if (oPiece?.icon === 'pawn') continue
+        if (wound(occ)) continue
         if (oPiece?.flags.royal) royalTeams.add(oInst.team)
         if (oInst.team !== inst.team) {
           if (!options.search) {
@@ -1463,6 +1509,7 @@ export function applyMove(
             next.scores[inst.team] = (next.scores[inst.team] ?? 0) + oPiece.value
           }
         }
+        pocketBlastVictim(occ)
         delete next.pieces[occ]
         next.board[ey][ex] = null
         victims.push({ x: ex, y: ey })
@@ -1488,6 +1535,7 @@ export function applyMove(
           if (!oInst) continue
           // Friendly fire is off: a blast never harms the moving team.
           if (oInst.team === inst.team) continue
+          if (wound(occ)) continue
           const oPiece = next.pieceTypes[oInst.typeId]
           if (!options.search) {
             next.captured.push({ team: oInst.team, typeId: oInst.typeId, by: inst.team })
@@ -1496,6 +1544,7 @@ export function applyMove(
             next.scores[inst.team] = (next.scores[inst.team] ?? 0) + oPiece.value
             if (oPiece.flags.royal) royalTeams.add(oInst.team)
           }
+          pocketBlastVictim(occ)
           delete next.pieces[occ]
           next.board[ey][ex] = null
           victims.push({ x: ex, y: ey })
@@ -1504,7 +1553,7 @@ export function applyMove(
       blasts.push({ x: fx, y: fy, radius, victims })
     } else if (eff.kind === 'spawn') {
       const spawnPiece = next.pieceTypes[eff.pieceTypeId]
-      if (spawnPiece) {
+      if (spawnPiece && !hit) {
         const sx = move.from.x + eff.offset.x
         const sy = move.from.y + eff.offset.y
         if (inBounds(next.variant.board, sx, sy) && next.board[sy][sx] === null) {
@@ -1514,6 +1563,7 @@ export function applyMove(
           next.pieces[sid] = {
             id: sid,
             typeId: eff.pieceTypeId,
+            lives: spawnPiece.lives ?? 1,
             team: inst.team,
             hasMoved: false,
           }
@@ -1538,6 +1588,7 @@ export function applyMove(
       const target = chosen ? next.pieceTypes[chosen] : undefined
       if (target) {
         touch(move.pieceId)
+        next.pieces[move.pieceId].lives = target.lives ?? 1
         // A piece that promotes goes back to a pocket as what it was before.
         next.pieces[move.pieceId].promotedFrom ??= piece.id
         if (piece.flags.random && !target.flags.random) {
@@ -1610,6 +1661,7 @@ export function applyMove(
     move.capturedId &&
     capturedInst &&
     capturedPiece &&
+    !hit &&
     !hasSwap
   ) {
     if (capturedPiece.flags.predator) {
@@ -1684,7 +1736,7 @@ export function applyMove(
 
   if (compute) {
     detectOutcome(next, inst.team, {
-      capturedRoyal: !!capturedPiece?.flags.royal,
+      capturedRoyal: !hit && !hasSwap && !!capturedPiece?.flags.royal,
       royalTeams: [...royalTeams],
       kingTookPredator,
       predatorAtePrey,
@@ -2041,4 +2093,3 @@ function detectOutcome(
     return
   }
 }
-

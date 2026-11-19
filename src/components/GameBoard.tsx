@@ -567,6 +567,7 @@ export function GameBoard() {
           } />
       )}
       <BoardShell
+        allowOverflow={variant.pieceTypes.some((p) => (p.lives ?? 1) > 1)}
         width={cols}
         height={rows}
         cellSize={cell}
@@ -677,6 +678,7 @@ export function GameBoard() {
                 onPointerLeave={() => setHover(null)}
                 className={cn(
                   'relative flex cursor-pointer items-center justify-center p-0 transition-[filter] outline-none touch-none',
+                  (pieceType?.lives ?? 1) > 1 && 'z-20',
                   'hover:brightness-105 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',
                 )}
                 style={{ backgroundColor: tileBackground(x, y) }}
@@ -692,8 +694,10 @@ export function GameBoard() {
                   <span
                     className={cn(
                       'relative z-10 inline-flex',
+                      lastMove?.capturedId === piece.id && (pieceType.lives ?? 1) > 1 && 'boss-hit',
                       isSelected && 'piece-selected z-20',
                     )}
+                    key={`${piece.id}-${piece.lives ?? 1}`}
                   >
                     <span
                       className="inline-flex"
@@ -708,6 +712,15 @@ export function GameBoard() {
                         size={Math.round(cell * 0.78)}
                       />
                     </span>
+                  </span>
+                )}
+
+                {piece && pieceType && (pieceType.lives ?? 1) > 1 && (
+                  <span
+                    className="pointer-events-none absolute bottom-0.5 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-red-400/60 bg-zinc-950/95 px-1.5 py-0.5 text-[10px] font-bold leading-none text-red-300 shadow-md"
+                    aria-label={`${pieceType.name}: ${piece.lives ?? pieceType.lives} of ${pieceType.lives} lives`}
+                  >
+                    {piece.lives ?? pieceType.lives} / {pieceType.lives} ♥
                   </span>
                 )}
 

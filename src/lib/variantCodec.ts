@@ -118,6 +118,8 @@ export function packVariant(variant: Variant): unknown {
         ? p.promotion.typeIds.map((id) => pieceIndex.get(id) ?? -1).filter((i) => i >= 0)
         : [],
       (p.art ?? []).map(packArtLayer),
+      p.lives ?? 1,
+      (p.images ?? []).map((src) => /^\/pieces\/[\w/.-]+$/.test(src) ? src : ''),
     ]),
     variant.setup.map((s) => [pieceIndex.get(s.typeId) ?? -1, teamIndex.get(s.team) ?? 0, s.x, s.y]),
     variant.winConditions.map((w) =>
@@ -267,7 +269,7 @@ export function unpackVariant(input: unknown): Variant {
 
   const pieceTypes = pieces.map((raw, i) => {
     if (!Array.isArray(raw)) throw new Error('packed piece is malformed')
-    const [pieceName, icon, symbol, value, flags, move, capture, effects, promo, art] = raw as [
+    const [pieceName, icon, symbol, value, flags, move, capture, effects, promo, art, lives, images] = raw as [
       string,
       number,
       string,
@@ -277,6 +279,8 @@ export function unpackVariant(input: unknown): Variant {
       unknown,
       unknown,
       number | number[],
+      unknown,
+      number,
       unknown,
     ]
     const promoList = Array.isArray(promo) ? promo : Number.isInteger(promo) ? [promo] : []
@@ -298,6 +302,8 @@ export function unpackVariant(input: unknown): Variant {
         .filter((e): e is Effect => e !== null),
       promotion: promoIds.length ? { typeIds: promoIds } : null,
       art: asArray(art).map(unpackArtLayer).filter((l): l is PieceArtLayer => l !== null),
+      lives: Number.isInteger(lives) && lives > 0 ? lives : 1,
+      images: asArray(images).map((src) => typeof src === 'string' && /^\/pieces\/[\w/.-]+$/.test(src) ? src : ''),
     } satisfies PieceType
   })
 

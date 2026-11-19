@@ -33,12 +33,15 @@ export function positionKey(state: GameState): string {
   }
 
   const ep = enPassantRight(state)
+  const lives = state.board.flat().filter((id): id is string => !!id)
+    .map((id) => state.pieces[id].lives ?? state.pieceTypes[state.pieces[id].typeId]?.lives ?? 1)
   const parts: (string | number)[] = [
     rows.join('/'),
     teamIndex.get(state.turn) ?? 0,
     castlingRights(state),
     ep ? `${ep.x},${ep.y}` : '-',
   ]
+  if (variant.pieceTypes.some((p) => (p.lives ?? 1) > 1)) parts.push(lives.join(','))
   // Three-Check: two positions with the same pieces are different games when
   // the checks have been counted differently. Every other game keeps the
   // keys it has always had.

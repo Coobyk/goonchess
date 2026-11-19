@@ -213,6 +213,7 @@ export interface Promotion {
 }
 
 export interface PieceType {
+  lives?: number
   id: string
   name: string
   icon: PieceIcon
@@ -364,6 +365,7 @@ export interface MoveRecord {
 }
 
 export interface PieceInstance {
+  lives?: number
   id: string
   typeId: string
   team: string
