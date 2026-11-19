@@ -88,7 +88,17 @@ export function variantKey(variant: Variant): Promise<string> {
 
 /** The identity of a position, short enough to index. */
 export function positionHash(state: GameState): Promise<string> {
-  return sha256Hex(positionKey(state), 24)
+  // A rolled piece has a kind of its own that the variant does not list, and
+  // the repetition key cannot tell those apart; the kind it rolled can.
+  const rolled: string[] = []
+  for (const row of state.board) {
+    for (const id of row) {
+      const typeId = id ? state.pieces[id]?.typeId : undefined
+      if (typeId?.startsWith('r|')) rolled.push(state.pieceTypes[typeId]?.name ?? '?')
+    }
+  }
+  const key = positionKey(state)
+  return sha256Hex(rolled.length ? `${key}|${rolled.join(',')}` : key, 24)
 }
 
 /**
