@@ -840,6 +840,7 @@ function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
   const loyalty = state.variant.rules?.includes('loyalty')
   for (const move of movesFor(state, x, y)) {
     if (predatorKeys) {
+      if (sacrificesRoyal(state, move)) continue
       if (!predatorKeys.has(predatorKey(move)) && !slaysPredator(state, move)) continue
       options.push({ move, next: applyMove(state, move, { compute: false }) })
       continue
@@ -1191,6 +1192,7 @@ function collectTeamMoves(
           // The hunt cannot be resisted: a compulsory capture stands even when
           // it walks out of check, and nothing else may be played instead —
           // the king's slaying of the Predator alone outranks it.
+          if (sacrificesRoyal(state, move)) continue
           if (!predatorKeys.has(predatorKey(move)) && !slaysPredator(state, move)) continue
           moves.push(move)
           states.push(wantStates ? applyMove(state, move, { compute: false, search }) : null)
