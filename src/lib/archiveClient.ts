@@ -32,6 +32,17 @@ export function saveSharing(on: boolean) {
   }
 }
 
+let storedGames = 0
+const storedListeners = new Set<() => void>()
+
+/** Counts the games this page has stored, so the numbers on screen can follow. */
+export function subscribeStored(listener: () => void): () => void {
+  storedListeners.add(listener)
+  return () => storedListeners.delete(listener)
+}
+
+export const storedVersion = (): number => storedGames
+
 /** Sends a finished game to the archive. Failures are silent: it is only a tally. */
 export async function submitGame(game: GameState, source: GameSource): Promise<boolean> {
   if (!game.winner || !game.moveHistory.length) return false
@@ -47,6 +58,10 @@ export async function submitGame(game: GameState, source: GameSource): Promise<b
         source,
       }),
     })
+    if (response.ok) {
+      storedGames += 1
+      for (const listener of storedListeners) listener()
+    }
     return response.ok
   } catch {
     return false

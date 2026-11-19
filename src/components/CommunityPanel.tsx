@@ -1,40 +1,33 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Users } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import type { ExplorerMove, VariantSummary } from '@/lib/archive'
-import { fetchExplorer, fetchVariantSummary, loadSharing, saveSharing, submitGame } from '@/lib/archiveClient'
+import {
+  fetchExplorer,
+  fetchVariantSummary,
+  loadSharing,
+  saveSharing,
+  storedVersion,
+  subscribeStored,
+} from '@/lib/archiveClient'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Label } from './ui/label'
 import { Switch } from './ui/switch'
 
 /**
  * What everybody else played: the most popular moves in the position on the
- * board, and how games of this variant usually go. Finished games played in
- * this browser are sent to the archive unless the switch is off — online
- * games are stored by their room.
+ * board, and how games of this variant usually go. The switch decides
+ * whether games played in this browser are sent (see `archiveWatcher`).
  */
 export function CommunityPanel() {
   const game = useAppStore((s) => s.game)
   const variant = useAppStore((s) => s.variant)
-  const online = useAppStore((s) => s.online)
   const puzzle = useAppStore((s) => s.puzzle)
-  const botMode = useAppStore((s) => s.bot.mode)
   const [sharing, setSharing] = useState(loadSharing)
   const [explorer, setExplorer] = useState<{ games: number; moves: ExplorerMove[] } | null>(null)
   const [summary, setSummary] = useState<VariantSummary | null>(null)
-  const sent = useRef<string | null>(null)
-  // Bumped once a game is stored, so the numbers include it.
-  const [stored, setStored] = useState(0)
-
-  useEffect(() => {
-    if (!sharing || online || puzzle || !game.winner) return
-    const key = `${variant.id}:${game.moveHistory.length}:${game.winner}:${game.moveHistory[0]?.notation}`
-    if (sent.current === key) return
-    sent.current = key
-    void submitGame(game, botMode === 'off' ? 'local' : 'bot').then((ok) => {
-      if (ok) setStored((n) => n + 1)
-    })
-  }, [game, variant.id, online, puzzle, botMode, sharing])
+  // Moves on once a game is stored, so the numbers include it.
+  const stored = useSyncExternalStore(subscribeStored, storedVersion)
 
   useEffect(() => {
     if (puzzle) return

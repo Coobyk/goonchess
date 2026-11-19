@@ -7,6 +7,7 @@ import { Toaster } from './components/ui/sonner'
 import { TooltipProvider } from './components/ui/tooltip'
 import { pathFor, replaceRoute, routeFromLocation } from './lib/router'
 import { useAppStore } from './store/useAppStore'
+import { watchFinishedGames } from './lib/archiveWatcher'
 
 const buildDate = new Date(__BUILD_TIME__)
 const buildTimeLabel = buildDate.toISOString().slice(0, 19).replace('T', ' ')
@@ -37,6 +38,8 @@ export default function App() {
 
     return () => window.removeEventListener('popstate', sync)
   }, [])
+
+  useEffect(() => watchFinishedGames(), [])
 
   return (
     <TooltipProvider>
