@@ -220,7 +220,7 @@ export function evaluate(state: GameState, teamId: string, options: EvalOptions 
       const sign = mine ? 1 : -1
 
       // Material.
-      score += sign * piece.value * MATERIAL_SCALE
+      score += sign * piece.value * MATERIAL_SCALE * ((inst.lives ?? piece.lives ?? 1) / (piece.lives ?? 1))
 
       if (piece.flags.royal) {
         if (hillWins) {

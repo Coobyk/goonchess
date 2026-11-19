@@ -440,6 +440,7 @@ function terminalScore(state: GameState, ply: number, ctx: SearchContext): numbe
   if (ctx.antichessWins && !teamHasPieces(state, state.turn)) return MATE - ply
   // Everybody else is wiped out: the side to move has won.
   if (ctx.eliminationWins) {
+    if (!teamHasPieces(state, state.turn)) return -MATE + ply
     for (const team of ctx.teams) {
       if (team === state.turn) continue
       if (!teamHasPieces(state, team)) return MATE - ply

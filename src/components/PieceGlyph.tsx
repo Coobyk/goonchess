@@ -97,6 +97,8 @@ export function PieceGlyph({
       style={{
         width: size,
         height: size,
+        transform: (piece.lives ?? 1) > 1 ? 'translateY(-12%) scale(1.5)' : undefined,
+        transformOrigin: '50% 70%',
         opacity: muted ? 0.7 : 1,
         filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.45))',
       }}
@@ -105,4 +107,3 @@ export function PieceGlyph({
     </span>
   )
 }
-

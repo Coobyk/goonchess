@@ -193,7 +193,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
   if (captured && move.capturedId) {
     if (move.effects.some((e) => e.kind === 'swap')) {
       flights.push(flight('swap', move.capturedId, captured.typeId, captured.team, move.finalTo, move.from, 'slide', travel, 0))
-    } else {
+    } else if (!game.pieces[move.capturedId]) {
       // The fade runs out exactly when the mover lands.
       const fade = Math.min(DISSOLVE_MS, landing)
       dissolves.push({
@@ -205,6 +205,13 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
         duration: fade,
       })
     }
+  }
+
+  if (!game.pieces[move.pieceId]) {
+    dissolves.push({
+      key: 'striker', typeId: mover.typeId, team: mover.team,
+      at: move.finalTo, delay: landing, duration: DISSOLVE_MS,
+    })
   }
 
   // Pieces caught in a blast fade out as the shockwave reaches them.

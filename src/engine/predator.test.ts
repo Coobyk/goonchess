@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyMove, createInitialState, findPiece, getLegalMoves, legalMovesForTeam } from './rules'
+import { applyMove, createInitialState, findPiece, getLegalMoves, legalMovesForTeam, legalOptionsForTeam } from './rules'
 import { predatorChess } from './templates'
 import type { GameState } from './types'
 import { packVariant, unpackVariant } from '@/lib/variantCodec'
@@ -170,6 +170,28 @@ describe('predator chess', () => {
     for (const move of teamMoves) {
       const name = mover(game, move)
       expect(name === 'Predator' || name === 'King').toBe(true)
+    }
+  })
+
+  it.each([1, 2])('only lets the king override the hunt against a Predator with %s remaining lives', (lives) => {
+    const game = bare()
+    const kingId = place(game, 'King', 'white', 4, 7)
+    const hunterId = place(game, 'Predator', 'white', 3, 7)
+    const preyId = place(game, 'Pawn', 'black', 7, 3)
+    const predatorId = place(game, 'Predator', 'black', 3, 6)
+    place(game, 'King', 'black', 0, 0)
+    game.pieces[predatorId].lives = lives
+
+    const kingMoves = getLegalMoves(game, 4, 7)
+    expect(kingMoves).toHaveLength(lives === 1 ? 1 : 0)
+    if (lives === 1) expect(kingMoves[0].capturedId).toBe(predatorId)
+    for (const moves of [
+      legalMovesForTeam(game, 'white'),
+      legalOptionsForTeam(game, 'white', { search: true }).map((o) => o.move),
+    ]) {
+      expect(moves).toHaveLength(lives === 1 ? 2 : 1)
+      expect(moves.filter((m) => m.pieceId === kingId)).toHaveLength(lives === 1 ? 1 : 0)
+      expect(moves.some((m) => m.pieceId === hunterId && m.capturedId === preyId)).toBe(true)
     }
   })
 

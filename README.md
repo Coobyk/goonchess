@@ -67,7 +67,10 @@ Deployable to Cloudflare Workers with GitHub Actions.
   variant: starting board, terrain key, armies, win conditions, movement and
   capture patterns, flags, effects, promotions and the active display settings.
 - **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
-  piece is a horse and every horse jumps), **Bomb Queen** (a queen that steps
+  piece is a horse and every horse jumps), **Boss Fight** (White's full army
+  against a giant queen-and-knight boss with three lives; a hit sacrifices
+  the attacker until the final blow),
+  **Bomb Queen** (a queen that steps
   one square in any direction and detonates on every capture), Chaos Lab
   (portals, walls, uncapturable gems and bombers) and blank boards to start
   from.
