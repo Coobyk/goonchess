@@ -108,6 +108,10 @@ export function hashPosition(state: GameState, out: Fingerprint): void {
       const lives = inst.lives ?? state.pieceTypes[inst.typeId]?.lives ?? 1
       h1 = mix(h1, lives)
       h2 = mix(h2, lives)
+      if (inst.staggered) {
+        h1 = mix(h1, 0x4d219ba7)
+        h2 = mix(h2, 0x16a3c95f)
+      }
       // A piece that has already moved is a different piece, as far as the
       // rules are concerned: it cannot castle, and it cannot take its first
       // step twice.

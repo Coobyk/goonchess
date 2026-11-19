@@ -601,6 +601,7 @@ export function GameBoard() {
               flip={flipBoard}
               rotation={rotatePieces ? 180 : 0}
               pieceTypes={pieceTypes}
+              pieces={game.pieces}
               teamIndex={teamIndex}
             />
             {pendingPromotion && pendingType && (
@@ -708,6 +709,9 @@ export function GameBoard() {
                     >
                       <PieceGlyph
                         piece={pieceType}
+                        lives={piece.lives}
+                        staggered={piece.staggered}
+                        hit={lastMove?.capturedId === piece.id}
                         teamIndex={teamIndex(piece.team)}
                         size={Math.round(cell * 0.78)}
                       />
@@ -721,6 +725,7 @@ export function GameBoard() {
                     aria-label={`${pieceType.name}: ${piece.lives ?? pieceType.lives} of ${pieceType.lives} lives`}
                   >
                     {piece.lives ?? pieceType.lives} / {pieceType.lives} ♥
+                    {piece.staggered && ' · STAGGERED'}
                   </span>
                 )}
 
@@ -769,6 +774,8 @@ export function GameBoard() {
               >
                 <PieceGlyph
                   piece={type}
+                  lives={inst.lives}
+                  staggered={inst.staggered}
                   teamIndex={teamIndex(inst.team)}
                   size={Math.round(cell * 0.86)}
                 />

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { PieceType } from '@/engine/types'
+import type { PieceInstance, PieceType } from '@/engine/types'
 import type { Flight, Anim } from '@/lib/moveAnimation'
 import { PieceGlyph } from './PieceGlyph'
 
@@ -21,6 +21,7 @@ export function MoveAnimationLayer({
   flip,
   rotation,
   pieceTypes,
+  pieces,
   teamIndex,
 }: {
   anim: Anim | null
@@ -30,6 +31,7 @@ export function MoveAnimationLayer({
   flip: boolean
   rotation: number
   pieceTypes: Record<string, PieceType>
+  pieces: Record<string, PieceInstance>
   teamIndex: (teamId: string) => number
 }) {
   if (!anim) return null
@@ -117,7 +119,7 @@ export function MoveAnimationLayer({
               }
             >
               <span className="inline-flex" style={{ transform: spin }}>
-                <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} />
+                <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} lives={pieces[f.pieceId]?.lives} staggered={pieces[f.pieceId]?.staggered} />
               </span>
             </span>
           </span>

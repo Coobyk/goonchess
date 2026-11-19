@@ -10,10 +10,12 @@ import { packVariant, unpackVariant } from '../lib/variantCodec'
 import { planMove } from '../lib/moveAnimation'
 import { replayMoves, replayStates } from '../lib/replay'
 import { fromPgn } from '../lib/pgn'
+import { computeThreats } from './threats'
 import type { GameState } from './types'
 
 function fixture(placements: [string, string, number, number][]) {
   const variant = bossFight()
+  variant.pieceTypes.find((p) => p.name === 'Boss')!.lives = 3
   variant.setup = placements.map(([name, team, x, y]) => ({
     typeId: variant.pieceTypes.find((p) => p.name === name)!.id, team, x, y,
   }))
@@ -34,6 +36,75 @@ function arena() {
 }
 
 describe('Boss Fight and generic lives', () => {
+  it.each([[6, 6], [6, 7]])('escapes the old f3 mating pattern by striking from %s,%s', (x, y) => {
+    let game = createInitialState(bossFight())
+    for (const [fx, fy, tx, ty] of [[4, 6, 4, 4], [4, 0, 5, 2], [0, 6, 0, 5], [5, 2, 5, 5]]) {
+      game = play(game, fx, fy, tx, ty)
+    }
+    expect(game.winner).toBeNull()
+    expect(isInCheck(game, 'white')).toBe(true)
+    const bossId = game.board[5][5]!
+    const attackerId = game.board[y][x]!
+    const hit = play(game, x, y, 5, 5)
+    expect(hit.pieces[attackerId]).toBeUndefined()
+    expect(hit.pieces[bossId]).toMatchObject({ lives: 4, staggered: true })
+    expect(game.pieces[bossId].staggered).toBeUndefined()
+    expect(hit.winner).toBeNull()
+    expect(isInCheck(hit, 'white')).toBe(false)
+    expect(computeThreats(hit, 'white').coverage.size).toBe(0)
+    const moves = getLegalMoves(hit, 5, 5)
+    expect(moves.length).toBeGreaterThan(0)
+    expect(moves.every((m) => !m.capturedId)).toBe(true)
+    expect(legalMovesForTeam(hit, 'black')).toEqual(moves)
+    const recovered = play(hit, 5, 5, 5, 4)
+    expect(recovered.pieces[bossId].staggered).toBeUndefined()
+    expect(hit.pieces[bossId].staggered).toBe(true)
+    recovered.turn = 'black'
+    expect(getLegalMoves(recovered, 5, 4).some((m) => m.capturedId)).toBe(true)
+  })
+
+  it('ignores compulsory captures while staggered, including a Predator hunt', () => {
+    const variant = fixture([['King', 'white', 0, 7], ['Pawn', 'white', 4, 2], ['Boss', 'black', 4, 0]])
+    variant.rules = ['forcedCapture', 'predator']
+    const type = variant.pieceTypes.find((p) => p.name === 'Boss')!
+    type.flags.predator = true
+    type.flags.mustCapture = true
+    const game = createInitialState(variant)
+    game.turn = 'black'
+    game.pieces[game.board[0][4]!].staggered = true
+    for (const moves of [getLegalMoves(game, 4, 0), legalMovesForTeam(game, 'black')]) {
+      expect(moves.length).toBeGreaterThan(0)
+      expect(moves.every((m) => !m.capturedId)).toBe(true)
+    }
+  })
+
+  it('stalemates a staggered boss with no non-capturing destinations', () => {
+    const variant = fixture([['King', 'white', 0, 7], ['Pawn', 'white', 1, 6], ['Boss', 'black', 4, 0]])
+    variant.board.tiles = variant.board.tiles.map((row, y) => row.map((tile, x) =>
+      [[0, 7], [1, 6], [1, 5], [4, 0]].some(([tx, ty]) => tx === x && ty === y) ? tile : { terrain: 'wall' },
+    ))
+    const game = createInitialState(variant)
+    game.pieces[game.board[0][4]!].staggered = true
+    const next = play(game, 1, 6, 1, 5)
+    expect(next.winner).toBe('draw')
+    expect(next.status).toBe('stalemate')
+  })
+
+  it('includes stagger independently of lives in identity and cloned state', () => {
+    const game = createInitialState(arena())
+    const other = cloneState(game)
+    const bossId = game.board[0][4]!
+    other.pieces[bossId] = { ...other.pieces[bossId], staggered: true }
+    const a = { slot: 0, check: 0 }, b = { slot: 0, check: 0 }
+    hashPosition(game, a)
+    hashPosition(other, b)
+    expect(a).not.toEqual(b)
+    expect(positionKey(game)).not.toBe(positionKey(other))
+    expect(JSON.parse(JSON.stringify(other)).pieces[bossId].staggered).toBe(true)
+    other.pieces[bossId].staggered = false
+    expect(positionKey(game)).toBe(positionKey(other))
+  })
+
   it.each(['white', 'black'])('awards elimination to the defender when %s sacrifices its last piece', (mover) => {
     const defender = mover === 'white' ? 'black' : 'white'
     const variant = fixture([['Rook', mover, 4, 2], ['Boss', defender, 4, 0]])
@@ -57,12 +128,12 @@ describe('Boss Fight and generic lives', () => {
     expect(next.status).toBe(threshold === 5 ? 'points' : 'active')
   })
 
-  it('starts with the full white army and one non-royal three-life amazon', () => {
+  it('starts with the full white army and one non-royal five-life amazon', () => {
     const variant = bossFight()
     expect(variant.setup.filter((p) => p.team === 'white')).toHaveLength(16)
     expect(variant.setup.filter((p) => p.team === 'black')).toHaveLength(1)
     const boss = variant.pieceTypes.find((p) => p.name === 'Boss')!
-    expect(boss.lives).toBe(3)
+    expect(boss.lives).toBe(5)
     expect(boss.flags.royal).toBe(false)
   })
 
@@ -155,16 +226,18 @@ describe('Boss Fight and generic lives', () => {
       game = play(game, x, y, tx, ty)
     }
     const lives = (state: GameState) => Object.values(state.pieces).find((p) => state.pieceTypes[p.typeId].name === 'Boss')!.lives
-    expect(lives(game)).toBe(2)
-    expect(lives(replayMoves(variant, game.moveHistory))).toBe(2)
-    expect(lives(replayMoves(variant, game.moveHistory.slice(0, -1)))).toBe(3)
+    expect(lives(game)).toBe(4)
+    expect(lives(replayMoves(variant, game.moveHistory))).toBe(4)
+    expect(lives(replayMoves(variant, game.moveHistory.slice(0, -1)))).toBe(5)
     const states = replayStates(game)
-    expect(lives(states.at(-2)!)).toBe(3)
-    expect(lives(states.at(-1)!)).toBe(2)
+    expect(lives(states.at(-2)!)).toBe(5)
+    expect(lives(states.at(-1)!)).toBe(4)
+    expect(states.at(-1)!.pieces[game.board[3][5]!].staggered).toBe(true)
     const sharedVariant = decodeVariant(encodeVariant(variant))
     const shared = fromPgn(decodeGame(encodeGame(game)), sharedVariant)
     expect(shared).not.toBeNull()
-    expect(lives(shared!.game)).toBe(2)
+    expect(lives(shared!.game)).toBe(4)
+    expect(Object.values(shared!.game.pieces).find((p) => p.staggered)?.lives).toBe(4)
   })
 
   it('lets Black capture the white king and win', () => {
@@ -248,12 +321,12 @@ describe('Boss Fight and generic lives', () => {
     expect(JSON.parse(JSON.stringify(other)).pieces[boss].lives).toBe(2)
   })
 
-  it('round trips lives and app-relative art through a share link', () => {
+  it('round trips lives and the assembled presentation through a share link', () => {
     const variant = decodeVariant(encodeVariant(bossFight()))
     const boss = variant.pieceTypes.find((p) => p.name === 'Boss')!
-    expect(boss.lives).toBe(3)
-    expect(boss.images).toEqual(['/pieces/boss/boss.svg', '/pieces/boss/boss.svg'])
-    expect(createInitialState(variant).pieces[createInitialState(variant).board[0][4]!].lives).toBe(3)
+    expect(boss.lives).toBe(5)
+    expect(boss.presentation).toBe('boss')
+    expect(createInitialState(variant).pieces[createInitialState(variant).board[0][4]!].lives).toBe(5)
   })
 
   it('defaults old links to one life and discards external image paths', () => {

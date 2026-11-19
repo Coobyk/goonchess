@@ -12,8 +12,36 @@
   100% { filter: none; transform: none; }
 }
 .boss-hit { animation: boss-hit 700ms ease-out; }
+.boss-assembly {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  overflow: visible;
+  filter: drop-shadow(0 0 1px #f4f1ea) drop-shadow(0 5px 5px #0009);
+}
+.boss-body { animation: boss-bob 3.8s ease-in-out infinite; }
+.boss-wing-left, .boss-wing-right { transform-origin: 150px 145px; }
+.boss-wing-left { animation: boss-flap 2.6s ease-in-out infinite alternate; }
+.boss-wing-right { animation: boss-flap 2.6s ease-in-out infinite alternate-reverse; }
+.boss-tail { transform-origin: 150px 175px; animation: boss-sway 3.2s ease-in-out infinite alternate; }
+.boss-drift { animation: boss-drift 2.3s ease-in-out var(--drift-delay, 0s) infinite alternate; }
+.boss-eyes { fill: #ff233d; filter: drop-shadow(0 0 4px #ff002b); animation: boss-glow 1.7s ease-in-out infinite alternate; }
+.boss-falling { animation: boss-fall 1.2s ease-in forwards; }
+.boss-staggered { filter: saturate(.45) brightness(.7) drop-shadow(0 0 4px #ff344d); }
+.boss-staggered .boss-body { animation: boss-wobble 650ms ease-in-out infinite alternate; }
+@keyframes boss-bob { 50% { transform: translateY(-5px); } }
+@keyframes boss-flap { from { transform: rotate(-5deg); } to { transform: rotate(7deg); } }
+@keyframes boss-sway { from { transform: rotate(-8deg); } to { transform: rotate(9deg); } }
+@keyframes boss-drift { from { transform: translate(0, -1px); } to { transform: translate(2px, 2px); } }
+@keyframes boss-glow { to { opacity: .55; filter: drop-shadow(0 0 8px #ff002b); } }
+@keyframes boss-fall { to { transform: translate(20px, 90px) rotate(95deg); opacity: 0; } }
+@keyframes boss-wobble { from { transform: rotate(-4deg) translateY(2px); } to { transform: rotate(4deg) translateY(5px); } }
 @media (prefers-reduced-motion: reduce) {
   .boss-hit { animation: none; }
+  .boss-assembly *, .boss-staggered .boss-body { animation: none; }
+  .boss-falling { display: none; }
 }
 
 @theme inline {

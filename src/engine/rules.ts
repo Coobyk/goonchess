@@ -366,6 +366,7 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     }
   }
 
+  if (inst.staggered) return moves.filter((m) => !m.capturedId)
   if (piece.flags.mustCapture) return moves.filter((m) => !!m.capturedId)
   return moves
 }
@@ -1352,6 +1353,11 @@ export function applyMove(
     if (current) next.pieces[id] = { ...current }
   }
 
+  if (inst.staggered) {
+    touch(move.pieceId)
+    delete next.pieces[move.pieceId].staggered
+  }
+
   const hasSwap = move.effects.some((e) => e.kind === 'swap')
   const capturedInst = move.capturedId ? next.pieces[move.capturedId] : undefined
   const capturedPiece = capturedInst ? next.pieceTypes[capturedInst.typeId] : undefined
@@ -1366,6 +1372,7 @@ export function applyMove(
     if (lives <= 1) return false
     touch(id)
     next.pieces[id].lives = lives - 1
+    next.pieces[id].staggered = true
     return true
   }
   const hit = !!(move.capturedId && capturedInst && !hasSwap && wound(move.capturedId))

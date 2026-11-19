@@ -68,8 +68,10 @@ Deployable to Cloudflare Workers with GitHub Actions.
   capture patterns, flags, effects, promotions and the active display settings.
 - **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
   piece is a horse and every horse jumps), **Boss Fight** (White's full army
-  against a giant queen-and-knight boss with three lives; a hit sacrifices
-  the attacker until the final blow),
+  against an animated army fused into a five-life queen-and-knight boss;
+  non-final hits sacrifice the attacker and stagger the boss, silencing its
+  attacks so a hit can escape check. Its next move must be non-capturing;
+  moving restores its attacks. No pass: a trapped, staggered boss is stalemated),
   **Bomb Queen** (a queen that steps
   one square in any direction and detonates on every capture), Chaos Lab
   (portals, walls, uncapturable gems and bombers) and blank boards to start
