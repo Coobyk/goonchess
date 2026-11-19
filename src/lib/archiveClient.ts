@@ -54,7 +54,7 @@ export async function submitGame(game: GameState, source: GameSource): Promise<b
 }
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(path, { signal })
+  const response = await fetch(path, { signal, cache: 'no-store' })
   if (!response.ok) throw new Error(`stats_${response.status}`)
   return (await response.json()) as T
 }

@@ -23,13 +23,17 @@ export function CommunityPanel() {
   const [explorer, setExplorer] = useState<{ games: number; moves: ExplorerMove[] } | null>(null)
   const [summary, setSummary] = useState<VariantSummary | null>(null)
   const sent = useRef<string | null>(null)
+  // Bumped once a game is stored, so the numbers include it.
+  const [stored, setStored] = useState(0)
 
   useEffect(() => {
     if (!sharing || online || puzzle || !game.winner) return
     const key = `${variant.id}:${game.moveHistory.length}:${game.winner}:${game.moveHistory[0]?.notation}`
     if (sent.current === key) return
     sent.current = key
-    void submitGame(game, botMode === 'off' ? 'local' : 'bot')
+    void submitGame(game, botMode === 'off' ? 'local' : 'bot').then((ok) => {
+      if (ok) setStored((n) => n + 1)
+    })
   }, [game, variant.id, online, puzzle, botMode, sharing])
 
   useEffect(() => {
@@ -37,13 +41,13 @@ export function CommunityPanel() {
     const abort = new AbortController()
     fetchExplorer(game, abort.signal).then(setExplorer, () => setExplorer(null))
     return () => abort.abort()
-  }, [game, puzzle])
+  }, [game, puzzle, stored])
 
   useEffect(() => {
     const abort = new AbortController()
     fetchVariantSummary(variant, abort.signal).then(setSummary, () => setSummary(null))
     return () => abort.abort()
-  }, [variant])
+  }, [variant, stored])
 
   const total = explorer?.games ?? 0
   const teams = variant.teams

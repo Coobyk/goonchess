@@ -21,15 +21,13 @@ export { GameArchive, GameRoom }
 
 /** A finished game a minute is more than anybody plays by hand. */
 const allowArchive = rateLimiter(20)
-/** The numbers move slowly; a minute of caching spares the archive most reads. */
-const STATS_MAX_AGE = 60
 
 /** A variant bigger than this is not a variant, it is an upload. */
 const MAX_BODY = 192 * 1024
 const MAX_NAME = 80
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname
 
@@ -56,7 +54,7 @@ export default {
 
     if (path === '/api/stats/moves' || path === '/api/stats/summary') {
       if (request.method !== 'GET') return json({ error: 'method_not_allowed' }, 405)
-      return stats(url, env, ctx)
+      return stats(url, env)
     }
 
     const room = path.match(/^\/api\/games\/([^/]+)(\/ws)?$/)
@@ -203,11 +201,8 @@ function vec(value: unknown): { x: number; y: number } | null {
   return { x: x as number, y: y as number }
 }
 
-/**
- * The move statistics, read from the archive. The answers are cached at the
- * edge for a minute, so a busy position is not a busy database.
- */
-async function stats(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
+/** The move statistics, read from the archive. */
+async function stats(url: URL, env: Env): Promise<Response> {
   const variant = url.searchParams.get('variant')
   const position = url.searchParams.get('position')
   const moves = url.pathname === '/api/stats/moves'
@@ -216,11 +211,6 @@ async function stats(url: URL, env: Env, ctx: ExecutionContext): Promise<Respons
     return json({ error: 'bad_position' }, 400)
   }
 
-  const cache = caches.default
-  const cacheKey = new Request(url.toString(), { method: 'GET' })
-  const hit = await cache.match(cacheKey)
-  if (hit) return hit
-
   const query = new URLSearchParams()
   if (variant) query.set('variant', variant)
   if (moves && position) query.set('position', position)
@@ -228,9 +218,7 @@ async function stats(url: URL, env: Env, ctx: ExecutionContext): Promise<Respons
     `https://archive.internal/${moves ? 'moves' : 'summary'}?${query}`,
   )
   if (!answer.ok) return json({ error: 'stats_failed' }, 502)
-  const response = json(await answer.json(), 200, { 'cache-control': `public, max-age=${STATS_MAX_AGE}` })
-  ctx.waitUntil(cache.put(cacheKey, response.clone()))
-  return response
+  return json(await answer.json(), 200, { 'cache-control': 'no-store' })
 }
 
 /**
