@@ -173,7 +173,7 @@ describe('predator chess', () => {
     }
   })
 
-  it.each([1, 2])('only lets the king override the hunt against a Predator with %s remaining lives', (lives) => {
+  it.each([1, 2])('lets the king override the hunt against a Predator with %s remaining lives', (lives) => {
     const game = bare()
     const kingId = place(game, 'King', 'white', 4, 7)
     const hunterId = place(game, 'Predator', 'white', 3, 7)
@@ -183,14 +183,21 @@ describe('predator chess', () => {
     game.pieces[predatorId].lives = lives
 
     const kingMoves = getLegalMoves(game, 4, 7)
-    expect(kingMoves).toHaveLength(lives === 1 ? 1 : 0)
-    if (lives === 1) expect(kingMoves[0].capturedId).toBe(predatorId)
+    expect(kingMoves).toHaveLength(1)
+    expect(kingMoves[0].capturedId).toBe(predatorId)
+    const next = applyMove(game, kingMoves[0])
+    expect(next.pieces[kingId]).toBeDefined()
+    expect(next.winner).toBe(lives === 1 ? 'white' : null)
+    if (lives > 1) {
+      expect(next.board[7][4]).toBe(kingId)
+      expect(next.pieces[predatorId]).toMatchObject({ lives: 1, staggered: true })
+    }
     for (const moves of [
       legalMovesForTeam(game, 'white'),
       legalOptionsForTeam(game, 'white', { search: true }).map((o) => o.move),
     ]) {
-      expect(moves).toHaveLength(lives === 1 ? 2 : 1)
-      expect(moves.filter((m) => m.pieceId === kingId)).toHaveLength(lives === 1 ? 1 : 0)
+      expect(moves).toHaveLength(2)
+      expect(moves.filter((m) => m.pieceId === kingId)).toHaveLength(1)
       expect(moves.some((m) => m.pieceId === hunterId && m.capturedId === preyId)).toBe(true)
     }
   })

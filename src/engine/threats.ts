@@ -70,7 +70,7 @@ export function computeThreats(state: GameState, teamId: string): ThreatReport {
 
   for (const id in state.pieces) {
     const inst = state.pieces[id]
-    if (inst.team === teamId) continue
+    if (inst.team === teamId || inst.staggered) continue
     const pos = findPiece(state, id)
     if (!pos) continue
     for (const move of movesFor(state, pos.x, pos.y)) {

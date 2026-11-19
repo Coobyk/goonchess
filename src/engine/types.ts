@@ -19,6 +19,7 @@ export const DICE_SIDES = 6
 /** The "square" a pocket piece is held on: outside any real board, so a drop
  * knows it comes from the hand and not from a square. */
 export const POCKET_SQUARE: Vec = { x: -1, y: -1 }
+export const PASS_SQUARE: Vec = { x: -2, y: -2 }
 export const isPocketSquare = (v: Vec): boolean => v.x === POCKET_SQUARE.x && v.y === POCKET_SQUARE.y
 
 /** The letter a piece icon writes in SAN and FEN notation. */
@@ -214,6 +215,7 @@ export interface Promotion {
 
 export interface PieceType {
   lives?: number
+  presentation?: 'boss'
   id: string
   name: string
   icon: PieceIcon
@@ -318,6 +320,7 @@ export interface CastleInfo {
 }
 
 export interface Move {
+  pass?: boolean
   from: Vec
   to: Vec
   pieceId: string
@@ -366,6 +369,8 @@ export interface MoveRecord {
 
 export interface PieceInstance {
   lives?: number
+  staggered?: boolean
+  staggerRecovered?: boolean
   id: string
   typeId: string
   team: string

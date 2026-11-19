@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyMove, createInitialState, getLegalMoves } from '@/engine/rules'
 import { classicChess } from '@/engine/templates'
-import { planBoardTransition, planMove } from './moveAnimation'
+import { parryTravel, planBoardTransition, planMove } from './moveAnimation'
 
 type State = ReturnType<typeof createInitialState>
 
@@ -14,6 +14,15 @@ function play(game: State, from: [number, number], to: [number, number]) {
 }
 
 describe('planMove', () => {
+  it('lunges less than halfway to the target and returns to the origin for video parries', () => {
+    expect(parryTravel(0)).toBe(0)
+    expect(parryTravel(0.45)).toBeCloseTo(0.42)
+    expect(parryTravel(0.2)).toBeGreaterThan(0)
+    expect(parryTravel(0.8)).toBeGreaterThan(0)
+    expect(parryTravel(1)).toBe(0)
+    expect(parryTravel(-1)).toBe(0)
+    expect(parryTravel(2)).toBe(0)
+  })
   it('slides the mover from its square to the one it landed on', () => {
     const before = createInitialState(classicChess())
     const after = play(before, [4, 6], [4, 4])

@@ -574,6 +574,25 @@ export function GameBoard() {
         flip={flipBoard}
         overlay={
           <>
+            {Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => {
+              const moves = [...legalMoves, ...hoverMoves].filter((m) => m.finalTo.x === x && m.finalTo.y === y)
+              if (!moves.length) return null
+              const captures = moves.some((m) => !!m.capturedId)
+              return (
+                <span
+                  key={`${x},${y}`}
+                  data-legal-move={`${x},${y}`}
+                  className="pointer-events-none absolute z-40 flex items-center justify-center"
+                  style={{ left: (flipBoard ? cols - 1 - x : x) * cell, top: (flipBoard ? rows - 1 - y : y) * cell, width: cell, height: cell }}
+                >
+                  {captures ? (
+                    <span className="absolute inset-[8%] rounded-sm ring-[3px] ring-inset ring-rose-500/70" />
+                  ) : (
+                    <span className="size-1/4 min-h-2 min-w-2 rounded-full bg-black/40 ring-2 ring-white/80" />
+                  )}
+                </span>
+              )
+            }))}
             {threatSettings.show && threatSettings.arrows && threats && (
               <ThreatArrows
                 edges={threats.edges}
@@ -601,6 +620,7 @@ export function GameBoard() {
               flip={flipBoard}
               rotation={rotatePieces ? 180 : 0}
               pieceTypes={pieceTypes}
+              pieces={game.pieces}
               teamIndex={teamIndex}
             />
             {pendingPromotion && pendingType && (
@@ -631,10 +651,6 @@ export function GameBoard() {
             const piece = pieceId ? game.pieces[pieceId] : null
             const pieceType = piece ? pieceTypes[piece.typeId] : null
             const isSelected = selected?.x === x && selected?.y === y
-            const dest = legalMoves.filter((m) => m.finalTo.x === x && m.finalTo.y === y)
-            const hoverDest = hoverMoves.filter((m) => m.finalTo.x === x && m.finalTo.y === y)
-            const captures = [...dest, ...hoverDest].some((m) => !!m.capturedId)
-            const hasDest = dest.length > 0 || hoverDest.length > 0
             const isLast =
               !!lastMove &&
               ((lastMove.from.x === x && lastMove.from.y === y) ||
@@ -708,6 +724,9 @@ export function GameBoard() {
                     >
                       <PieceGlyph
                         piece={pieceType}
+                        lives={piece.lives}
+                        staggered={piece.staggered}
+                        hit={lastMove?.capturedId === piece.id}
                         teamIndex={teamIndex(piece.team)}
                         size={Math.round(cell * 0.78)}
                       />
@@ -721,6 +740,7 @@ export function GameBoard() {
                     aria-label={`${pieceType.name}: ${piece.lives ?? pieceType.lives} of ${pieceType.lives} lives`}
                   >
                     {piece.lives ?? pieceType.lives} / {pieceType.lives} ♥
+                    {piece.staggered && ' · STAGGERED'}
                   </span>
                 )}
 
@@ -734,12 +754,6 @@ export function GameBoard() {
                   />
                 )}
 
-                {hasDest && !captures && (
-                  <span className="absolute z-20 size-1/4 min-h-2 min-w-2 rounded-full bg-black/40 ring-1 ring-white/20" />
-                )}
-                {hasDest && captures && (
-                  <span className="absolute inset-[8%] z-20 rounded-sm ring-[3px] ring-inset ring-rose-500/70" />
-                )}
                 {pieceThreat && !pieceThreat.defended && threatSettings.hanging && (
                   <span className="threat-hanging pointer-events-none absolute inset-[7%] z-20 rounded-sm border-2 border-dashed border-rose-400/90" />
                 )}
@@ -769,6 +783,8 @@ export function GameBoard() {
               >
                 <PieceGlyph
                   piece={type}
+                  lives={inst.lives}
+                  staggered={inst.staggered}
                   teamIndex={teamIndex(inst.team)}
                   size={Math.round(cell * 0.86)}
                 />

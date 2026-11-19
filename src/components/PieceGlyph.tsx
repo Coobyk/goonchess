@@ -1,16 +1,23 @@
 import { SAN_LETTERS, type PieceType } from '@/engine/types'
 import { RAINBOW, SHAPE_OF_ICON, artToUri, rainbowUri } from '@/lib/pieceArt'
+import { BossAssembly } from './BossAssembly'
 
 export function PieceGlyph({
   piece,
   teamIndex,
   size = 40,
   muted = false,
+  lives,
+  staggered = false,
+  hit = false,
 }: {
   piece?: PieceType | null
   teamIndex: number
   size?: number
   muted?: boolean
+  lives?: number
+  staggered?: boolean
+  hit?: boolean
 }) {
   if (!piece) return null
   const code = SAN_LETTERS[piece.icon]
@@ -18,7 +25,9 @@ export function PieceGlyph({
   // after every move, and it says so.
   const light = teamIndex === 0
   const shape = piece.flags?.random ? SHAPE_OF_ICON[piece.icon] : undefined
-  const glyph = shape ? (
+  const glyph = piece.presentation === 'boss' ? (
+    <BossAssembly size={size / 0.78 * 4.5} lives={lives ?? piece.lives ?? 1} maxLives={piece.lives ?? 1} staggered={staggered} hit={hit} />
+  ) : shape ? (
     <img
       src={rainbowUri(shape, light)}
       alt={piece.name}
@@ -93,12 +102,10 @@ export function PieceGlyph({
 
   return (
     <span
-      className="pointer-events-none flex items-center justify-center"
+      className="pointer-events-none relative flex items-center justify-center"
       style={{
         width: size,
         height: size,
-        transform: (piece.lives ?? 1) > 1 ? 'translateY(-12%) scale(1.5)' : undefined,
-        transformOrigin: '50% 70%',
         opacity: muted ? 0.7 : 1,
         filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.45))',
       }}

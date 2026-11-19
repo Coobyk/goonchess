@@ -890,15 +890,16 @@ export function bossFight(): Variant {
   const base = classicChess()
   const boss = makePiece({
     name: 'Boss', icon: 'custom', symbol: 'B', value: 25,
-    move: [slider(ALL8), leaper(KNIGHT)], flags: { jump: false },
+    move: [leaper(ALL8), leaper(KNIGHT)], flags: { jump: false },
   })
-  boss.lives = 3
+  boss.lives = 5
+  boss.presentation = 'boss'
   boss.images = ['/pieces/boss/boss.svg', '/pieces/boss/boss.svg']
   return {
     ...base,
     id: 'boss-fight',
     name: 'Boss Fight',
-    description: "Black's whole army fused into one boss. Land 3 hits to slay it.",
+    description: "A five-life Centaur: king steps plus knight jumps, no sliding. Hits stagger it through its recovery move and your next move. Kings parry safely from their own square.",
     pieceTypes: [...base.pieceTypes, boss],
     setup: [...base.setup.filter((p) => p.team === 'white'), { typeId: boss.id, team: 'black', x: 4, y: 0 }],
     winConditions: [...base.winConditions, { id: uid(), kind: 'elimination' }],
@@ -914,7 +915,7 @@ export const TEMPLATES: {
   freshSetup?: (variant: Variant) => Variant
 }[] = [
   { id: 'classic', name: 'Classic Chess', description: 'Standard 8×8', build: classicChess },
-  { id: 'boss-fight', name: 'Boss Fight', description: 'An army against a three-life boss', build: bossFight },
+  { id: 'boss-fight', name: 'Boss Fight', description: 'Five-life Centaur. Strike, stagger, parry.', build: bossFight },
   { id: 'mini', name: 'Mini Chess', description: 'Fast 6×6', build: miniChess },
   { id: 'horses', name: 'Only Horses', description: 'Every piece jumps', build: onlyHorses },
   { id: 'random', name: 'Random Chess', description: 'The pieces change', build: randomChess },

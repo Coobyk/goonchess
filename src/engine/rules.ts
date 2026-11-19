@@ -12,7 +12,7 @@ import type {
 } from './types'
 import { positionKey } from './repetition'
 import { nextSeed } from './rand'
-import { SAN_LETTERS } from './types'
+import { PASS_SQUARE, SAN_LETTERS } from './types'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -286,9 +286,9 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     if (hypergamy && occPiece) {
       if (!occPiece.flags.royal && occPiece.value < piece.value) return
     }
-    // Atomic: a king's capture would set off the blast on top of the king
-    // itself, so no king ever takes anything.
-    if (atomic && piece.flags.royal) return
+    // A king never lands inside its own atomic blast.
+    if (atomic && piece.flags.royal &&
+      ((occInst.lives ?? occPiece?.lives ?? 1) <= 1 || piece.effects.some((e) => e.kind === 'swap'))) return
     seen[finalIndex] = 1
     const finalTo = { x: fx, y: fy }
     moves.push({
@@ -366,6 +366,7 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     }
   }
 
+  if (inst.staggered) return moves.filter((m) => !m.capturedId)
   if (piece.flags.mustCapture) return moves.filter((m) => !!m.capturedId)
   return moves
 }
@@ -642,7 +643,7 @@ function captureIsForced(state: GameState, teamId: string): boolean {
       if (!id) continue
       const inst = state.pieces[id]
       if (!inst || inst.team !== teamId) continue
-      if (movesFor(state, x, y).some((m) => !!m.capturedId && !sacrificesRoyal(state, m))) return true
+      if (movesFor(state, x, y).some((m) => !!m.capturedId)) return true
     }
   }
   return false
@@ -778,6 +779,10 @@ export interface MoveOption {
 }
 
 export function getLegalMoves(state: GameState, x: number, y: number): Move[] {
+  if (x === PASS_SQUARE.x && y === PASS_SQUARE.y) {
+    const pass = staggerPass(state)
+    return pass ? [pass] : []
+  }
   return legalOptions(state, x, y).map((option) => option.move)
 }
 
@@ -797,14 +802,6 @@ function takesPredator(state: GameState, move: Move): boolean {
   if (!move.capturedId) return false
   const victim = state.pieces[move.capturedId]
   return !!victim && !!state.pieceTypes[victim.typeId]?.flags.predator
-}
-
-function sacrificesRoyal(state: GameState, move: Move): boolean {
-  const victim = move.capturedId ? state.pieces[move.capturedId] : undefined
-  const mover = state.pieces[move.pieceId]
-  return !!victim && !!mover && !!state.pieceTypes[mover.typeId]?.flags.royal &&
-    (victim.lives ?? state.pieceTypes[victim.typeId]?.lives ?? 1) > 1 &&
-    !move.effects.some((e) => e.kind === 'swap')
 }
 
 /**
@@ -840,13 +837,12 @@ function legalOptions(state: GameState, x: number, y: number): MoveOption[] {
   const loyalty = state.variant.rules?.includes('loyalty')
   for (const move of movesFor(state, x, y)) {
     if (predatorKeys) {
-      if (sacrificesRoyal(state, move)) continue
       if (!predatorKeys.has(predatorKey(move)) && !slaysPredator(state, move)) continue
       options.push({ move, next: applyMove(state, move, { compute: false }) })
       continue
     }
     if (forced && !move.capturedId) continue
-    if (sacrificesRoyal(state, move) || !castlingIsLegal(state, move, inst)) continue
+    if (!castlingIsLegal(state, move, inst)) continue
     const next = applyMove(state, move, { compute: false })
     const free = takesPredator(state, move)
     if (
@@ -1138,6 +1134,7 @@ function collectTeamMoves(
   teamId: string,
   wantStates: boolean,
   search: boolean,
+  includePass = true,
 ): { moves: Move[]; states: (GameState | null)[] } {
   const moves: Move[] = []
   const states: (GameState | null)[] = []
@@ -1192,14 +1189,13 @@ function collectTeamMoves(
           // The hunt cannot be resisted: a compulsory capture stands even when
           // it walks out of check, and nothing else may be played instead —
           // the king's slaying of the Predator alone outranks it.
-          if (sacrificesRoyal(state, move)) continue
           if (!predatorKeys.has(predatorKey(move)) && !slaysPredator(state, move)) continue
           moves.push(move)
           states.push(wantStates ? applyMove(state, move, { compute: false, search }) : null)
           continue
         }
         if (forced && !move.capturedId) continue
-        if (sacrificesRoyal(state, move) || !castlingIsLegal(state, move, inst)) continue
+        if (!castlingIsLegal(state, move, inst)) continue
         const fast =
           !hasLives &&
           !inCheck &&
@@ -1237,7 +1233,26 @@ function collectTeamMoves(
     moves.push(drops.moves[i])
     states.push(drops.states[i])
   }
+  if (!moves.length && includePass) {
+    const pass = staggerPass(state, teamId)
+    if (pass) {
+      moves.push(pass)
+      states.push(wantStates ? applyMove(state, pass, { compute: false, search }) : null)
+    }
+  }
   return { moves, states }
+}
+
+export function staggerPass(state: GameState, teamId = state.turn): Move | undefined {
+  if (state.winner || teamId !== state.turn) return
+  const staggered = Object.values(state.pieces).filter((p) => p.team === teamId && p.staggered)
+  if (!staggered.length || collectTeamMoves(state, teamId, false, false, false).moves.length) return
+  const awake = cloneState(state)
+  for (const inst of staggered) {
+    awake.pieces[inst.id] = { ...inst, staggered: false, staggerRecovered: false }
+  }
+  if (!collectTeamMoves(awake, teamId, false, false, false).moves.length) return
+  return { pass: true, pieceId: 'stagger-pass', from: PASS_SQUARE, to: PASS_SQUARE, finalTo: PASS_SQUARE, effects: [] }
 }
 
 /** Put the royal piece on a square and see whether it is attacked there. */
@@ -1267,7 +1282,7 @@ export function hasAnyLegalMove(state: GameState, teamId: string): boolean {
       if (getLegalMoves(state, x, y).length > 0) return true
     }
   }
-  return false
+  return !!staggerPass(state, teamId)
 }
 
 /* ------------------------------------------------------------- apply move */
@@ -1322,10 +1337,20 @@ export function applyMove(
   move: Move,
   options: ApplyOptions = {},
 ): GameState {
-  const compute = options.compute ?? true
   const next: GameState = cloneState(state)
   // The die has been used; the next piece rolls its own.
   next.roll = undefined
+
+  if (move.pass) {
+    for (const id of Object.keys(next.pieces)) {
+      const inst = next.pieces[id]
+      if (inst.team === state.turn && inst.staggered) next.pieces[id] = { ...inst, staggerRecovered: true }
+    }
+    expireStagger(state, next, state.turn)
+    return finishMove(next, {
+      move, team: state.turn, notation: 'pass', san: options.san ? 'pass' : undefined,
+    }, options)
+  }
 
   // A drop arrives from the pocket, so the piece does not exist until now —
   // and what it cost comes out of the pocket as it lands.
@@ -1352,6 +1377,11 @@ export function applyMove(
     if (current) next.pieces[id] = { ...current }
   }
 
+  if (inst.staggered) {
+    touch(move.pieceId)
+    next.pieces[move.pieceId].staggerRecovered = true
+  }
+
   const hasSwap = move.effects.some((e) => e.kind === 'swap')
   const capturedInst = move.capturedId ? next.pieces[move.capturedId] : undefined
   const capturedPiece = capturedInst ? next.pieceTypes[capturedInst.typeId] : undefined
@@ -1359,6 +1389,7 @@ export function applyMove(
   // king that never stood on the square anyone aimed at.
   const royalTeams = new Set<string>()
 
+  const wounded = new Set<string>()
   const wound = (id: string): boolean => {
     const victim = next.pieces[id]
     if (!victim) return false
@@ -1366,9 +1397,13 @@ export function applyMove(
     if (lives <= 1) return false
     touch(id)
     next.pieces[id].lives = lives - 1
+    next.pieces[id].staggered = true
+    delete next.pieces[id].staggerRecovered
+    wounded.add(id)
     return true
   }
   const hit = !!(move.capturedId && capturedInst && !hasSwap && wound(move.capturedId))
+  const parry = hit && piece.flags.royal
   const pocketBlastVictim = (id: string) => {
     const victim = next.pieces[id]
     if (!next.hands || !victim || victim.team === inst.team) return
@@ -1382,15 +1417,19 @@ export function applyMove(
 
   if (move.capturedId && capturedInst) {
     if (hit) {
-      delete next.pieces[move.pieceId]
-      if (next.board[move.from.y]?.[move.from.x] === move.pieceId) next.board[move.from.y][move.from.x] = null
-      if (piece.flags.royal) royalTeams.add(inst.team)
-      if (!options.search) next.captured.push({ team: inst.team, typeId: inst.typeId, by: capturedInst.team })
-      next.scores[capturedInst.team] = (next.scores[capturedInst.team] ?? 0) + piece.value
-      if (next.hands) {
-        const pocket = next.hands[capturedInst.team] ?? (next.hands[capturedInst.team] = {})
-        const held = inst.promotedFrom ?? inst.typeId
-        pocket[held] = (pocket[held] ?? 0) + 1
+      if (parry) {
+        touch(move.pieceId)
+        next.pieces[move.pieceId].hasMoved = true
+      } else {
+        delete next.pieces[move.pieceId]
+        if (next.board[move.from.y]?.[move.from.x] === move.pieceId) next.board[move.from.y][move.from.x] = null
+        if (!options.search) next.captured.push({ team: inst.team, typeId: inst.typeId, by: capturedInst.team })
+        next.scores[capturedInst.team] = (next.scores[capturedInst.team] ?? 0) + piece.value
+        if (next.hands) {
+          const pocket = next.hands[capturedInst.team] ?? (next.hands[capturedInst.team] = {})
+          const held = inst.promotedFrom ?? inst.typeId
+          pocket[held] = (pocket[held] ?? 0) + 1
+        }
       }
     } else if (hasSwap) {
       // Swap positions instead of capturing.
@@ -1496,6 +1535,7 @@ export function applyMove(
         if (!inBounds(next.variant.board, ex, ey)) continue
         const occ = next.board[ey][ex]
         if (!occ) continue
+        if (parry && occ === move.pieceId) continue
         const oInst = next.pieces[occ]
         if (!oInst) continue
         const oPiece = next.pieceTypes[oInst.typeId]
@@ -1577,7 +1617,7 @@ export function applyMove(
 
   // Promotion
   let promotionTypeId: string | undefined
-  if (piece.promotion && next.pieces[move.pieceId]) {
+  if (!hit && piece.promotion && next.pieces[move.pieceId]) {
     const team = teamById(next.variant, inst.team)
     const farRank = team?.forward === 'down' ? next.variant.board.height - 1 : 0
     if (fy === farRank) {
@@ -1611,6 +1651,8 @@ export function applyMove(
       }
     }
   }
+
+  expireStagger(state, next, inst.team, wounded)
 
   // Loyalty Chess: the king is jealous of his queen. A queen that looks the
   // enemy king in the eye — whether she moved into the line or another piece
@@ -1708,6 +1750,45 @@ export function applyMove(
     blasts: blasts.length ? blasts : undefined,
     origin: options.origin,
   }
+  return finishMove(next, record, options, {
+    capturedRoyal: !hit && !hasSwap && !!capturedPiece?.flags.royal,
+    royalTeams: [...royalTeams],
+    kingTookPredator,
+    predatorAtePrey,
+    jealousKings,
+  })
+}
+
+const checkingStaggerExpiry = new WeakSet<GameState>()
+
+function expireStagger(state: GameState, next: GameState, mover: string, wounded?: Set<string>) {
+  const recovered = new Map<string, GameState['pieces'][string]>()
+  for (const id of Object.keys(state.pieces)) {
+    const previous = state.pieces[id]
+    if (!previous.staggered || !previous.staggerRecovered || previous.team === mover || wounded?.has(id)) continue
+    if (!next.pieces[id]) continue
+    recovered.set(id, next.pieces[id])
+    next.pieces[id] = { ...next.pieces[id] }
+    delete next.pieces[id].staggered
+    delete next.pieces[id].staggerRecovered
+  }
+  if (!recovered.size || checkingStaggerExpiry.has(state) || !isInCheck(next, mover)) return
+  checkingStaggerExpiry.add(state)
+  try {
+    if (!collectTeamMoves(state, mover, false, false, false).moves.length) {
+      for (const [id, piece] of recovered) next.pieces[id] = piece
+    }
+  } finally {
+    checkingStaggerExpiry.delete(state)
+  }
+}
+
+function finishMove(
+  next: GameState,
+  record: MoveRecord,
+  options: ApplyOptions,
+  meta: Parameters<typeof detectOutcome>[2] = {},
+): GameState {
   // Turn switch
   const order = next.variant.teams.map((t) => t.id)
   const idx = order.indexOf(next.turn)
@@ -1718,7 +1799,7 @@ export function applyMove(
   // in a search too, so the bot knows how close the third one is.
   if (next.variant.winConditions.some((w) => w.kind === 'threeCheck') && isInCheck(next, next.turn)) {
     const counts = { ...(next.checks ?? {}) }
-    counts[inst.team] = (counts[inst.team] ?? 0) + 1
+    counts[record.team] = (counts[record.team] ?? 0) + 1
     next.checks = counts
   }
 
@@ -1736,15 +1817,7 @@ export function applyMove(
     record.repeats = repeats
   }
 
-  if (compute) {
-    detectOutcome(next, inst.team, {
-      capturedRoyal: !hit && !hasSwap && !!capturedPiece?.flags.royal,
-      royalTeams: [...royalTeams],
-      kingTookPredator,
-      predatorAtePrey,
-      jealousKings,
-    })
-  }
+  if (options.compute ?? true) detectOutcome(next, record.team, meta)
   return next
 }
 
@@ -1783,6 +1856,7 @@ function notationFor(
  * worked out for real games, not for every node of a search.
  */
 export function sanFor(state: GameState, move: Move, next: GameState): string {
+  if (move.pass) return 'pass'
   if (move.castle) {
     return (castleSide(move) ? 'O-O' : 'O-O-O') + checkSuffix(next, state.turn)
   }

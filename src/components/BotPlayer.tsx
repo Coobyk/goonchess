@@ -6,7 +6,7 @@ import { botLevelFor, isBotTeam } from '@/engine/ai/botSettings'
 import { clockIsOn } from '@/lib/clock'
 import { wouldRepeat } from '@/lib/replay'
 import { moveKey } from '@/engine/repetition'
-import { dropOptions, getLegalMoves, legalOptionsForTeam } from '@/engine/rules'
+import { dropOptions, getLegalMoves, legalOptionsForTeam, staggerPass } from '@/engine/rules'
 import { intentMatches, type GameState, type Move } from '@/engine/types'
 
 /**
@@ -37,6 +37,16 @@ export function BotPlayer() {
   useEffect(() => {
     const team = game.turn
     const isLatest = game.moveHistory.length === (undoStack[undoStack.length-1]?.moveHistory ?? game.moveHistory).length
+    const canPass = !online || (online.connected && online.status === 'playing' &&
+      online.seat !== null && game.variant.teams[online.seat]?.id === team)
+    const pass = isLatest && !opponentOpen && canPass ? staggerPass(game) : undefined
+    if (pass) {
+      client.cancel()
+      running.current = false
+      setBotThinking(false)
+      useAppStore.getState().playMove(pass)
+      return
+    }
     const botTurn = !online && !opponentOpen && isLatest && isBotTeam(bot, team, botSide)
     if (!botTurn || game.winner) {
       client.cancel()

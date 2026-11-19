@@ -68,8 +68,18 @@ Deployable to Cloudflare Workers with GitHub Actions.
   capture patterns, flags, effects, promotions and the active display settings.
 - **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
   piece is a horse and every horse jumps), **Boss Fight** (White's full army
-  against a giant queen-and-knight boss with three lives; a hit sacrifices
-  the attacker until the final blow),
+  against an animated army fused into a five-life Centaur boss: one king step
+  or one knight jump, never a slide;
+  non-final hits sacrifice non-royal attackers; a king parries safely from its
+  own square instead. Both stagger the boss, silencing its
+  attacks so a hit can escape check. Its recovery move must be non-capturing
+  and cannot give check. Stagger lasts through White's following move and
+  clears once that move finishes; another hit resets it. If clearing stagger
+  would leave no legal move, White may move while the boss stays staggered
+  for another cycle, until normal clearing permits a legal move. A parrying king stays
+  on its original square, even though the move list names the target square.
+  If stagger alone removes every legal move, that side loses its turn with a
+  recorded pass, counting as recovery. Ordinary stalemate remains a draw),
   **Bomb Queen** (a queen that steps
   one square in any direction and detonates on every capture), Chaos Lab
   (portals, walls, uncapturable gems and bombers) and blank boards to start

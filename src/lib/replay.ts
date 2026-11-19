@@ -43,6 +43,12 @@ export function replayMoves(
   return state
 }
 
+export function undoPly(records: MoveRecord[], target = records.length - 1): number {
+  target = Math.max(0, target)
+  while (target > 0 && records[target]?.move.pass) target -= 1
+  return target
+}
+
 /**
  * Would this move bring back a position that has already been played?
  *

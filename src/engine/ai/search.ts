@@ -1,4 +1,4 @@
-import { applyMove, hasAnyLegalMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank, teamHasPieces, teamHasRoyal } from '../rules'
+import { applyMove, hasAnyLegalMove, isInCheck, legalMovesForTeam, royalOnCentre, royalOnFarRank, staggerPass, teamHasPieces, teamHasRoyal } from '../rules'
 import { evaluate } from './evaluate'
 import { bookMove } from './book'
 import { enPassantSensitive, hashPosition, TABLE_SIZE, type Fingerprint } from './hash'
@@ -501,6 +501,12 @@ function quiesce(
 
   const terminal = terminalScore(state, ply, ctx)
   if (terminal !== null) return terminal
+
+  const pass = staggerPass(state)
+  if (pass) {
+    const next = applyMove(state, pass, { compute: false, search: true })
+    return -quiesce(next, -beta, -alpha, ply + 1, depth - 1, ctx)
+  }
 
   const stand = sideScore(state, ctx)
   if (stand >= beta) return beta

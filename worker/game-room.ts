@@ -24,7 +24,7 @@ import {
   type ClockSettings,
   type ClockState,
 } from '../src/lib/clock'
-import { replayMoves, replayStates, resolveMove } from '../src/lib/replay'
+import { replayMoves, replayStates, resolveMove, undoPly } from '../src/lib/replay'
 import { archiveEntry } from '../src/lib/archive'
 import { ARCHIVE_RECORD_URL, archiveStub } from './archive'
 import { CHAT_HISTORY, CHAT_MAX_LENGTH, type ChatLine, type ClientMessage as Message, type OfferKind } from '../src/lib/protocol'
@@ -377,7 +377,7 @@ export class GameRoom {
     this.broadcast({ t: 'offer-accepted', kind })
   }
 
-  /** One move back. The position is rebuilt by playing the history again. */
+  /** One move back, including any forced passes it caused. */
   private async undo(): Promise<void> {
     const loaded = await this.load()
     if (!loaded?.game || loaded.game.winner) return
@@ -385,7 +385,7 @@ export class GameRoom {
     const history = game.moveHistory
     if (!history.length) return
 
-    const rebuilt = replayMoves(meta.variant, history.slice(0, -1), (record) => ({
+    const rebuilt = replayMoves(meta.variant, history.slice(0, undoPly(history)), (record) => ({
       origin: record.origin,
       san: true,
     }))
@@ -600,5 +600,4 @@ function send(ws: WebSocket, message: unknown) {
     /* ignore */
   }
 }
-
 

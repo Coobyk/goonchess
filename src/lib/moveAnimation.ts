@@ -27,7 +27,12 @@ const TRANSITION_STAGGER = 20
 /** Cap on that stagger, so a full board never waits too long to settle. */
 const TRANSITION_MAX_STAGGER = 360
 
-export type FlightKind = 'slide' | 'vanish' | 'emerge'
+export type FlightKind = 'slide' | 'vanish' | 'emerge' | 'parry'
+
+export function parryTravel(progress: number): number {
+  const p = Math.max(0, Math.min(1, progress))
+  return 0.42 * (p < 0.45 ? p / 0.45 : (1 - p) / 0.55)
+}
 
 export interface Flight {
   key: string
@@ -145,7 +150,13 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
   const inPlace = !throughPortal && span(start, move.finalTo) === 0
   let landing: number
 
-  if (inPlace) {
+  const parry = !!move.capturedId && !!game.pieces[move.capturedId] &&
+    game.board[move.from.y]?.[move.from.x] === move.pieceId &&
+    !move.effects.some((e) => e.kind === 'swap')
+  if (parry) {
+    flights.push(flight('parry', move.pieceId, mover.typeId, mover.team, move.from, move.finalTo, 'parry', 280, 0))
+    landing = 280
+  } else if (inPlace) {
     const changed = game.pieces[move.pieceId]?.typeId
     if (changed && changed !== mover.typeId) {
       pops.push({
