@@ -642,7 +642,7 @@ function captureIsForced(state: GameState, teamId: string): boolean {
       if (!id) continue
       const inst = state.pieces[id]
       if (!inst || inst.team !== teamId) continue
-      if (movesFor(state, x, y).some((m) => !!m.capturedId)) return true
+      if (movesFor(state, x, y).some((m) => !!m.capturedId && !sacrificesRoyal(state, m))) return true
     }
   }
   return false

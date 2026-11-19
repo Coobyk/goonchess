@@ -109,6 +109,22 @@ describe('Boss Fight and generic lives', () => {
     expect(getLegalMoves(game, 4, 1).some((m) => m.capturedId)).toBe(false)
   })
 
+  it.each([1, 2])('only forces a royal capture against a pawn with %s remaining lives', (lives) => {
+    const variant = fixture([['King', 'white', 4, 3], ['Pawn', 'black', 3, 1], ['King', 'black', 7, 0]])
+    variant.rules = ['forcedCapture']
+    variant.pieceTypes.find((p) => p.name === 'Pawn')!.lives = lives
+    const game = createInitialState(variant)
+    game.turn = 'black'
+    const next = play(game, 3, 1, 3, 2)
+    expect(isInCheck(next, 'white')).toBe(true)
+    expect(next.winner).toBeNull()
+    expect(next.status).toBe('active')
+    for (const moves of [getLegalMoves(next, 4, 3), legalMovesForTeam(next, 'white')]) {
+      expect(moves.length).toBeGreaterThan(0)
+      expect(moves.every((m) => !!m.capturedId === (lives === 1))).toBe(true)
+    }
+  })
+
   it('swaps without damaging either piece', () => {
     const variant = arena()
     variant.pieceTypes.find((p) => p.name === 'Rook')!.effects = [{ kind: 'swap' }]
