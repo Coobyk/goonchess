@@ -894,6 +894,7 @@ export function bossFight(): Variant {
   })
   boss.lives = 5
   boss.presentation = 'boss'
+  boss.images = ['/pieces/boss/boss.svg', '/pieces/boss/boss.svg']
   return {
     ...base,
     id: 'boss-fight',

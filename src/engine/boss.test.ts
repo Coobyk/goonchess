@@ -554,6 +554,7 @@ describe('Boss Fight and generic lives', () => {
     const boss = variant.pieceTypes.find((p) => p.name === 'Boss')!
     expect(boss.lives).toBe(5)
     expect(boss.presentation).toBe('boss')
+    expect(boss.images).toEqual(['/pieces/boss/boss.svg', '/pieces/boss/boss.svg'])
     expect(createInitialState(variant).pieces[createInitialState(variant).board[0][4]!].lives).toBe(5)
   })
 
