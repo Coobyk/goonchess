@@ -71,6 +71,7 @@ import {
 } from '@/lib/clock'
 import { pushRoute, routeFromLocation, type MakerTab, type View } from '@/lib/router'
 import { fromPgn } from '@/lib/pgn'
+import { undoPly } from '@/lib/replay'
 import { proveWork } from '@/lib/captcha'
 import { toast } from 'sonner'
 import {
@@ -1230,7 +1231,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // so it is the human's turn again.
       if (before && isBotTeam(bot, before.turn, botSide) && target >= 1) target -= 1
       // Undo a forced pass with the move that caused it, or it immediately plays again.
-      while (target > 0 && game.moveHistory[target]?.move.pass) target -= 1
+      target = undoPly(game.moveHistory, target)
       const prev = undoStack[target]
       if (!prev) return
       const { clockState } = get()

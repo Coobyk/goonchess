@@ -3,6 +3,8 @@ import { decodeGame, encodeGame } from '@/lib/encoding'
 import { fromPgn } from '@/lib/pgn'
 import { createInitialState, getLegalMoves, staggerPass } from '@/engine/rules'
 import { bossFight } from '@/engine/templates'
+import { replayMoves, undoPly } from '@/lib/replay'
+import { positionKey } from '@/engine/repetition'
 
 vi.hoisted(() => { vi.stubGlobal('document', { documentElement: { classList: { toggle() {} }, style: {} } }) })
 vi.mock('sonner', () => ({ toast: vi.fn() }))
@@ -20,6 +22,8 @@ describe('imported games keep their history', () => {
     expect(store().undoStack).toHaveLength(6)
     expect(store().undoStack.at(-1)?.moveHistory).toHaveLength(5)
     expect(store().game.moveHistory).toHaveLength(5)
+    expect(undoPly(result!.game.moveHistory)).toBe(4)
+    expect(undoPly([])).toBe(0)
 
     store().jumpToPly(2)
     expect(store().game.moveHistory).toHaveLength(2)
@@ -53,6 +57,10 @@ describe('imported games keep their history', () => {
     store().playMove(staggerPass(hit)!)
     const passed = store().game
     expect(passed.moveHistory.at(-1)?.move.pass).toBe(true)
+    const roomUndo = replayMoves(variant, passed.moveHistory.slice(0, undoPly(passed.moveHistory)))
+    expect(positionKey(roomUndo)).toBe(positionKey(opening))
+    expect(roomUndo.moveHistory).toHaveLength(0)
+    expect(staggerPass(roomUndo)).toBeUndefined()
     expect(store().undoStack).toHaveLength(3)
     store().jumpToPly(1)
     expect(store().game).toBe(hit)
