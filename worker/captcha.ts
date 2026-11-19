@@ -113,18 +113,21 @@ export async function verifyChallenge(
  * work is what does the real work.
  */
 const WINDOW_MS = 10 * 60_000
-const MAX_PER_WINDOW = 6
-const seen = new Map<string, { count: number; resetAt: number }>()
 
-export function allowCreate(ip: string): boolean {
-  const now = Date.now()
-  const entry = seen.get(ip)
-  if (!entry || entry.resetAt <= now) {
-    if (seen.size > 5000) seen.clear()
-    seen.set(ip, { count: 1, resetAt: now + WINDOW_MS })
+export function rateLimiter(maxPerWindow: number, windowMs = WINDOW_MS): (ip: string) => boolean {
+  const seen = new Map<string, { count: number; resetAt: number }>()
+  return (ip) => {
+    const now = Date.now()
+    const entry = seen.get(ip)
+    if (!entry || entry.resetAt <= now) {
+      if (seen.size > 5000) seen.clear()
+      seen.set(ip, { count: 1, resetAt: now + windowMs })
+      return true
+    }
+    if (entry.count >= maxPerWindow) return false
+    entry.count += 1
     return true
   }
-  if (entry.count >= MAX_PER_WINDOW) return false
-  entry.count += 1
-  return true
 }
+
+export const allowCreate = rateLimiter(6)

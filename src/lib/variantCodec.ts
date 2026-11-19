@@ -1,6 +1,6 @@
 import { uid } from '@/engine/rules'
 import { ART_SHAPES } from './pieceArt'
-import { BOARD_DARK, BOARD_LIGHT } from './palette'
+import { BOARD_DARK, BOARD_LIGHT } from './boardShades'
 import {
   assertNever,
   DEFAULT_POINT_TARGET,

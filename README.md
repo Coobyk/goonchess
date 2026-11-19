@@ -155,6 +155,24 @@ GitHub Actions. Configure these once:
   work: `npx wrangler secret put CAPTCHA_SECRET`
 
 Without `CAPTCHA_SECRET` the site still plays offline, but creating an online
-game returns 503. The Durable Object and its storage are created by the
-migration in `wrangler.toml` on the first deploy; there is nothing to set up by
-hand. The workflow can also be started manually from the Actions tab.
+game returns 503. The Durable Objects and their storage are created by the
+migrations in `wrangler.toml` on deploy; there is nothing to set up by hand.
+
+### Game archive and move statistics
+
+Finished games go to `GameArchive`, one Durable Object with a SQLite database
+for the whole site. Online games are stored by their room; games played in the
+browser are posted to `POST /api/archive`, replayed move by move against the
+rules, and kept only if they really ended. Only moves and results are stored —
+no names or addresses — and players can switch sharing off in the
+"Popular moves" panel.
+
+- `GET /api/stats/moves?variant=<key>&position=<hash>` — moves played from a
+  position in the first 24 plies, most played first, with results
+- `GET /api/stats/summary?variant=<key>` — games, results, average length,
+  most played moves, first moves and endings for one variant
+- `GET /api/stats/summary` — total games and the most played variants
+
+To query the raw data, open the `GameArchive` object in the Cloudflare
+dashboard's Durable Objects data studio; the tables are `games`, `variants`
+and `position_moves`. The workflow can also be started manually from the Actions tab.

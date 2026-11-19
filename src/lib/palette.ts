@@ -5,8 +5,9 @@
  * distraction rather than a feature. Every board now wears the same two
  * shades, and the theme decides which pair that is.
  */
-export const BOARD_LIGHT = '#f0d9b5'
-export const BOARD_DARK = '#b58863'
+import { BOARD_DARK, BOARD_LIGHT } from './boardShades'
+
+export { BOARD_DARK, BOARD_LIGHT }
 
 /** The square colours of the theme that is on right now. */
 export function boardColors(): { light: string; dark: string } {
