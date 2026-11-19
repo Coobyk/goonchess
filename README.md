@@ -69,7 +69,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Built-in variants** — Classic Chess, Mini Chess, **Only Horses** (every
   piece is a horse and every horse jumps), **Boss Fight** (White's full army
   against an animated army fused into a five-life queen-and-knight boss;
-  non-final hits sacrifice the attacker and stagger the boss, silencing its
+  non-final hits sacrifice non-royal attackers; a king parries safely from its
+  own square instead. Both stagger the boss, silencing its
   attacks so a hit can escape check. Its next move must be non-capturing;
   moving restores its attacks. No pass: a trapped, staggered boss is stalemated),
   **Bomb Queen** (a queen that steps

@@ -175,9 +175,71 @@ describe('Boss Fight and generic lives', () => {
     expect(isInCheck(game, 'black')).toBe(false)
   })
 
-  it('does not let a royal sacrifice itself against a surviving boss', () => {
+  it.each(['standard', 'crazyhouse', 'atomic'] as const)('keeps the royal on its square when parrying with %s rules', (rule) => {
+    const variant = fixture([['King', 'white', 4, 1], ['Boss', 'black', 4, 0]])
+    variant.rules = rule === 'standard' ? [] : [rule]
+    const game = createInitialState(variant)
+    const kingId = game.board[1][4]!
+    const bossId = game.board[0][4]!
+    expect(isInCheck(game, 'white')).toBe(true)
+    const next = play(game, 4, 1, 4, 0)
+    expect(next.board[1][4]).toBe(kingId)
+    expect(next.board[0][4]).toBe(bossId)
+    expect(next.pieces[kingId]).toMatchObject({ hasMoved: true })
+    expect(next.pieces[bossId]).toMatchObject({ lives: 2, staggered: true })
+    expect(isInCheck(next, 'white')).toBe(false)
+    expect(next.winner).toBeNull()
+    expect(next.captured).toEqual([])
+    expect(next.scores).toEqual(game.scores)
+    expect(next.hands).toEqual(game.hands)
+    expect(game.pieces[kingId].hasMoved).toBe(false)
+    const animation = planMove(game, next)!
+    expect(animation.flights).toHaveLength(1)
+    expect(animation.flights[0]).toMatchObject({ kind: 'parry', pieceId: kingId, from: { x: 4, y: 1 }, to: { x: 4, y: 0 } })
+    expect(animation.dissolves).toEqual([])
+  })
+
+  it('captures the final life normally with the king', () => {
     const game = createInitialState(fixture([['King', 'white', 4, 1], ['Boss', 'black', 4, 0]]))
-    expect(getLegalMoves(game, 4, 1).some((m) => m.capturedId)).toBe(false)
+    const kingId = game.board[1][4]!
+    const bossId = game.board[0][4]!
+    game.pieces[bossId].lives = 1
+    const next = play(game, 4, 1, 4, 0)
+    expect(next.board[1][4]).toBeNull()
+    expect(next.board[0][4]).toBe(kingId)
+    expect(next.pieces[bossId]).toBeUndefined()
+    expect(next.winner).toBe('white')
+    expect(planMove(game, next)!.flights[0].kind).toBe('slide')
+  })
+
+  it('does not allow a parry that leaves another attacker checking the king', () => {
+    const game = createInitialState(fixture([['King', 'white', 4, 1], ['Boss', 'black', 4, 0], ['Rook', 'black', 4, 7]]))
+    for (const moves of [getLegalMoves(game, 4, 1), legalMovesForTeam(game, 'white')]) {
+      expect(moves.some((m) => m.capturedId === game.board[0][4])).toBe(false)
+    }
+  })
+
+  it('parries f1 after the previous self-play mating pattern and survives replay', () => {
+    let game = createInitialState(bossFight())
+    for (const [x, y, tx, ty] of [
+      [1, 7, 2, 5], [4, 0, 2, 0], [5, 6, 5, 5], [2, 0, 7, 5],
+      [2, 5, 4, 4], [7, 5, 6, 6], [5, 7, 6, 6], [6, 6, 5, 7],
+    ]) game = play(game, x, y, tx, ty)
+    expect(game.winner).toBeNull()
+    expect(isInCheck(game, 'white')).toBe(true)
+    const kingId = game.board[7][4]!
+    const bossId = game.board[7][5]!
+    const next = play(game, 4, 7, 5, 7)
+    expect(next.board[7][4]).toBe(kingId)
+    expect(next.board[7][5]).toBe(bossId)
+    expect(next.pieces[bossId]).toMatchObject({ lives: 3, staggered: true })
+    expect(next.winner).toBeNull()
+    expect(isInCheck(next, 'white')).toBe(false)
+    const replayed = fromPgn(decodeGame(encodeGame(next)), decodeVariant(encodeVariant(next.variant)))!
+    expect(positionKey(replayed.game)).toBe(positionKey(next))
+    const states = replayStates(next)
+    expect(states.at(-1)!.pieces[bossId].staggered).toBe(true)
+    expect(states.at(-2)!.pieces[bossId].staggered).toBeUndefined()
   })
 
   it.each([1, 2])('only forces a royal capture against a pawn with %s remaining lives', (lives) => {
@@ -192,7 +254,7 @@ describe('Boss Fight and generic lives', () => {
     expect(next.status).toBe('active')
     for (const moves of [getLegalMoves(next, 4, 3), legalMovesForTeam(next, 'white')]) {
       expect(moves.length).toBeGreaterThan(0)
-      expect(moves.every((m) => !!m.capturedId === (lives === 1))).toBe(true)
+      expect(moves.every((m) => !!m.capturedId)).toBe(true)
     }
   })
 
@@ -249,7 +311,7 @@ describe('Boss Fight and generic lives', () => {
   it('resolves white checkmate and stalemate normally', () => {
     const mate = createInitialState(fixture([['King', 'white', 0, 7], ['Boss', 'black', 3, 5]]))
     mate.turn = 'black'
-    const won = play(mate, 3, 5, 1, 6)
+    const won = play(mate, 3, 5, 1, 5)
     expect(won.status).toBe('checkmate')
     expect(won.winner).toBe('black')
     const draw = createInitialState(fixture([['King', 'white', 0, 7], ['Boss', 'black', 3, 5]]))

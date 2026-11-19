@@ -224,7 +224,7 @@
   }
 
   /* Moving a piece: it slides to the new square instead of teleporting. */
-  .piece-fly {
+  .piece-fly, .piece-parry {
     animation-name: piece-fly;
     animation-duration: var(--fly-duration, 240ms);
     animation-delay: var(--fly-delay, 0ms);
@@ -232,6 +232,7 @@
     animation-fill-mode: forwards;
     will-change: transform;
   }
+  .piece-parry { animation-name: piece-parry; }
   .piece-lift {
     animation-name: piece-lift;
     animation-duration: var(--fly-duration, 240ms);
@@ -365,6 +366,11 @@
   }
 }
 
+@keyframes piece-parry {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  45% { transform: translate3d(calc(var(--fly-dx) * .42), calc(var(--fly-dy) * .42), 0); }
+}
+
 @keyframes piece-lift {
   0% {
     transform: scale(1);
@@ -467,6 +473,7 @@
   .blast-ring,
   .blast-spark,
   .piece-fly,
+  .piece-parry,
   .piece-lift,
   .piece-vanish,
   .piece-emerge,

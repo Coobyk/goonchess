@@ -5,6 +5,7 @@ import { PieceGlyph } from './PieceGlyph'
 
 const FLIGHT_CLASS: Record<Flight['kind'], string> = {
   slide: 'piece-fly',
+  parry: 'piece-parry',
   vanish: 'piece-vanish',
   emerge: 'piece-emerge',
 }
