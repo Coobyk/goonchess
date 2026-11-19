@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyMove, cloneState, createInitialState, getLegalMoves, isInCheck, legalMovesForTeam } from './rules'
+import { applyMove, cloneState, createInitialState, getLegalMoves, hasAnyLegalMove, isInCheck, legalMovesForTeam, legalOptionsForTeam, staggerPass } from './rules'
 import { bossFight } from './templates'
 import { positionKey } from './repetition'
 import { hashPosition } from './ai/hash'
@@ -8,10 +8,11 @@ import { evaluate } from './ai/evaluate'
 import { decodeGame, decodeVariant, encodeGame, encodeVariant } from '../lib/encoding'
 import { packVariant, unpackVariant } from '../lib/variantCodec'
 import { planMove } from '../lib/moveAnimation'
-import { replayMoves, replayStates } from '../lib/replay'
+import { replayMoves, replayStates, requestFor, resolveMove } from '../lib/replay'
 import { fromPgn } from '../lib/pgn'
+import { replayRequests } from '../lib/archive'
 import { computeThreats } from './threats'
-import type { GameState } from './types'
+import { PASS_SQUARE, type GameState } from './types'
 
 function fixture(placements: [string, string, number, number][]) {
   const variant = bossFight()
@@ -78,13 +79,14 @@ describe('Boss Fight and generic lives', () => {
     game.turn = 'black'
     expect(getLegalMoves(game, 4, 0).some((m) => m.capturedId)).toBe(true)
     game.pieces[game.board[0][4]!].staggered = true
+    expect(staggerPass(game)).toBeUndefined()
     for (const moves of [getLegalMoves(game, 4, 0), legalMovesForTeam(game, 'black')]) {
       expect(moves.length).toBeGreaterThan(0)
       expect(moves.every((m) => !m.capturedId)).toBe(true)
     }
   })
 
-  it('stalemates a staggered boss with no non-capturing destinations', () => {
+  it('preserves stalemate when removing stagger would not restore a legal move', () => {
     const variant = fixture([['King', 'white', 0, 7], ['Pawn', 'white', 1, 6], ['Boss', 'black', 4, 0]])
     variant.board.tiles = variant.board.tiles.map((row, y) => row.map((tile, x) =>
       [[0, 7], [1, 6], [1, 5], [4, 0]].some(([tx, ty]) => tx === x && ty === y) ? tile : { terrain: 'wall' },
@@ -94,6 +96,78 @@ describe('Boss Fight and generic lives', () => {
     const next = play(game, 1, 6, 1, 5)
     expect(next.winner).toBe('draw')
     expect(next.status).toBe('stalemate')
+    expect(staggerPass(next)).toBeUndefined()
+  })
+
+  it('records a forced recovery pass, preserving undo, replay, sharing and position identity', () => {
+    const variant = fixture([['King', 'white', 4, 1], ['Pawn', 'white', 0, 6], ['Boss', 'black', 4, 0]])
+    variant.board.tiles = variant.board.tiles.map((row, y) => row.map((tile, x) =>
+      [[4, 0], [4, 1], [4, 2], [0, 6], [0, 5]].some(([tx, ty]) => tx === x && ty === y) ? tile : { terrain: 'wall' },
+    ))
+    const opening = createInitialState(variant)
+    const bossId = opening.board[0][4]!
+    const hit = play(opening, 4, 1, 4, 0)
+    expect(hit.winner).toBeNull()
+    expect(getLegalMoves(hit, 4, 0)).toEqual([])
+    expect(hasAnyLegalMove(hit, 'black')).toBe(true)
+    const pass = staggerPass(hit)!
+    expect(pass).toMatchObject({ pass: true, from: PASS_SQUARE, to: PASS_SQUARE, finalTo: PASS_SQUARE })
+    expect(legalMovesForTeam(hit, 'black')).toEqual([pass])
+    const passed = applyMove(hit, pass, { san: true })
+    expect(legalOptionsForTeam(hit, 'black')[0].next).toEqual(applyMove(hit, pass, { compute: false }))
+    expect(passed.turn).toBe('white')
+    expect(passed.winner).toBeNull()
+    expect(passed.board).toEqual(hit.board)
+    expect(passed.scores).toEqual(hit.scores)
+    expect(passed.captured).toEqual(hit.captured)
+    expect(passed.pieces[bossId]).toMatchObject({ lives: 2, staggered: true, staggerRecovered: true })
+    expect(hit.pieces[bossId].staggerRecovered).toBeUndefined()
+    expect(isInCheck(passed, 'white')).toBe(false)
+    expect(passed.moveHistory.at(-1)).toMatchObject({ team: 'black', notation: 'pass', san: 'pass', positionKey: positionKey(passed), repeats: 1 })
+    const beforeHash = { slot: 0, check: 0 }, afterHash = { slot: 0, check: 0 }
+    hashPosition(hit, beforeHash)
+    hashPosition(passed, afterHash)
+    expect(afterHash).not.toEqual(beforeHash)
+    expect(positionKey(passed)).not.toBe(positionKey(hit))
+    expect(staggerPass(passed)).toBeUndefined()
+    expect(resolveMove(opening, requestFor(passed.moveHistory.at(-1)!))).toEqual({ error: 'illegal_move' })
+    expect(resolveMove(hit, requestFor(passed.moveHistory.at(-1)!))).toEqual({ move: { ...pass, promotionTypeId: undefined } })
+    expect(resolveMove(hit, { ...requestFor(passed.moveHistory.at(-1)!), to: { x: 0, y: 0 } })).toEqual({ error: 'illegal_move' })
+    const bot = searchBestMove(hit, { team: 'black', level: 'casual', timeBudgetMs: 100, seed: 1 })
+    expect(bot.move).toEqual(pass)
+    expect(applyMove(hit, bot.move!).turn).toBe('white')
+
+    const replied = play(passed, 4, 1, 4, 2)
+    expect(replied.pieces[bossId].staggered).toBeUndefined()
+    expect(replied.pieces[bossId].staggerRecovered).toBeUndefined()
+    expect(isInCheck(play(replied, 4, 0, 4, 1), 'white')).toBe(true)
+    const states = replayStates(replied)
+    expect(positionKey(states[1])).toBe(positionKey(hit))
+    expect(positionKey(states[2])).toBe(positionKey(passed))
+    expect(positionKey(states[3])).toBe(positionKey(replied))
+    expect(positionKey(replayMoves(variant, replied.moveHistory.slice(0, -2)))).toBe(positionKey(hit))
+    expect(replayRequests(variant, replied.moveHistory.map(requestFor))!.map(positionKey)).toEqual(states.map(positionKey))
+    const shared = fromPgn(decodeGame(encodeGame(replied)), decodeVariant(encodeVariant(variant)))!
+    expect(shared.game.moveHistory[1].move.pass).toBe(true)
+    expect(positionKey(shared.game)).toBe(positionKey(replied))
+    expect(shared.states.map(positionKey)).toEqual(states.map(positionKey))
+  })
+
+  it('expires the opponent\'s recovered stagger on a pass without clearing fresh wounds', () => {
+    const variant = fixture([
+      ['King', 'white', 4, 1], ['Pawn', 'white', 0, 6], ['Pawn', 'white', 1, 6], ['Boss', 'black', 4, 0],
+    ])
+    variant.board.tiles = variant.board.tiles.map((row, y) => row.map((tile, x) =>
+      [[4, 0], [4, 1], [0, 6], [1, 6]].some(([tx, ty]) => tx === x && ty === y) ? tile : { terrain: 'wall' },
+    ))
+    const hit = play(createInitialState(variant), 4, 1, 4, 0)
+    const recovered = hit.board[6][0]!, fresh = hit.board[6][1]!
+    hit.pieces[recovered] = { ...hit.pieces[recovered], staggered: true, staggerRecovered: true }
+    hit.pieces[fresh] = { ...hit.pieces[fresh], staggered: true }
+    const next = applyMove(hit, staggerPass(hit)!)
+    expect(next.pieces[recovered].staggered).toBeUndefined()
+    expect(next.pieces[fresh].staggered).toBe(true)
+    expect(hit.pieces[recovered].staggered).toBe(true)
   })
 
   it('includes stagger independently of lives in identity and cloned state', () => {
@@ -321,6 +395,8 @@ describe('Boss Fight and generic lives', () => {
     const next = play(game, 1, 6, 1, 5)
     expect(next.winner).toBe('draw')
     expect(next.status).toBe('stalemate')
+    expect(staggerPass({ ...next, winner: null })).toBeUndefined()
+    expect(getLegalMoves({ ...next, winner: null }, PASS_SQUARE.x, PASS_SQUARE.y)).toEqual([])
   })
 
   it('rebuilds damaged lives for shared games and restores them on undo replay', () => {

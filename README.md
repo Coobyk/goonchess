@@ -76,7 +76,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
   and cannot give check. Stagger lasts through White's following move and
   clears once that move finishes; another hit resets it. A parrying king stays
   on its original square, even though the move list names the target square.
-  No pass: a trapped, staggered boss is stalemated),
+  If stagger alone removes every legal move, that side loses its turn with a
+  recorded pass, counting as recovery. Ordinary stalemate remains a draw),
   **Bomb Queen** (a queen that steps
   one square in any direction and detonates on every capture), Chaos Lab
   (portals, walls, uncapturable gems and bombers) and blank boards to start

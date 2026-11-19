@@ -1229,6 +1229,8 @@ export const useAppStore = create<AppState>((set, get) => {
       // When the bot is playing, take back its move and the human's with it,
       // so it is the human's turn again.
       if (before && isBotTeam(bot, before.turn, botSide) && target >= 1) target -= 1
+      // Undo a forced pass with the move that caused it, or it immediately plays again.
+      while (target > 0 && game.moveHistory[target]?.move.pass) target -= 1
       const prev = undoStack[target]
       if (!prev) return
       const { clockState } = get()

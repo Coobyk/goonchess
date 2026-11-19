@@ -12,7 +12,7 @@ import type {
 } from './types'
 import { positionKey } from './repetition'
 import { nextSeed } from './rand'
-import { SAN_LETTERS } from './types'
+import { PASS_SQUARE, SAN_LETTERS } from './types'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -779,6 +779,10 @@ export interface MoveOption {
 }
 
 export function getLegalMoves(state: GameState, x: number, y: number): Move[] {
+  if (x === PASS_SQUARE.x && y === PASS_SQUARE.y) {
+    const pass = staggerPass(state)
+    return pass ? [pass] : []
+  }
   return legalOptions(state, x, y).map((option) => option.move)
 }
 
@@ -1130,6 +1134,7 @@ function collectTeamMoves(
   teamId: string,
   wantStates: boolean,
   search: boolean,
+  includePass = true,
 ): { moves: Move[]; states: (GameState | null)[] } {
   const moves: Move[] = []
   const states: (GameState | null)[] = []
@@ -1228,7 +1233,26 @@ function collectTeamMoves(
     moves.push(drops.moves[i])
     states.push(drops.states[i])
   }
+  if (!moves.length && includePass) {
+    const pass = staggerPass(state, teamId)
+    if (pass) {
+      moves.push(pass)
+      states.push(wantStates ? applyMove(state, pass, { compute: false, search }) : null)
+    }
+  }
   return { moves, states }
+}
+
+export function staggerPass(state: GameState, teamId = state.turn): Move | undefined {
+  if (state.winner || teamId !== state.turn) return
+  const staggered = Object.values(state.pieces).filter((p) => p.team === teamId && p.staggered)
+  if (!staggered.length || collectTeamMoves(state, teamId, false, false, false).moves.length) return
+  const awake = cloneState(state)
+  for (const inst of staggered) {
+    awake.pieces[inst.id] = { ...inst, staggered: false, staggerRecovered: false }
+  }
+  if (!collectTeamMoves(awake, teamId, false, false, false).moves.length) return
+  return { pass: true, pieceId: 'stagger-pass', from: PASS_SQUARE, to: PASS_SQUARE, finalTo: PASS_SQUARE, effects: [] }
 }
 
 /** Put the royal piece on a square and see whether it is attacked there. */
@@ -1258,7 +1282,7 @@ export function hasAnyLegalMove(state: GameState, teamId: string): boolean {
       if (getLegalMoves(state, x, y).length > 0) return true
     }
   }
-  return false
+  return !!staggerPass(state, teamId)
 }
 
 /* ------------------------------------------------------------- apply move */
@@ -1313,10 +1337,20 @@ export function applyMove(
   move: Move,
   options: ApplyOptions = {},
 ): GameState {
-  const compute = options.compute ?? true
   const next: GameState = cloneState(state)
   // The die has been used; the next piece rolls its own.
   next.roll = undefined
+
+  if (move.pass) {
+    for (const id of Object.keys(next.pieces)) {
+      const inst = next.pieces[id]
+      if (inst.team === state.turn && inst.staggered) next.pieces[id] = { ...inst, staggerRecovered: true }
+    }
+    expireStagger(state, next, state.turn)
+    return finishMove(next, {
+      move, team: state.turn, notation: 'pass', san: options.san ? 'pass' : undefined,
+    }, options)
+  }
 
   // A drop arrives from the pocket, so the piece does not exist until now —
   // and what it cost comes out of the pocket as it lands.
@@ -1618,14 +1652,7 @@ export function applyMove(
     }
   }
 
-  for (const id of Object.keys(state.pieces)) {
-    const previous = state.pieces[id]
-    if (!previous.staggered || !previous.staggerRecovered || previous.team === inst.team || wounded.has(id)) continue
-    if (!next.pieces[id]) continue
-    touch(id)
-    delete next.pieces[id].staggered
-    delete next.pieces[id].staggerRecovered
-  }
+  expireStagger(state, next, inst.team, wounded)
 
   // Loyalty Chess: the king is jealous of his queen. A queen that looks the
   // enemy king in the eye — whether she moved into the line or another piece
@@ -1723,6 +1750,32 @@ export function applyMove(
     blasts: blasts.length ? blasts : undefined,
     origin: options.origin,
   }
+  return finishMove(next, record, options, {
+    capturedRoyal: !hit && !hasSwap && !!capturedPiece?.flags.royal,
+    royalTeams: [...royalTeams],
+    kingTookPredator,
+    predatorAtePrey,
+    jealousKings,
+  })
+}
+
+function expireStagger(state: GameState, next: GameState, mover: string, wounded?: Set<string>) {
+  for (const id of Object.keys(state.pieces)) {
+    const previous = state.pieces[id]
+    if (!previous.staggered || !previous.staggerRecovered || previous.team === mover || wounded?.has(id)) continue
+    if (!next.pieces[id]) continue
+    next.pieces[id] = { ...next.pieces[id] }
+    delete next.pieces[id].staggered
+    delete next.pieces[id].staggerRecovered
+  }
+}
+
+function finishMove(
+  next: GameState,
+  record: MoveRecord,
+  options: ApplyOptions,
+  meta: Parameters<typeof detectOutcome>[2] = {},
+): GameState {
   // Turn switch
   const order = next.variant.teams.map((t) => t.id)
   const idx = order.indexOf(next.turn)
@@ -1733,7 +1786,7 @@ export function applyMove(
   // in a search too, so the bot knows how close the third one is.
   if (next.variant.winConditions.some((w) => w.kind === 'threeCheck') && isInCheck(next, next.turn)) {
     const counts = { ...(next.checks ?? {}) }
-    counts[inst.team] = (counts[inst.team] ?? 0) + 1
+    counts[record.team] = (counts[record.team] ?? 0) + 1
     next.checks = counts
   }
 
@@ -1751,15 +1804,7 @@ export function applyMove(
     record.repeats = repeats
   }
 
-  if (compute) {
-    detectOutcome(next, inst.team, {
-      capturedRoyal: !hit && !hasSwap && !!capturedPiece?.flags.royal,
-      royalTeams: [...royalTeams],
-      kingTookPredator,
-      predatorAtePrey,
-      jealousKings,
-    })
-  }
+  if (options.compute ?? true) detectOutcome(next, record.team, meta)
   return next
 }
 
@@ -1798,6 +1843,7 @@ function notationFor(
  * worked out for real games, not for every node of a search.
  */
 export function sanFor(state: GameState, move: Move, next: GameState): string {
+  if (move.pass) return 'pass'
   if (move.castle) {
     return (castleSide(move) ? 'O-O' : 'O-O-O') + checkSuffix(next, state.turn)
   }
