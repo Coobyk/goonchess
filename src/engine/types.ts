@@ -368,6 +368,7 @@ export interface MoveRecord {
 export interface PieceInstance {
   lives?: number
   staggered?: boolean
+  staggerRecovered?: boolean
   id: string
   typeId: string
   team: string

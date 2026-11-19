@@ -1345,7 +1345,7 @@ export function applyMove(
 
   if (inst.staggered) {
     touch(move.pieceId)
-    delete next.pieces[move.pieceId].staggered
+    next.pieces[move.pieceId].staggerRecovered = true
   }
 
   const hasSwap = move.effects.some((e) => e.kind === 'swap')
@@ -1355,6 +1355,7 @@ export function applyMove(
   // king that never stood on the square anyone aimed at.
   const royalTeams = new Set<string>()
 
+  const wounded = new Set<string>()
   const wound = (id: string): boolean => {
     const victim = next.pieces[id]
     if (!victim) return false
@@ -1363,6 +1364,8 @@ export function applyMove(
     touch(id)
     next.pieces[id].lives = lives - 1
     next.pieces[id].staggered = true
+    delete next.pieces[id].staggerRecovered
+    wounded.add(id)
     return true
   }
   const hit = !!(move.capturedId && capturedInst && !hasSwap && wound(move.capturedId))
@@ -1613,6 +1616,15 @@ export function applyMove(
         }
       }
     }
+  }
+
+  for (const id of Object.keys(state.pieces)) {
+    const previous = state.pieces[id]
+    if (!previous.staggered || !previous.staggerRecovered || previous.team === inst.team || wounded.has(id)) continue
+    if (!next.pieces[id]) continue
+    touch(id)
+    delete next.pieces[id].staggered
+    delete next.pieces[id].staggerRecovered
   }
 
   // Loyalty Chess: the king is jealous of his queen. A queen that looks the
