@@ -26,7 +26,7 @@ export function PieceGlyph({
   const light = teamIndex === 0
   const shape = piece.flags?.random ? SHAPE_OF_ICON[piece.icon] : undefined
   const glyph = piece.presentation === 'boss' ? (
-    <BossAssembly size={size / 0.78 * 3} lives={lives ?? piece.lives ?? 1} maxLives={piece.lives ?? 1} staggered={staggered} hit={hit} />
+    <BossAssembly size={size / 0.78 * 4.5} lives={lives ?? piece.lives ?? 1} maxLives={piece.lives ?? 1} staggered={staggered} hit={hit} />
   ) : shape ? (
     <img
       src={rainbowUri(shape, light)}

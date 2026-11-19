@@ -1,13 +1,13 @@
 import type { CSSProperties } from 'react'
 
 const WING = [
-  { shape: 'R', x: 94, y: 113, size: 43, angle: -22 },
-  { shape: 'N', x: 69, y: 91, size: 42, angle: -32 },
-  { shape: 'B', x: 43, y: 66, size: 42, angle: -40 },
-  { shape: 'P', x: 22, y: 43, size: 37, angle: -48 },
-  { shape: 'P', x: 11, y: 80, size: 34, angle: -56 },
+  { shape: 'R', x: 121, y: 159, size: 64, angle: -22 },
+  { shape: 'N', x: 86, y: 128, size: 64, angle: -32 },
+  { shape: 'B', x: 48, y: 90, size: 66, angle: -40 },
+  { shape: 'P', x: 6, y: 25, size: 64, angle: -48 },
+  { shape: 'P', x: 5, y: 102, size: 58, angle: -56 },
 ]
-const TAIL = [[144, 177, 32], [163, 200, 30], [190, 193, 28], [202, 167, 26]]
+const TAIL = [[192, 224, 52], [222, 271, 50], [272, 280, 48], [300, 235, 46]]
 
 export function BossAssembly({ size, lives, maxLives, staggered, hit }: {
   size: number
@@ -19,9 +19,9 @@ export function BossAssembly({ size, lives, maxLives, staggered, hit }: {
   const wingCount = Math.max(0, 10 - Math.max(0, maxLives - lives))
   return (
     <svg
-      viewBox="0 0 300 300"
+      viewBox="0 0 400 350"
       width={size}
-      height={size}
+      height={size * 350 / 400}
       className={`boss-assembly${staggered ? ' boss-staggered' : ''}`}
       role="img"
       aria-label={`Fused chess army${staggered ? ', staggered' : ''}`}
@@ -42,7 +42,7 @@ export function BossAssembly({ size, lives, maxLives, staggered, hit }: {
               const falling = hit && index === wingCount
               if (index >= wingCount && !falling) return null
               return (
-                <g key={i} transform={`translate(${side === -1 ? x : 300 - x - width} ${y}) rotate(${-side * angle} ${width / 2} ${width / 2})`}>
+                <g key={i} transform={`translate(${side === -1 ? x : 400 - x - width} ${y}) rotate(${-side * angle} ${width / 2} ${width / 2})`}>
                   <g className={falling ? 'boss-falling' : 'boss-drift'} style={{ '--drift-delay': `${-index * 0.37}s` } as CSSProperties}>
                     <image href={`/pieces/cburnett/b${shape}.svg`} width={width} height={width} />
                   </g>
@@ -51,11 +51,11 @@ export function BossAssembly({ size, lives, maxLives, staggered, hit }: {
             })}
           </g>
         ))}
-        <image href="/pieces/cburnett/bQ.svg" x="123" y="127" width="54" height="62" />
-        <image href="/pieces/cburnett/bK.svg" x="119" y="77" width="62" height="70" />
+        <image href="/pieces/cburnett/bQ.svg" x="164" y="175" width="72" height="88" />
+        <image href="/pieces/cburnett/bK.svg" x="158" y="106" width="84" height="96" />
         <g className="boss-eyes">
-          <ellipse cx="145" cy="115" rx="2.8" ry="1.8" />
-          <ellipse cx="155" cy="115" rx="2.8" ry="1.8" />
+          <ellipse cx="193" cy="158" rx="3.8" ry="2.4" />
+          <ellipse cx="207" cy="158" rx="3.8" ry="2.4" />
         </g>
       </g>
     </svg>

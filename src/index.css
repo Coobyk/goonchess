@@ -22,10 +22,10 @@
   filter: drop-shadow(0 0 1px #f4f1ea) drop-shadow(0 5px 5px #0009);
 }
 .boss-body { animation: boss-bob 3.8s ease-in-out infinite; }
-.boss-wing-left, .boss-wing-right { transform-origin: 150px 145px; }
+.boss-wing-left, .boss-wing-right { transform-origin: 200px 190px; }
 .boss-wing-left { animation: boss-flap 2.6s ease-in-out infinite alternate; }
 .boss-wing-right { animation: boss-flap 2.6s ease-in-out infinite alternate-reverse; }
-.boss-tail { transform-origin: 150px 175px; animation: boss-sway 3.2s ease-in-out infinite alternate; }
+.boss-tail { transform-origin: 214px 245px; animation: boss-sway 3.2s ease-in-out infinite alternate; }
 .boss-drift { animation: boss-drift 2.3s ease-in-out var(--drift-delay, 0s) infinite alternate; }
 .boss-eyes { fill: #ff233d; filter: drop-shadow(0 0 4px #ff002b); animation: boss-glow 1.7s ease-in-out infinite alternate; }
 .boss-falling { animation: boss-fall 1.2s ease-in forwards; }

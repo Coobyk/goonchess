@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { BossAssembly } from './BossAssembly'
+import { PieceGlyph } from './PieceGlyph'
+import { bossFight } from '@/engine/templates'
 
 describe('assembled boss', () => {
+  it('uses an oversized landscape canvas without stretching the chess glyphs', () => {
+    const boss = bossFight().pieceTypes.find((p) => p.presentation === 'boss')!
+    const html = renderToStaticMarkup(createElement(PieceGlyph, { piece: boss, teamIndex: 1, size: 78 }))
+    expect(html).toContain('viewBox="0 0 400 350"')
+    expect(html).toContain('width="450" height="393.75"')
+  })
   it('builds the full army from sixteen real black glyphs', () => {
     const html = renderToStaticMarkup(createElement(BossAssembly, { size: 192, lives: 5, maxLives: 5, staggered: false, hit: false }))
     expect(html.match(/<image /g)).toHaveLength(16)
