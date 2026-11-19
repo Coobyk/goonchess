@@ -29,6 +29,11 @@ const TRANSITION_MAX_STAGGER = 360
 
 export type FlightKind = 'slide' | 'vanish' | 'emerge' | 'parry'
 
+export function parryTravel(progress: number): number {
+  const p = Math.max(0, Math.min(1, progress))
+  return 0.42 * (p < 0.45 ? p / 0.45 : (1 - p) / 0.55)
+}
+
 export interface Flight {
   key: string
   pieceId: string

@@ -6,7 +6,7 @@ import {
   type Vec,
 } from '@/engine/types'
 import { isInCheck } from '@/engine/rules'
-import { BLAST_STAGGER, planMove, type Anim } from './moveAnimation'
+import { BLAST_STAGGER, parryTravel, planMove, type Anim } from './moveAnimation'
 import { boardColors, portalRgba } from './palette'
 import { artToUri, rainbowUri, SHAPE_OF_ICON } from './pieceArt'
 import { findPack } from './soundPacks'
@@ -521,6 +521,16 @@ export async function exportGameVideo(
               sx(f.from) + cell / 2 + (f.to.x - f.from.x) * cell * e,
               sy(f.from) + cell / 2 + (f.to.y - f.from.y) * cell * e,
               lift,
+              1,
+            )
+          } else if (f.kind === 'parry') {
+            const e = parryTravel(p)
+            drawPiece(
+              f.typeId,
+              f.team,
+              sx(f.from) + cell / 2 + (f.to.x - f.from.x) * cell * e,
+              sy(f.from) + cell / 2 + (f.to.y - f.from.y) * cell * e,
+              1,
               1,
             )
           } else if (f.kind === 'vanish') {
