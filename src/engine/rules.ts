@@ -1997,15 +1997,24 @@ function detectOutcome(
   }
 
   for (const wc of variant.winConditions) {
-    if (wc.kind === 'points' && (wc.threshold ?? Infinity) <= (state.scores[mover] ?? 0)) {
-      state.winner = mover
-      state.status = 'points'
-      return
+    if (wc.kind === 'points') {
+      const teams = [mover, ...variant.teams.map((t) => t.id).filter((id) => id !== mover)]
+      const winner = teams.find((id) => (wc.threshold ?? Infinity) <= (state.scores[id] ?? 0))
+      if (winner) {
+        state.winner = winner
+        state.status = 'points'
+        return
+      }
     }
   }
 
   for (const wc of variant.winConditions) {
     if (wc.kind !== 'elimination') continue
+    if (!teamHasPieces(state, mover)) {
+      state.winner = variant.teams.find((t) => t.id !== mover && teamHasPieces(state, t.id))?.id ?? 'draw'
+      state.status = 'eliminated'
+      return
+    }
     for (const team of variant.teams) {
       if (team.id === mover) continue
       const alive = teamHasPieces(state, team.id)

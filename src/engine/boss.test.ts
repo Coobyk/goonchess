@@ -34,6 +34,29 @@ function arena() {
 }
 
 describe('Boss Fight and generic lives', () => {
+  it.each(['white', 'black'])('awards elimination to the defender when %s sacrifices its last piece', (mover) => {
+    const defender = mover === 'white' ? 'black' : 'white'
+    const variant = fixture([['Rook', mover, 4, 2], ['Boss', defender, 4, 0]])
+    variant.winConditions = [{ id: 'elimination', kind: 'elimination' }]
+    const game = createInitialState(variant)
+    game.turn = mover
+    const next = play(game, 4, 2, 4, 0)
+    expect(Object.values(next.pieces)).toHaveLength(1)
+    expect(next.pieces[next.board[0][4]!].lives).toBe(2)
+    expect(next.status).toBe('eliminated')
+    expect(next.winner).toBe(defender)
+  })
+
+  it.each([5, 6])('checks defender points after a sacrifice against a target of %s', (threshold) => {
+    const variant = fixture([['King', 'white', 0, 7], ['Rook', 'white', 4, 2], ['Boss', 'black', 4, 0]])
+    variant.winConditions = [{ id: 'points', kind: 'points', threshold }]
+    const next = play(createInitialState(variant), 4, 2, 4, 0)
+    expect(next.scores.black).toBe(5)
+    expect(next.scores.white).toBe(0)
+    expect(next.winner).toBe(threshold === 5 ? 'black' : null)
+    expect(next.status).toBe(threshold === 5 ? 'points' : 'active')
+  })
+
   it('starts with the full white army and one non-royal three-life amazon', () => {
     const variant = bossFight()
     expect(variant.setup.filter((p) => p.team === 'white')).toHaveLength(16)
