@@ -74,7 +74,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
   own square instead. Both stagger the boss, silencing its
   attacks so a hit can escape check. Its recovery move must be non-capturing
   and cannot give check. Stagger lasts through White's following move and
-  clears once that move finishes; another hit resets it. A parrying king stays
+  clears once that move finishes; another hit resets it. If clearing stagger
+  would leave no legal move, White may move while the boss stays staggered
+  for another cycle, until normal clearing permits a legal move. A parrying king stays
   on its original square, even though the move list names the target square.
   If stagger alone removes every legal move, that side loses its turn with a
   recorded pass, counting as recovery. Ordinary stalemate remains a draw),

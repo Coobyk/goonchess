@@ -1759,14 +1759,27 @@ export function applyMove(
   })
 }
 
+const checkingStaggerExpiry = new WeakSet<GameState>()
+
 function expireStagger(state: GameState, next: GameState, mover: string, wounded?: Set<string>) {
+  const recovered = new Map<string, GameState['pieces'][string]>()
   for (const id of Object.keys(state.pieces)) {
     const previous = state.pieces[id]
     if (!previous.staggered || !previous.staggerRecovered || previous.team === mover || wounded?.has(id)) continue
     if (!next.pieces[id]) continue
+    recovered.set(id, next.pieces[id])
     next.pieces[id] = { ...next.pieces[id] }
     delete next.pieces[id].staggered
     delete next.pieces[id].staggerRecovered
+  }
+  if (!recovered.size || checkingStaggerExpiry.has(state) || !isInCheck(next, mover)) return
+  checkingStaggerExpiry.add(state)
+  try {
+    if (!collectTeamMoves(state, mover, false, false, false).moves.length) {
+      for (const [id, piece] of recovered) next.pieces[id] = piece
+    }
+  } finally {
+    checkingStaggerExpiry.delete(state)
   }
 }
 

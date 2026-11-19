@@ -341,8 +341,49 @@ describe('Boss Fight and generic lives', () => {
     expect(recovery.pieces[bossId]).toMatchObject({ staggered: true, staggerRecovered: true })
     expect(isInCheck(recovery, 'white')).toBe(false)
     expect(recovery.status).not.toBe('checkmate')
+    expect(recovery.winner).toBeNull()
     expect(recovery.winner).not.toBe('black')
     expect(getLegalMoves(recovery, 4, 7).some((m) => m.to.x === 2 && m.to.y === 6)).toBe(false)
+    expect(hasAnyLegalMove(recovery, 'white')).toBe(true)
+    const quiet = getLegalMoves(recovery, 0, 6).find((m) => m.to.x === 0 && m.to.y === 5)!
+    expect(quiet).toBeDefined()
+    const option = legalOptionsForTeam(recovery, 'white', { search: true }).find((o) => o.move.pieceId === quiet.pieceId && o.move.to.y === 5)!
+    const continued = applyMove(recovery, quiet, { san: true })
+    expect(continued.winner).toBeNull()
+    expect(continued.pieces[bossId]).toMatchObject({ staggered: true, staggerRecovered: true })
+    expect(isInCheck(continued, 'white')).toBe(false)
+    expect(positionKey(option.next)).toBe(positionKey(continued))
+    const awake = cloneState(continued)
+    awake.pieces[bossId] = { ...awake.pieces[bossId] }
+    delete awake.pieces[bossId].staggered
+    delete awake.pieces[bossId].staggerRecovered
+    expect(isInCheck(awake, 'white')).toBe(true)
+    expect(positionKey(awake)).not.toBe(positionKey(continued))
+    const awakeHash = { slot: 0, check: 0 }, continuedHash = { slot: 0, check: 0 }
+    hashPosition(awake, awakeHash)
+    hashPosition(continued, continuedHash)
+    expect(awakeHash).not.toEqual(continuedHash)
+    expect(positionKey(replayStates(continued).at(-1)!)).toBe(positionKey(continued))
+    expect(positionKey(replayStates(continued).at(-2)!)).toBe(positionKey(recovery))
+    const shared = fromPgn(decodeGame(encodeGame(continued)), decodeVariant(encodeVariant(continued.variant)))!
+    expect(positionKey(shared.game)).toBe(positionKey(continued))
+    const bot = searchBestMove(recovery, { team: 'white', level: 'casual', timeBudgetMs: 100, seed: 29 })
+    expect(bot.move).toBeDefined()
+    expect(applyMove(recovery, bot.move!).winner).toBeNull()
+    const away = play(continued, 2, 6, 3, 4)
+    const ready = play(away, 0, 5, 0, 4)
+    expect(ready.pieces[bossId].staggered).toBeUndefined()
+    expect(ready.pieces[bossId].staggerRecovered).toBeUndefined()
+  })
+
+  it('does not defer recovered stagger when a normal check escape is available', () => {
+    const game = createInitialState(fixture([['King', 'white', 4, 7], ['Pawn', 'white', 0, 6], ['Boss', 'black', 5, 5]]))
+    const bossId = game.board[5][5]!
+    game.pieces[bossId] = { ...game.pieces[bossId], staggered: true, staggerRecovered: true }
+    expect(getLegalMoves(game, 0, 6)).toEqual([])
+    const safe = play(game, 4, 7, 3, 7)
+    expect(safe.pieces[bossId].staggered).toBeUndefined()
+    expect(isInCheck(safe, 'white')).toBe(false)
   })
 
   it('allows Kxc2 when the king really is on d1, resetting an already recovered stagger', () => {
