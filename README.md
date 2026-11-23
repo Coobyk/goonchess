@@ -24,6 +24,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Random Chess** — a whole mode built on that: every piece but the king is
   random, so the board is reshuffled after every move. It sits in the New
   menu, next to Only Horses.
+- **Spinning Chess** — regular chess, rule for rule, except every piece spins
+  on its square the whole game: on the board, in flight and under the cursor.
+  All the pieces turn in step, so a piece that moves keeps the same spin.
 - **Piece composer** — draw a piece instead of settling for a letter. The six
   chess pieces are stacked on top of each other: a knight with a bishop's
   crown on its head, a queen wearing a king's crown, an amazon with a knight's

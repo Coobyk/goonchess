@@ -44,6 +44,12 @@
   .boss-falling { display: none; }
 }
 
+@keyframes piece-spin {
+  to { transform: rotate(360deg); }
+}
+/* Spinning Chess: the spin is the variant, so it keeps turning under reduced motion too. */
+.piece-spin { animation: piece-spin linear infinite; }
+
 @theme inline {
   --font-sans: 'Medeo Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;

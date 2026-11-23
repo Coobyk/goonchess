@@ -5,6 +5,7 @@ import { PieceGlyph } from './PieceGlyph'
 import { boardCellSize, useElementWidth } from '@/lib/boardMetrics'
 import { EvalBar } from './EvalBar'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
+import { Spin } from './Spin'
 import { ThreatArrows } from './ThreatArrows'
 import { BestMoveArrow } from './BestMoveArrow'
 import { useAppStore, selectViewerSeat } from '@/store/useAppStore'
@@ -209,6 +210,7 @@ function PendingPromotion({
   pieceType,
   pieceTypes,
   rotatePieces,
+  spinning,
   onChoose,
   onCancel,
 }: {
@@ -222,6 +224,7 @@ function PendingPromotion({
   pieceType: PieceType
   pieceTypes: Record<string, PieceType>
   rotatePieces: boolean
+  spinning: boolean
   onChoose: (typeId: string) => void
   onCancel: () => void
 }) {
@@ -261,7 +264,9 @@ function PendingPromotion({
             className="inline-flex"
             style={{ transform: rotatePieces ? 'rotate(180deg)' : undefined }}
           >
-            <PieceGlyph piece={pieceType} teamIndex={teamIndex} size={size} />
+            <Spin on={spinning}>
+              <PieceGlyph piece={pieceType} teamIndex={teamIndex} size={size} />
+            </Spin>
           </span>
         </span>
       </span>
@@ -429,6 +434,7 @@ export function GameBoard() {
   }, [orientation, targetOrientation, moveDuration])
   const flipBoard = (viewerSeat !== null || turnView === 'board') && orientation === 1
   const rotatePieces = viewerSeat === null && turnView === 'pieces' && orientation === 1
+  const spinning = !!variant.rules?.includes('spinning')
 
   // Play a blast animation when a *new* move sets off an explosion (not on undo).
   const [blast, setBlast] = useState<{ id: number; x: number; y: number; radius: number } | null>(null)
@@ -622,6 +628,7 @@ export function GameBoard() {
               pieceTypes={pieceTypes}
               pieces={game.pieces}
               teamIndex={teamIndex}
+              spinning={spinning}
             />
             {pendingPromotion && pendingType && (
               <PendingPromotion
@@ -635,6 +642,7 @@ export function GameBoard() {
                 pieceType={pendingType}
                 pieceTypes={pieceTypes}
                 rotatePieces={rotatePieces}
+                spinning={spinning}
                 onChoose={choosePromotion}
                 onCancel={cancelPromotion}
               />
@@ -722,14 +730,16 @@ export function GameBoard() {
                         transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
                       }}
                     >
-                      <PieceGlyph
-                        piece={pieceType}
-                        lives={piece.lives}
-                        staggered={piece.staggered}
-                        hit={lastMove?.capturedId === piece.id}
-                        teamIndex={teamIndex(piece.team)}
-                        size={Math.round(cell * 0.78)}
-                      />
+                      <Spin on={spinning}>
+                        <PieceGlyph
+                          piece={pieceType}
+                          lives={piece.lives}
+                          staggered={piece.staggered}
+                          hit={lastMove?.capturedId === piece.id}
+                          teamIndex={teamIndex(piece.team)}
+                          size={Math.round(cell * 0.78)}
+                        />
+                      </Spin>
                     </span>
                   </span>
                 )}
@@ -781,13 +791,15 @@ export function GameBoard() {
                 className="inline-flex"
                 style={{ transform: rotatePieces ? 'rotate(180deg)' : undefined }}
               >
-                <PieceGlyph
-                  piece={type}
-                  lives={inst.lives}
-                  staggered={inst.staggered}
-                  teamIndex={teamIndex(inst.team)}
-                  size={Math.round(cell * 0.86)}
-                />
+                <Spin on={spinning}>
+                  <PieceGlyph
+                    piece={type}
+                    lives={inst.lives}
+                    staggered={inst.staggered}
+                    teamIndex={teamIndex(inst.team)}
+                    size={Math.round(cell * 0.86)}
+                  />
+                </Spin>
               </span>
             </span>
           </div>

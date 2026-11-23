@@ -288,6 +288,8 @@ export type VariantRule =
   | 'loyalty'
   /** A piece may only capture pieces worth as much as itself or more. */
   | 'hypergamy'
+  /** Every piece spins round and round, all game long. Changes only how the pieces look. */
+  | 'spinning'
 
 export interface Variant {
   schema: 1

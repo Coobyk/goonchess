@@ -109,6 +109,10 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
     name: 'Hypergamy',
     hint: 'A piece may only take a piece worth as much as itself or more. A pawn takes anything, knights and bishops hunt each other, a rook reaches rooks and queens — and the queen can only ever be taken down by another queen. The king stands outside the order: worth nothing, he may take anyone, and being beneath nobody, anyone may take him.',
   },
+  spinning: {
+    name: 'Spinning pieces',
+    hint: 'Every piece on the board spins round and round, all game long. The rules are the ordinary ones — only your eyes have to keep up.',
+  },
 }
 
 const TURN_VIEW_COPY = {
