@@ -113,8 +113,9 @@ function sanOf(state: GameState, move: Move): string {
  * seeded game can be replayed.
  */
 export function bookMove(state: GameState, seed = 0): Move | null {
-  // The book was written for classic chess, and for nothing else.
-  if (state.variant.id !== 'classic') return null
+  // The book was written for classic chess, and for nothing else. Spinning
+  // Chess is classic chess move for move, so it reads the same book.
+  if (state.variant.id !== 'classic' && state.variant.id !== 'spinning') return null
   // The sheet is read from the moves already played. One played without its
   // notation and the game is off the page.
   let node = book()
