@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { PieceInstance, PieceType } from '@/engine/types'
 import type { Flight, Anim } from '@/lib/moveAnimation'
 import { PieceGlyph } from './PieceGlyph'
+import { Spin } from './Spin'
 
 const FLIGHT_CLASS: Record<Flight['kind'], string> = {
   slide: 'piece-fly',
@@ -24,6 +25,7 @@ export function MoveAnimationLayer({
   pieceTypes,
   pieces,
   teamIndex,
+  spinning = false,
 }: {
   anim: Anim | null
   cell: number
@@ -34,6 +36,7 @@ export function MoveAnimationLayer({
   pieceTypes: Record<string, PieceType>
   pieces: Record<string, PieceInstance>
   teamIndex: (teamId: string) => number
+  spinning?: boolean
 }) {
   if (!anim) return null
   const size = Math.round(cell * 0.78)
@@ -62,7 +65,9 @@ export function MoveAnimationLayer({
             }
           >
             <span className="inline-flex" style={{ transform: spin }}>
-              <PieceGlyph piece={type} teamIndex={teamIndex(d.team)} size={size} />
+              <Spin on={spinning}>
+                <PieceGlyph piece={type} teamIndex={teamIndex(d.team)} size={size} />
+              </Spin>
             </span>
           </span>
         )
@@ -86,7 +91,9 @@ export function MoveAnimationLayer({
             }
           >
             <span className="inline-flex" style={{ transform: spin }}>
-              <PieceGlyph piece={type} teamIndex={teamIndex(p.team)} size={size} />
+              <Spin on={spinning}>
+                <PieceGlyph piece={type} teamIndex={teamIndex(p.team)} size={size} />
+              </Spin>
             </span>
           </span>
         )
@@ -120,7 +127,9 @@ export function MoveAnimationLayer({
               }
             >
               <span className="inline-flex" style={{ transform: spin }}>
-                <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} lives={pieces[f.pieceId]?.lives} staggered={pieces[f.pieceId]?.staggered} />
+                <Spin on={spinning}>
+                  <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} lives={pieces[f.pieceId]?.lives} staggered={pieces[f.pieceId]?.staggered} />
+                </Spin>
               </span>
             </span>
           </span>

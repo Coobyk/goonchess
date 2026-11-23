@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyMove, createInitialState, getLegalMoves } from '@/engine/rules'
-import { classicChess, horde } from '@/engine/templates'
+import { classicChess, horde, spinningChess } from '@/engine/templates'
 import { bookMove } from './book'
 
 type State = ReturnType<typeof createInitialState>
@@ -37,6 +37,14 @@ describe('opening book', () => {
     game = play(game, [0, 1], [0, 3]) // a5
     // a4 a5 is not in the book.
     expect(bookMove(game, 1)).toBeNull()
+  })
+
+  it('plays Spinning Chess from the same book', () => {
+    let game = createInitialState(spinningChess())
+    game = play(game, [4, 6], [4, 4]) // e4
+    const move = bookMove(game, 3)
+    expect(move).not.toBeNull()
+    expect(game.pieces[move!.pieceId].team).toBe('black')
   })
 
   it('knows nothing about other variants', () => {

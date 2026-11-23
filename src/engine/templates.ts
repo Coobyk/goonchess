@@ -543,6 +543,20 @@ export function hypergamyChess(): Variant {
   }
 }
 
+/* ----------------------------------------------------------- spinning */
+
+/** Classic chess, rule for rule, with every piece spinning on its square. */
+export function spinningChess(): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'spinning',
+    name: 'Spinning Chess',
+    description: 'Regular chess, except every piece never stops spinning.',
+    rules: ['spinning'],
+  }
+}
+
 /* ----------------------------------------------------------------- blank */
 
 export function blankVariant(width = 8, height = 8): Variant {
@@ -987,6 +1001,12 @@ export const TEMPLATES: {
     name: 'Hypergamy',
     description: 'Take only your equals or betters',
     build: hypergamyChess,
+  },
+  {
+    id: 'spinning',
+    name: 'Spinning Chess',
+    description: 'Regular chess, every piece spinning',
+    build: spinningChess,
   },
 ]
 
