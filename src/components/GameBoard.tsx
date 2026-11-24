@@ -309,10 +309,11 @@ export function GameBoard() {
   const { width: cols, height: rows } = variant.board
   const cell = boardCellSize(width, cols, 64, 24)
 
-  // Put the cursor on the board as soon as it exists.
-  useEffect(() => {
-    setCursor((current) => current ?? { x: 0, y: Math.max(0, rows - 1) })
-  }, [rows])
+  // A smaller variant still needs one square in the keyboard tab order.
+  const boardCursor = {
+    x: Math.min(cursor?.x ?? 0, cols - 1),
+    y: Math.min(cursor?.y ?? rows - 1, rows - 1),
+  }
 
   const [drag, setDrag] = useState<{ pieceId: string; clientX: number; clientY: number } | null>(null)
   const dragRef = useRef<{
@@ -539,7 +540,7 @@ export function GameBoard() {
     }
     // The cursor is the origin, so quick key presses keep moving from where
     // the cursor is now rather than from the square that had focus.
-    const origin = cursor ?? { x, y }
+    const origin = cursor ? boardCursor : { x, y }
     const step = steps[e.key]
     if (step) {
       e.preventDefault()
@@ -677,7 +678,7 @@ export function GameBoard() {
                 key={`${x}-${y}`}
                 type="button"
                 role="gridcell"
-                tabIndex={cursor?.x === x && cursor?.y === y ? 0 : -1}
+                tabIndex={boardCursor.x === x && boardCursor.y === y ? 0 : -1}
                 aria-label={describeSquare(x, y, piece, pieceType, variant)}
                 aria-selected={isSelected}
                 data-square={`${x},${y}`}
