@@ -1031,7 +1031,7 @@ export const useAppStore = create<AppState>((set, get) => {
         legalMoves: [],
         pendingPromotion: null,
         // The position the move leads to joins the history.
-        undoStack: pushHistory(game, next),
+        undoStack: pushHistory(game, settled),
         clockState: clockNext,
       })
 

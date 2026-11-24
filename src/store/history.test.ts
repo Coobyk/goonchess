@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { decodeGame, encodeGame } from '@/lib/encoding'
 import { fromPgn } from '@/lib/pgn'
 import { createInitialState, getLegalMoves, staggerPass } from '@/engine/rules'
-import { bossFight, miniChess } from '@/engine/templates'
+import { bossFight, miniChess, randomChess } from '@/engine/templates'
 import { replayMoves, undoPly } from '@/lib/replay'
 import { positionKey } from '@/engine/repetition'
 
@@ -32,6 +32,27 @@ describe('starting a variant after a puzzle', () => {
 })
 
 describe('imported games keep their history', () => {
+  it('retains the settled Random Chess pieces when the next player times out', () => {
+    const opening = createInitialState(randomChess(1))
+    store().setBot({ mode: 'off' })
+    store().loadPosition(opening, [opening])
+    useAppStore.setState({ clock: { minutes: 0, increment: 0 } })
+    const move = opening.board.flatMap((row, y) => row.flatMap((_, x) => getLegalMoves(opening, x, y)))[0]
+    expect(move).toBeDefined()
+    store().playMove(move)
+    const settled = store().game
+    expect(selectLatestGame(store())).toBe(settled)
+    useAppStore.setState({
+      clock: { minutes: 1, increment: 0 },
+      clockState: { times: { white: 0, black: 0 }, lastMoveAt: Date.now() - 1, running: true },
+    })
+    store().tickClock()
+    expect(store().game.pieces).toEqual(settled.pieces)
+    expect(store().game.pieceTypes).toEqual(settled.pieceTypes)
+    expect(store().game.winner).toBeTruthy()
+    useAppStore.setState({ clock: { minutes: 0, increment: 0 } })
+  })
+
   it.each([false, true])('preserves timeout results through review (rewound before timeout: %s)', (rewound) => {
     const result = fromPgn('1. e4')!
     store().loadPosition(result.game, result.states)
