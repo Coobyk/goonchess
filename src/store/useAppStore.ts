@@ -1007,14 +1007,8 @@ export const useAppStore = create<AppState>((set, get) => {
       if (clockIsOn(clock) && flagFell(clockState, mover, now) && !online) {
         // The flag fell before the move was made. Online, the room owns the
         // flag, so the move is still sent and the room decides.
-        const fallen = flagFall(game, clockState, mover)
-        set({
-          game: fallen.game,
-          clockState: fallen.clock,
-          selected: null,
-          legalMoves: [],
-          pendingPromotion: null,
-        })
+        // Use the same terminal history update as a scheduled clock tick.
+        get().tickClock()
         return
       }
       const clockNext = clockIsOn(clock)
