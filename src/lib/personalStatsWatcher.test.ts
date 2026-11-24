@@ -16,6 +16,7 @@ vi.mock('sonner', () => ({ toast: vi.fn() }))
 import { useAppStore } from '@/store/useAppStore'
 import { loadStats } from './stats'
 import { watchPersonalResults } from './personalStatsWatcher'
+import type { OnlineGame } from '@/store/useAppStore'
 
 let stop: () => void
 beforeEach(() => {
@@ -70,4 +71,38 @@ it('does not count bot-vs-bot games', () => {
   useAppStore.getState().setBot({ mode: 'all' })
   foolsMate()
   expect(loadStats()).toEqual({})
+})
+
+const room: OnlineGame = {
+  code: 'test-room', seat: 0, status: 'playing', connected: true,
+  presence: [true, true], watchers: 0, error: null, chat: [], offer: null,
+}
+
+it('waits for the room to correct a provisional win to a timeout loss', () => {
+  useAppStore.setState({ online: room })
+  const opening = useAppStore.getState().game
+  useAppStore.setState({ game: { ...opening, winner: 'white' } })
+  expect(loadStats()).toEqual({})
+  useAppStore.setState({ game: { ...opening, winner: 'black' }, online: { ...room, status: 'over' } })
+  expect(loadStats().classic).toMatchObject({ games: 1, wins: 0, losses: 1 })
+})
+
+it('counts an acknowledged identical result even after a puzzle', () => {
+  useAppStore.setState({ online: room, puzzle: {
+    from: { x: 0, y: 0 }, to: { x: 0, y: 1 }, side: 'white', gain: 1,
+    difficulty: 'easy', themes: [], movesBefore: 0,
+  } })
+  useAppStore.setState({ game: { ...useAppStore.getState().game, winner: 'white' } })
+  useAppStore.setState({ online: { ...room, status: 'over' } })
+  expect(loadStats().classic).toMatchObject({ games: 1, wins: 1 })
+})
+
+it('counts separate zero-move online resignations despite a shared opening history', () => {
+  useAppStore.setState({ online: room })
+  const opening = useAppStore.getState().game
+  for (let i = 0; i < 2; i++) {
+    useAppStore.setState({ game: { ...opening, winner: 'black' }, online: { ...room, status: 'over' } })
+    useAppStore.setState({ game: opening, online: room })
+  }
+  expect(loadStats().classic.games).toBe(2)
 })

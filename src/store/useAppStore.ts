@@ -560,7 +560,14 @@ export const useAppStore = create<AppState>((set, get) => {
       // The move is already on the board; the clock that came with the echo is
       // still the room's, so it replaces the local countdown.
       const echoed = rebaseClock(message.clockState)
-      if (echoed) set({ clockState: echoed })
+      // Even an identical board is the room's acknowledgement of the result.
+      // Local mating moves are provisional until this status becomes `over`.
+      if (echoed || (next.winner && online.status !== 'over')) {
+        set({
+          ...(echoed ? { clockState: echoed } : {}),
+          online: next.winner ? { ...online, status: 'over' } : online,
+        })
+      }
       return
     }
 

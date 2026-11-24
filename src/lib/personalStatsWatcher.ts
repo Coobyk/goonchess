@@ -7,12 +7,13 @@ export function watchPersonalResults(): () => void {
   const recorded = new WeakSet<object>()
   return useAppStore.subscribe((state, prev) => {
     const { game, variant, online } = state
-    if (game === prev.game || !game.winner || prev.game.winner || state.puzzle) return
+    if (!game.winner) return
     // Loading a replay/position is not playing a move. Online histories are
     // deserialized, so their room and playing status establish continuity.
     if (online) {
-      if (online.code !== prev.online?.code || prev.online.status !== 'playing') return
+      if (online.status !== 'over' || online.code !== prev.online?.code || prev.online.status !== 'playing') return
     } else {
+      if (game === prev.game || prev.game.winner || state.puzzle) return
       const before = prev.game.moveHistory
       const after = game.moveHistory
       if (variant !== prev.variant || (after.length !== before.length && after.length !== before.length + 1)) return
@@ -24,9 +25,11 @@ export function watchPersonalResults(): () => void {
     }
     // The opening history entry identifies a game, not its move count or winner.
     // Rewinding/reviewing that game cannot award the same result again.
-    const start = state.undoStack[0] ?? prev.undoStack[0] ?? prev.game
-    if (recorded.has(start)) return
-    recorded.add(start)
+    if (!online) {
+      const start = state.undoStack[0] ?? prev.undoStack[0] ?? prev.game
+      if (recorded.has(start)) return
+      recorded.add(start)
+    }
     const viewerSeat = selectViewerSeat(state)
     if (viewerSeat === null && (online || state.bot.mode === 'all')) return
     const you = variant.teams[viewerSeat ?? 0]?.id
