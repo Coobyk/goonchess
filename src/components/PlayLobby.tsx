@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowRight, ArrowUpRight, Bomb, Check, Crown, Orbit, Search, Skull, Sparkles, Wrench } from 'lucide-react'
 import { TEMPLATES } from '@/engine/templates'
-import { useAppStore } from '@/store/useAppStore'
+import { selectLatestGame, useAppStore } from '@/store/useAppStore'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
@@ -25,7 +25,8 @@ export function PlayLobby() {
   const [pending, setPending] = useState<Template | null>(null)
 
   const start = (template: Template) => {
-    const { game } = useAppStore.getState()
+    // Reviewing the opening must not hide the moves in the live game.
+    const game = selectLatestGame(useAppStore.getState())
     if (game.moveHistory.length > 0 && !game.winner) {
       setPending(template)
       return
