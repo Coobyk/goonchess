@@ -20,7 +20,7 @@ const FEATURED = [
 // Placement array order does not change a setup (e.g. repainting a piece).
 const setupSignature = (variant: Variant) => JSON.stringify(packVariant({
   ...variant,
-  setup: variant.setup.toSorted((a, b) => a.y - b.y || a.x - b.x),
+  setup: [...variant.setup].sort((a, b) => a.y - b.y || a.x - b.x),
 }))
 
 /** Discovery stays out of shared rooms: changing a variant starts a new local game. */
