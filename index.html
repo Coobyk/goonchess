@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#f5f2e9" />
     <meta
       name="description"
       content="Goonchess is a chess variant maker: design boards, terrain and pieces, then play the result."
@@ -12,9 +12,9 @@
     <title>Goonchess — build your own chess</title>
     <script>
       try {
-        if (JSON.parse(localStorage.getItem('goonchess:theme') || '"dark"') === 'light') {
-          document.documentElement.classList.remove('dark')
-        }
+        const dark = JSON.parse(localStorage.getItem('goonchess:theme') || '"light"') === 'dark'
+        document.documentElement.classList.toggle('dark', dark)
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
       } catch (e) {}
     </script>
   </head>
