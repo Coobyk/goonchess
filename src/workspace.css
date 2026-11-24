@@ -38,7 +38,13 @@
   letter-spacing: -.04em;
   line-height: 1.16;
 }
-.lobby-intro h1 span, .workspace-intro h1 span { color: var(--primary); }
+.lobby-intro h1 span, .workspace-intro h1 span {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-decoration-color: var(--primary);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 7px;
+}
 .lobby-description, .workspace-intro > div > p:last-child {
   margin-top: 8px;
   color: var(--muted-foreground);
@@ -75,8 +81,8 @@
   color: var(--muted-foreground);
   background: var(--background);
 }
-.variant-tile.is-selected .variant-icon { color: var(--primary); border-color: var(--primary); }
-.variant-check { position: absolute; right: 8px; top: 8px; color: var(--primary); }
+.variant-tile.is-selected .variant-icon { color: var(--primary-foreground); background: var(--primary); border-color: var(--primary); }
+.variant-check { position: absolute; right: 8px; top: 8px; color: var(--foreground); }
 .board-stage {
   min-width: 0;
   align-self: start;
@@ -108,7 +114,7 @@
 .play-sidebar [data-slot="card-title"] { font-size: 12px; font-weight: 600; }
 .play-sidebar [data-slot="card-header"] { padding-top: 1px; }
 .briefing-card { padding: 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); }
-.briefing-link { color: var(--primary); }
+.briefing-link { color: var(--foreground); text-decoration: underline; text-decoration-color: var(--primary); text-underline-offset: 3px; }
 .briefing-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .move-empty { color: var(--muted-foreground); }
 .workspace-intro h1 { font-size: clamp(28px, 2.8vw, 38px); }
