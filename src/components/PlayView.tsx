@@ -396,7 +396,7 @@ export function PlayView() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="club-play-table flex min-w-0 flex-col items-center gap-3">
+      <div id="play-table" role="region" aria-label="Chess table" tabIndex={-1} className="club-play-table flex min-w-0 flex-col items-center gap-3">
         <div className="club-board-caption">
           <span>{variant.name}</span>
           <span>{variant.board.width} × {variant.board.height} / {online ? 'ONLINE TABLE' : 'LOCAL TABLE'}</span>

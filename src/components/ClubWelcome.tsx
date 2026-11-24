@@ -93,23 +93,38 @@ export function ClubWorkshop() {
   const playVariant = useAppStore((s) => s.playVariant)
   if (online) return null
 
+  const openGame = (id: string) => {
+    const template = TEMPLATES.find((t) => t.id === id)
+    if (!template) return
+    playVariant(template.build())
+    const table = document.getElementById('play-table')
+    table?.focus({ preventScroll: true })
+    table?.scrollIntoView({ block: 'start' })
+  }
+
+  const openWorkshop = () => {
+    setView('maker')
+    document.getElementById('main-content')?.focus({ preventScroll: true })
+    window.scrollTo({ top: 0 })
+  }
+
   return (
     <section className="club-workshop" aria-labelledby="workshop-title">
       <div className="club-workshop-heading"><span className="club-section-number">02</span><h2 id="workshop-title">A little less ordinary.</h2><span>OFF THE BEATEN BOARD</span></div>
       <div className="club-discovery-grid">
-        <button type="button" onClick={() => playVariant(TEMPLATES.find((t) => t.id === 'horses')!.build())}>
+        <button type="button" onClick={() => openGame('horses')}>
           <span className="club-discovery-art club-horses" aria-hidden="true">♞♘</span>
           <span className="club-eyebrow">A different kind of horsepower</span>
           <span className="club-discovery-title">Only Horses <ArrowUpRight /></span>
           <span>Every piece jumps. Nothing goes to plan.</span>
         </button>
-        <button type="button" onClick={() => playVariant(TEMPLATES.find((t) => t.id === 'king-of-the-hill')!.build())}>
+        <button type="button" onClick={() => openGame('king-of-the-hill')}>
           <span className="club-discovery-art club-hill" aria-hidden="true">♚</span>
           <span className="club-eyebrow">Take the scenic route</span>
           <span className="club-discovery-title">King of the Hill <ArrowUpRight /></span>
           <span>The middle of the board is the finish line.</span>
         </button>
-        <button type="button" className="club-create-card" onClick={() => setView('maker')}>
+        <button type="button" className="club-create-card" onClick={openWorkshop}>
           <span className="club-discovery-art" aria-hidden="true">✳</span>
           <span className="club-eyebrow">No rulebook? No problem.</span>
           <span className="club-discovery-title">Your next bad idea <ArrowUpRight /></span>
