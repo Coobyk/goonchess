@@ -8,7 +8,7 @@ import { positionKey } from '@/engine/repetition'
 
 vi.hoisted(() => { vi.stubGlobal('document', { documentElement: { classList: { toggle() {} }, style: {} } }) })
 vi.mock('sonner', () => ({ toast: vi.fn() }))
-import { useAppStore } from './useAppStore'
+import { selectLatestGame, useAppStore } from './useAppStore'
 
 const store = () => useAppStore.getState()
 
@@ -32,6 +32,19 @@ describe('starting a variant after a puzzle', () => {
 })
 
 describe('imported games keep their history', () => {
+  it('reads the live timeout result rather than the unfinished history snapshot', () => {
+    const result = fromPgn('1. e4')!
+    store().loadPosition(result.game, result.states)
+    useAppStore.setState({
+      clock: { minutes: 1, increment: 0 },
+      clockState: { times: { white: 60000, black: 0 }, lastMoveAt: Date.now() - 1, running: true },
+    })
+    store().tickClock()
+    expect(store().game.winner).toBe('white')
+    expect(selectLatestGame(store())).toBe(store().game)
+    useAppStore.setState({ clock: { minutes: 0, increment: 0 } })
+  })
+
   it('lets the move list and the graph step through a PGN game', () => {
     const result = fromPgn('1. e4 e5 2. Nf3 Nc6 3. Bb5')
     expect(result).toBeTruthy()
@@ -48,6 +61,7 @@ describe('imported games keep their history', () => {
     expect(store().game.moveHistory).toHaveLength(2)
     store().jumpToPly(0)
     expect(store().game.moveHistory).toHaveLength(0)
+    expect(selectLatestGame(store()).moveHistory).toHaveLength(5)
     store().jumpToPly(5)
     expect(store().game.moveHistory).toHaveLength(5)
   })

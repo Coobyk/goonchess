@@ -1375,8 +1375,11 @@ useAppStore.subscribe((state, prev) => {
  * The position the game is actually on — the top of the history, not the one
  * being reviewed. Read it through `useAppStore(selectLatestGame)`.
  */
-export const selectLatestGame = (s: AppState): GameState =>
-  s.undoStack[s.undoStack.length - 1] ?? s.game
+export const selectLatestGame = (s: AppState): GameState => {
+  const latest = s.undoStack[s.undoStack.length - 1]
+  // Timeouts can update the live result without adding another move.
+  return !latest || s.game.moveHistory.length >= latest.moveHistory.length ? s.game : latest
+}
 
 /** The seat the human plays from — online or against the bot — or null for a
  * spectator, who watches every side. */
