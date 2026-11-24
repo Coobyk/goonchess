@@ -51,7 +51,7 @@ export default function App() {
         <footer className="app-footer border-t">
           <div className="text-muted-foreground mx-auto flex w-full max-w-[1560px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-5 text-[11px] lg:px-9">
             <span>
-              Chess without limits. Built by{' '}
+              Goonchess · built by{' '}
               <a
                 href="https://coobyk.com"
                 target="_blank"

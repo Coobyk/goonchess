@@ -49,9 +49,9 @@ export function MakerView() {
     <div className="maker-page space-y-6">
       <div className="workspace-intro">
         <div>
-          <p className="eyebrow"><span className="status-dot" /> The variant workshop</p>
-          <h1>Make your own <span>kind of chaos.</span></h1>
-          <p>Remix the board. Dream up a piece. Rewrite the rules.</p>
+          <p className="eyebrow">Variant maker</p>
+          <h1>Make your <span>own variant.</span></h1>
+          <p>Design boards, terrain and pieces, then play the result.</p>
         </div>
         <Button size="lg" onClick={() => useAppStore.getState().setView('play')}><Swords /> Play this setup</Button>
       </div>

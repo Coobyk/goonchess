@@ -2,7 +2,6 @@ import { useState, type MouseEvent } from 'react'
 import { toast } from 'sonner'
 import {
   BookOpen,
-  Crown,
   ChevronDown,
   ChevronRight,
   FileJson,
@@ -142,6 +141,7 @@ const BLANK_BOARDS: { size: number; toast: string }[] = [
 ]
 
 export function AppHeader() {
+  const variant = useAppStore((s) => s.variant)
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
   const setMakerTab = useAppStore((s) => s.setMakerTab)
@@ -207,18 +207,18 @@ export function AppHeader() {
   return (
     <>
       <header className="app-header sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex h-[76px] w-full max-w-[1660px] items-center gap-1.5 px-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 w-full max-w-[1660px] items-center gap-1.5 px-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <a
               href="/"
               aria-label="Goonchess home"
               onClick={goHome}
-              className="brand flex shrink-0 items-center gap-2.5 text-xl font-extrabold tracking-tight transition-opacity hover:opacity-80"
+              className="brand flex shrink-0 items-center text-xl font-extrabold tracking-tight transition-opacity hover:opacity-90"
             >
-              <span className="brand-mark grid size-9 place-items-center rounded-xl"><Crown className="size-5" strokeWidth={2.2} /></span>
-              <span>goon<span className="brand-accent">chess</span><span className="brand-dot">.</span></span>
+              Goon
+              <span className="ml-1 rounded-md bg-primary px-1.5 py-0.5 text-primary-foreground">chess</span>
             </a>
-            <span className="brand-tagline ml-5 hidden border-l pl-5 text-[10px] font-medium uppercase tracking-[0.2em] xl:block">Not your usual chess club</span>
+            <p className="text-muted-foreground ml-4 hidden max-w-56 truncate text-xs xl:block">{variant.name}</p>
           </div>
 
           <nav aria-label="Main navigation" className="primary-navigation flex items-center gap-1.5 lg:mx-auto">

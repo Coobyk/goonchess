@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { ArrowRight, ArrowUpRight, Bomb, Check, Crown, Orbit, Search, Skull, Sparkles, Wrench } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Bomb, Check, Crown, Orbit, Search, Skull, Wrench } from 'lucide-react'
 import { TEMPLATES } from '@/engine/templates'
 import type { Variant } from '@/engine/types'
 import { selectLatestGame, useAppStore } from '@/store/useAppStore'
@@ -62,18 +62,17 @@ export function PlayLobby() {
     <section className="play-lobby" aria-label="Discover chess variants">
       <div className="lobby-intro">
         <div>
-          <p className="eyebrow"><span className="status-dot" /> A different kind of chess club</p>
-          <h1>Chess. <span>With a twist.</span></h1>
-          <p className="lobby-description">Forget the usual. Play wild variants, or invent your own.</p>
+          <p className="eyebrow">Play · Make · Learn</p>
+          <h1>Play chess. <span>Your way.</span></h1>
+          <p className="lobby-description">Pick a variant, change the rules, or build something of your own.</p>
         </div>
         <Button className="create-cta" size="lg" onClick={() => setView('maker')}>
           <Wrench /> Make a variant <ArrowUpRight />
         </Button>
-        <Sparkles className="lobby-spark" aria-hidden="true" />
       </div>
 
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">Choose your chaos <span className="ml-2 text-xs font-normal text-muted-foreground">Find your next obsession.</span></h2>
+        <h2 className="text-sm font-semibold">Choose a variant</h2>
         <Button ref={browseTrigger} variant="ghost" size="sm" className="browse-variants h-7 text-xs" onClick={() => setBrowseOpen(true)}>
           All {TEMPLATES.length} variants <ArrowRight className="size-3.5" />
         </Button>
@@ -107,8 +106,8 @@ export function PlayLobby() {
           browseTrigger.current?.focus()
         }}>
           <DialogHeader>
-            <DialogTitle>Pick your next plot twist.</DialogTitle>
-            <DialogDescription>{TEMPLATES.length} ways to play. Same game, different possibilities.</DialogDescription>
+            <DialogTitle>Choose a variant</DialogTitle>
+            <DialogDescription>{TEMPLATES.length} ways to play. Pick a starting point, or make your own.</DialogDescription>
           </DialogHeader>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />

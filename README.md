@@ -15,9 +15,8 @@ Deployable to Cloudflare Workers with GitHub Actions.
   The same position three times is a draw, counted with the same rule chess
   uses: the  pieces, the side to move, the castles still possible and the en
   passant right all have to match — and in Three-Check, the checks banked as
-  well. The board wears a cool lavender palette,
-  `#d9dcee` and `#6b729e`, in light and in dark mode alike. Legacy colors in
-  packed variant links stay unchanged to preserve archive keys.
+  well. The board wears the brown of Lichess,
+  `#f0d9b5` and `#b58863`, in light and in dark mode alike.
 - **Random pieces** — any piece can be marked random. After every move it is
   given a new kind, drawn at random from the kinds of the variant, and it wears
   the colours of a rainbow so you can see at a glance that it is not what it
