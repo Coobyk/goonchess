@@ -13,6 +13,14 @@ vi.hoisted(() => {
   })
 })
 vi.mock('sonner', () => ({ toast: vi.fn() }))
+const connection = vi.hoisted(() => ({ handlers: null as import('./online').SocketHandlers | null }))
+vi.mock('./online', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./online')>(),
+  connect: (_code: string, handlers: import('./online').SocketHandlers) => {
+    connection.handlers = handlers
+    return { close: vi.fn(), send: () => true }
+  },
+}))
 import { useAppStore } from '@/store/useAppStore'
 import { loadStats } from './stats'
 import { watchPersonalResults } from './personalStatsWatcher'
@@ -127,4 +135,29 @@ it('counts a first-move win after restart when another piece transforms', () => 
   expect(state.game.winner).toBe('white')
   expect(state.game).not.toBe(state.undoStack[0])
   expect(loadStats().classic.games).toBe(1)
+})
+
+it('acknowledges matching boards through room messages and reopens rematches', () => {
+  useAppStore.getState().joinOnline('test-room')
+  useAppStore.setState({ online: room })
+  const opening = useAppStore.getState().game
+  const finished = { ...opening, winner: 'white' }
+  useAppStore.setState({ game: finished })
+  expect(loadStats()).toEqual({})
+  connection.handlers!.onMessage({ t: 'state', game: finished })
+  expect(useAppStore.getState().online!.status).toBe('over')
+  expect(loadStats().classic.wins).toBe(1)
+  // The player reviews the opening, then the room begins the rematch there.
+  useAppStore.getState().loadPosition(opening)
+  connection.handlers!.onMessage({ t: 'state', game: opening })
+  expect(useAppStore.getState().online!.status).toBe('playing')
+})
+
+it('records a timeout correction delivered through the room handler', () => {
+  useAppStore.getState().joinOnline('test-room')
+  useAppStore.setState({ online: room })
+  const opening = useAppStore.getState().game
+  useAppStore.setState({ game: { ...opening, winner: 'white' } })
+  connection.handlers!.onMessage({ t: 'state', game: { ...opening, winner: 'black' } })
+  expect(loadStats().classic).toMatchObject({ games: 1, wins: 0, losses: 1 })
 })

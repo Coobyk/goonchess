@@ -562,10 +562,13 @@ export const useAppStore = create<AppState>((set, get) => {
       const echoed = rebaseClock(message.clockState)
       // Even an identical board is the room's acknowledgement of the result.
       // Local mating moves are provisional until this status becomes `over`.
-      if (echoed || (next.winner && online.status !== 'over')) {
+      const status = next.winner ? 'over' : online.status === 'over'
+        ? online.seat === null ? 'spectating' : 'playing'
+        : online.status
+      if (echoed || status !== online.status) {
         set({
           ...(echoed ? { clockState: echoed } : {}),
-          online: next.winner ? { ...online, status: 'over' } : online,
+          online: { ...online, status },
         })
       }
       return
