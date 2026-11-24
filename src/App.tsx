@@ -8,6 +8,7 @@ import { TooltipProvider } from './components/ui/tooltip'
 import { pathFor, replaceRoute, routeFromLocation } from './lib/router'
 import { useAppStore } from './store/useAppStore'
 import { watchFinishedGames } from './lib/archiveWatcher'
+import { watchPersonalResults } from './lib/personalStatsWatcher'
 import { ClubWelcome, ClubWorkshop } from './components/ClubWelcome'
 
 const buildDate = new Date(__BUILD_TIME__)
@@ -41,6 +42,7 @@ export default function App() {
   }, [])
 
   useEffect(() => watchFinishedGames(), [])
+  useEffect(() => watchPersonalResults(), [])
 
   return (
     <TooltipProvider>

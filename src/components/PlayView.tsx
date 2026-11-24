@@ -827,7 +827,7 @@ export function PlayView() {
             <TabsContent value="analysis" forceMount className="data-[state=inactive]:hidden">
               <AnalysisPanel />
             </TabsContent>
-            <TabsContent value="stats" forceMount className="data-[state=inactive]:hidden">
+            <TabsContent value="stats">
               <div className="space-y-3">
                 <CommunityPanel />
                 <StatsPanel />

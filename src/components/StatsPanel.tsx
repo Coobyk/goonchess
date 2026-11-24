@@ -1,18 +1,10 @@
-import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
 import { BarChart3, Flame } from 'lucide-react'
-import { useAppStore, selectViewerSeat } from '@/store/useAppStore'
+import { useAppStore } from '@/store/useAppStore'
 import {
   dayKey,
   liveStreakDays,
   loadStats,
   loadStreak,
-  recordPlayDay,
-  recordResult,
-  saveStreak,
-  saveStats,
-  type PlayStreak,
-  type Stats,
 } from '@/lib/stats'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -24,49 +16,11 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
  * device. The site-wide move statistics are in `CommunityPanel`.
  */
 export function StatsPanel() {
-  const game = useAppStore((s) => s.game)
+  // A result is persisted by the app-level watcher before this render.
+  useAppStore((s) => s.game)
   const variant = useAppStore((s) => s.variant)
-  const online = useAppStore((s) => s.online)
-  const viewerSeat = useAppStore(selectViewerSeat)
-  const [stats, setStats] = useState<Stats>(() => loadStats())
-  const [streak, setStreak] = useState<PlayStreak>(() => loadStreak())
-  const [recorded, setRecorded] = useState<string | null>(null)
-
-  // Note the result once the game is over. A finished game — win, loss or
-  // draw — marks the day as played and keeps the streak going.
-  useEffect(() => {
-    if (!game.winner) return
-    const key = `${variant.id}:${game.moveHistory.length}:${game.winner}`
-    if (recorded === key) return
-    setRecorded(key)
-    // Games the viewer only watched — a spectated room, or bots playing each
-    // other — record nothing: there is no "you" in them.
-    if (viewerSeat === null && (online || useAppStore.getState().bot.mode === 'all')) return
-    // "You" is the seat you hold, or your side against a single bot — and the
-    // first army where the idea of your side does not apply.
-    const you = variant.teams[viewerSeat ?? 0]?.id
-    const result =
-      game.winner === 'draw' ? ('draw' as const) : game.winner === you ? ('win' as const) : ('loss' as const)
-    const next = recordResult(loadStats(), variant.id, result)
-    saveStats(next)
-    setStats(next)
-    const today = dayKey(new Date())
-    const nextStreak = recordPlayDay(loadStreak(), today)
-    saveStreak(nextStreak)
-    setStreak(nextStreak)
-    // First finished game of the day: announce the streak.
-    if (streak.lastDay !== today) {
-      if (nextStreak.days === 1) {
-        toast('Your streak started! 🔥', {
-          description: 'Come back tomorrow to make it 2 days in a row.',
-        })
-      } else {
-        toast(`Day ${nextStreak.days} in a row! 🔥`, {
-          description: 'Come back tomorrow to keep the streak going.',
-        })
-      }
-    }
-  }, [game, variant, online, viewerSeat, recorded, streak])
+  const stats = loadStats()
+  const streak = loadStreak()
 
   const row = stats[variant.id]
   const others = Object.entries(stats).filter(([id]) => id !== variant.id)
