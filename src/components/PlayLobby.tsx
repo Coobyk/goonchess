@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowRight, ArrowUpRight, Bomb, Check, Crown, Orbit, Search, Skull, Sparkles, Wrench } from 'lucide-react'
 import { TEMPLATES } from '@/engine/templates'
+import type { Variant } from '@/engine/types'
 import { selectLatestGame, useAppStore } from '@/store/useAppStore'
 import { cn } from '@/lib/utils'
 import { packVariant } from '@/lib/variantCodec'
@@ -16,6 +17,12 @@ const FEATURED = [
   { id: 'boss-fight', icon: Skull, tone: 'amber', label: 'One boss. Five lives.' },
 ] as const
 
+// Placement array order does not change a setup (e.g. repainting a piece).
+const setupSignature = (variant: Variant) => JSON.stringify(packVariant({
+  ...variant,
+  setup: variant.setup.toSorted((a, b) => a.y - b.y || a.x - b.x),
+}))
+
 /** Discovery stays out of shared rooms: changing a variant starts a new local game. */
 export function PlayLobby() {
   const variant = useAppStore((s) => s.variant)
@@ -23,7 +30,7 @@ export function PlayLobby() {
   const activeTemplate = useMemo(() => {
     const template = TEMPLATES.find((t) => t.id === variant.id)
     if (!template || !FEATURED.some((t) => t.id === template.id)) return null
-    return JSON.stringify(packVariant(variant)) === JSON.stringify(packVariant(template.build()))
+    return setupSignature(variant) === setupSignature(template.build())
       ? template.id
       : null
   }, [variant])
