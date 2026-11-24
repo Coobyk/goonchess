@@ -20,7 +20,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from './ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { useMediaQuery } from '@/lib/mediaQuery'
 import { copyText } from '@/lib/clipboard'
 import { useAppStore, selectViewerSeat } from '@/store/useAppStore'
 import { OnlineBar } from './OnlineBar'
@@ -91,7 +90,7 @@ function TeamPlate({
   return (
     <div
       className={cn(
-        'flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2',
+        'club-team-plate flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2',
         game.turn === team.id && !game.winner ? 'border-foreground bg-secondary' : 'bg-card',
       )}
     >
@@ -226,7 +225,11 @@ function MoveHistoryCard() {
         <Separator className="mb-2" />
         <div ref={moveHistoryRef} className="h-48 overflow-y-auto pr-2">
           {fullMoves.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No moves yet.</p>
+            <div className="club-empty-history">
+              <span aria-hidden="true">♙</span>
+              <p>Your opening is unwritten.</p>
+              <small>Make the first move. See where it takes you.</small>
+            </div>
           ) : (
             <ol className="space-y-1">
               <li>
@@ -334,12 +337,10 @@ export function PlayView() {
     }
   }, [game.winner, game.status])
 
-  // Wide screens get the whole sidebar; narrow ones get a tab strip, so the
-  // page is not one long column under the board.
-  const wide = useMediaQuery('(min-width: 1024px)')
+  // Keep the board's tools in one compact, consistent scoresheet.
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <div className="club-game-layout grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <WinConfetti />
       <BotPlayer />
       <ClockTicker />
@@ -395,7 +396,11 @@ export function PlayView() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="flex flex-col items-center gap-4">
+      <div className="club-play-table flex min-w-0 flex-col items-center gap-3">
+        <div className="club-board-caption">
+          <span>{variant.name}</span>
+          <span>{variant.board.width} × {variant.board.height} / {online ? 'ONLINE TABLE' : 'LOCAL TABLE'}</span>
+        </div>
         <OnlineBar />
         {game.winner && (
           <Alert className="w-full max-w-xl">
@@ -799,17 +804,12 @@ export function PlayView() {
         </div>
       </div>
 
-      <aside className="flex flex-col gap-4">
+      <aside className="club-scoresheet flex min-w-0 flex-col gap-4">
         <LiveAnnouncer />
-        {wide ? (
-          <>
-            <AnalysisPanel />
-            <MoveHistoryCard />
-            <CommunityPanel />
-            <StatsPanel />
-          </>
-        ) : (
-          <Tabs defaultValue="moves">
+        <div className="club-scoresheet-heading">
+          <span>The scoresheet</span><span aria-hidden="true">↗</span>
+        </div>
+        <Tabs defaultValue="moves">
             <TabsList className="w-full">
               <TabsTrigger value="moves" className="flex-1">
                 Moves
@@ -824,7 +824,7 @@ export function PlayView() {
             <TabsContent value="moves">
               <MoveHistoryCard />
             </TabsContent>
-            <TabsContent value="analysis">
+            <TabsContent value="analysis" forceMount className="data-[state=inactive]:hidden">
               <AnalysisPanel />
             </TabsContent>
             <TabsContent value="stats">
@@ -833,10 +833,15 @@ export function PlayView() {
                 <StatsPanel />
               </div>
             </TabsContent>
-          </Tabs>
-        )}
+        </Tabs>
+        <div className="club-table-note">
+          <span className="club-eyebrow">A friendly reminder</span>
+          <p>There’s more than one<br />way to play a good game.</p>
+          <button type="button" className="club-text-link" onClick={() => useAppStore.getState().setView('rulebook')}>
+            Read the field guide <span aria-hidden="true">↗</span>
+          </button>
+        </div>
       </aside>
     </div>
   )
 }
-

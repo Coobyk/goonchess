@@ -162,7 +162,6 @@ export function AppHeader() {
     window.history.pushState(null, '', '/')
     window.scrollTo({ top: 0 })
   }
-  const variant = useAppStore((s) => s.variant)
   const soundEnabled = useAppStore((s) => s.soundEnabled)
   const setSoundEnabled = useAppStore((s) => s.setSoundEnabled)
   const soundPack = useAppStore((s) => s.soundPack)
@@ -206,28 +205,25 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
+      <a href="#main-content" className="club-skip-link">Skip to content</a>
+      <header className="club-header bg-background/95 sticky top-0 z-40 border-b backdrop-blur-xl">
+        <div className="mx-auto flex h-20 w-full max-w-[1320px] items-center gap-1.5 px-4 lg:px-10">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <a
               href="/"
               aria-label="Goonchess home"
               onClick={goHome}
-              className="flex shrink-0 items-center text-xl font-extrabold tracking-tight transition-opacity hover:opacity-90"
+              className="club-wordmark flex shrink-0 items-center transition-opacity hover:opacity-75"
             >
-              Goon
-              <span className="ml-1 rounded-md bg-primary px-1.5 py-0.5 text-primary-foreground">
-                chess
-              </span>
+              <span className="club-logo-mark" aria-hidden="true">♞</span>
+              goonchess<span className="club-logo-period">.</span>
             </a>
             <div className="hidden min-w-0 sm:block">
-              <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
-                {variant.name}
-              </p>
+              <p className="club-brand-note hidden xl:block">NOT YOUR<br />USUAL CHESS CLUB</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 lg:mx-auto">
+          <nav aria-label="Main navigation" className="club-primary-nav flex items-center gap-1.5 lg:mx-auto">
             <ToggleGroup
               type="single"
               value={view}
@@ -257,7 +253,7 @@ export function AppHeader() {
                 <BookOpen /> <span className="hidden sm:inline">Learn</span>
               </ToggleGroupItem>
             </ToggleGroup>
-          </div>
+          </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-1 lg:ml-0">
             <div className="hidden items-center gap-1 lg:flex">

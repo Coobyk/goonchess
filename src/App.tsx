@@ -8,6 +8,7 @@ import { TooltipProvider } from './components/ui/tooltip'
 import { pathFor, replaceRoute, routeFromLocation } from './lib/router'
 import { useAppStore } from './store/useAppStore'
 import { watchFinishedGames } from './lib/archiveWatcher'
+import { ClubWelcome, ClubWorkshop } from './components/ClubWelcome'
 
 const buildDate = new Date(__BUILD_TIME__)
 const buildTimeLabel = buildDate.toISOString().slice(0, 19).replace('T', ' ')
@@ -43,15 +44,31 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <div className="flex min-h-full flex-col">
+      <div className="club-app flex min-h-full flex-col">
         <AppHeader />
-        <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-8">
-          {view === 'play' ? <PlayView /> : view === 'maker' ? <MakerView /> : <RulebookView />}
+        <main id="main-content" tabIndex={-1} className="club-main mx-auto w-full max-w-[1320px] flex-1 px-4 py-6 lg:px-10">
+          {view === 'play' ? (
+            <>
+              <ClubWelcome />
+              <PlayView />
+              <ClubWorkshop />
+            </>
+          ) : (
+            <>
+              <div className="club-page-heading">
+                <p className="club-eyebrow">
+                  {view === 'maker' ? 'The workshop / Make it your own' : 'The field guide / A little know-how'}
+                </p>
+                <h1>{view === 'maker' ? 'Your rules. Your game.' : 'Know the game. Then change it.'}</h1>
+              </div>
+              {view === 'maker' ? <MakerView /> : <RulebookView />}
+            </>
+          )}
         </main>
         <footer className="border-t">
           <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-xs lg:px-8">
             <span>
-              Goonchess · built by{' '}
+              An independent chess club. Built by{' '}
               <a
                 href="https://coobyk.com"
                 target="_blank"

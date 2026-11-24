@@ -49,7 +49,7 @@ export const saveVariant = (v: Variant) => write(VARIANT_KEY, v)
 export const loadLibrary = () => read<SavedVariant[]>(LIBRARY_KEY, [])
 export const saveLibrary = (items: SavedVariant[]) => write(LIBRARY_KEY, items)
 
-export const loadTheme = () => read<'dark' | 'light'>(THEME_KEY, 'dark')
+export const loadTheme = () => read<'dark' | 'light'>(THEME_KEY, 'light')
 export const saveTheme = (t: 'dark' | 'light') => write(THEME_KEY, t)
 
 export const loadSoundEnabled = () => read<boolean>(SOUND_KEY, true)
