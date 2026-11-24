@@ -1,4 +1,4 @@
-import { useAppStore } from '@/store/useAppStore'
+import { selectLatestGame, useAppStore } from '@/store/useAppStore'
 import { loadSharing, submitGame } from '@/lib/archiveClient'
 
 /**
@@ -10,9 +10,11 @@ import { loadSharing, submitGame } from '@/lib/archiveClient'
  */
 export function watchFinishedGames(): () => void {
   return useAppStore.subscribe((state, prev) => {
-    const { game } = state
-    if (game === prev.game || !game.winner || prev.game.winner) return
-    if (!continues(prev.game.moveHistory, game.moveHistory)) return
+    // Reviewing a ply only changes the displayed game, not the live result.
+    const game = selectLatestGame(state)
+    const previous = selectLatestGame(prev)
+    if (game === previous || !game.winner || previous.winner) return
+    if (!continues(previous.moveHistory, game.moveHistory)) return
     if (state.online || state.puzzle || !loadSharing()) return
     void submitGame(game, state.bot.mode === 'off' ? 'local' : 'bot')
   })
