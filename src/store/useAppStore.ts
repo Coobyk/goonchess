@@ -113,6 +113,8 @@ export interface OnlineGame {
 interface AppState {
   variant: Variant
   game: GameState
+  /** Imports are displayed, but only played results belong in the archive. */
+  gameOrigin: 'played' | 'loaded'
   view: View
   makerTab: MakerTab
   theme: Theme
@@ -362,6 +364,7 @@ export const useAppStore = create<AppState>((set, get) => {
     return {
       variant,
       game,
+      gameOrigin: 'played' as const,
       selected: null,
       legalMoves: [] as Move[],
       undoStack: [game],
@@ -597,6 +600,7 @@ export const useAppStore = create<AppState>((set, get) => {
   return {
     variant: initial,
     game: setup.game,
+    gameOrigin: 'loaded',
     view: initialRoute.view,
     makerTab: initialRoute.makerTab,
     theme: loadTheme(),
@@ -973,6 +977,7 @@ export const useAppStore = create<AppState>((set, get) => {
     loadPosition: (state, history) => {
       set({
         game: state,
+        gameOrigin: 'loaded',
         selected: null,
         legalMoves: [],
         // A loaded game may come with every position it passed through, so
@@ -1021,6 +1026,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const settled = rollRandomPieces(next, move.pieceId)
       set({
         game: settled,
+        gameOrigin: 'played',
         selected: null,
         legalMoves: [],
         pendingPromotion: null,
@@ -1304,6 +1310,7 @@ export const useAppStore = create<AppState>((set, get) => {
         const fallen = flagFall(game, clockState, side)
         set({
           clockState: fallen.clock,
+          gameOrigin: 'played',
           game: displayed.moveHistory.length === game.moveHistory.length ? fallen.game : displayed,
           // A terminal result belongs to the final history position too, so
           // reviewing an earlier ply cannot discard it or revive the game.

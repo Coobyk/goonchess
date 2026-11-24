@@ -14,6 +14,7 @@ export function watchFinishedGames(): () => void {
     const game = selectLatestGame(state)
     const previous = selectLatestGame(prev)
     if (game === previous || !game.winner) return
+    if (state.gameOrigin !== 'played') return
     // A new result may continue the live game or branch from a reviewed ply.
     // Merely navigating the move list keeps the live snapshot unchanged above.
     if (![previous, prev.game].some((before) =>

@@ -10,6 +10,24 @@ import { watchFinishedGames } from './archiveWatcher'
 import { getLegalMoves } from '@/engine/rules'
 
 describe('archiving a timeout', () => {
+  it('does not submit an imported finish while reviewing another opening', () => {
+    const current = fromPgn('1. e4 e5 2. Nf3')!
+    const imported = fromPgn('1. e4', current.game.variant)!
+    // A finished position imported on the same variant, with one ply.
+    imported.game = { ...imported.game, winner: 'white', status: 'resign' }
+    imported.states[imported.states.length - 1] = imported.game
+    const store = () => useAppStore.getState()
+    store().loadPosition(current.game, current.states)
+    store().jumpToPly(0)
+    vi.mocked(submitGame).mockClear()
+    const stop = watchFinishedGames()
+    try {
+      expect(imported.game.winner).toBeTruthy()
+      store().loadPosition(imported.game, imported.states)
+      expect(submitGame).not.toHaveBeenCalled()
+    } finally { stop() }
+  })
+
   it('submits a new winning continuation played from a reviewed position', () => {
     const result = fromPgn('1. f3 e5 2. g4 Nc6')!
     const store = () => useAppStore.getState()
