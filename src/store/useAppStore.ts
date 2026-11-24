@@ -713,7 +713,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // A variant from the library is played, not edited: the Maker is one
       // click away for anyone who wants to change it.
       commit(structuredClone(v))
-      set({ view: 'play', makerTab: 'board' })
+      set({ view: 'play', makerTab: 'board', puzzle: null, puzzleStart: null, puzzleVerdict: null })
       pushRoute('play', 'board', null)
     },
 
