@@ -205,7 +205,19 @@ export function AppHeader() {
 
   return (
     <>
-      <a href="#main-content" className="club-skip-link">Skip to content</a>
+      <a
+        href="#main-content"
+        className="club-skip-link"
+        onClick={(event) => {
+          // The fragment can hold a shared variant or replay. Never replace it.
+          event.preventDefault()
+          const main = document.getElementById('main-content')
+          main?.focus({ preventScroll: true })
+          main?.scrollIntoView({ block: 'start' })
+        }}
+      >
+        Skip to content
+      </a>
       <header className="club-header bg-background/95 sticky top-0 z-40 border-b backdrop-blur-xl">
         <div className="mx-auto flex h-20 w-full max-w-[1320px] items-center gap-1.5 px-4 lg:px-10">
           <div className="flex min-w-0 shrink-0 items-center gap-3">

@@ -15,7 +15,7 @@
 .club-primary-nav [data-slot='toggle-group-item'] { border-radius: 0; background: transparent; padding: 13px 16px; font-size: 12px; box-shadow: none; border-bottom: 2px solid transparent; }
 .club-primary-nav [data-slot='toggle-group-item'][data-state='on'] { color: var(--primary); background: transparent; border-bottom-color: var(--primary); }
 .club-primary-nav [data-slot='toggle-group-item'] svg { display: none; }
-.club-main { padding-top: 0; }
+.club-main { padding-top: 0; scroll-margin-top: 100px; }
 .club-intro { position: relative; display: grid; grid-template-columns: 1.3fr 1fr; align-items: end; gap: 40px; padding: 40px 0 38px; }
 .club-eyebrow { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); font: 9px/1.6 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .club-eyebrow > span:empty { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
