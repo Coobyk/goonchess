@@ -43,15 +43,15 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <div className="flex min-h-full flex-col">
+      <div className="app-shell flex min-h-full flex-col">
         <AppHeader />
-        <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-8">
+        <main className="app-main mx-auto w-full max-w-[1560px] flex-1 px-4 py-6 sm:px-6 lg:px-9 lg:py-8">
           {view === 'play' ? <PlayView /> : view === 'maker' ? <MakerView /> : <RulebookView />}
         </main>
-        <footer className="border-t">
-          <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-xs lg:px-8">
+        <footer className="app-footer border-t">
+          <div className="text-muted-foreground mx-auto flex w-full max-w-[1560px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-5 text-[11px] lg:px-9">
             <span>
-              Goonchess · built by{' '}
+              Chess without limits. Built by{' '}
               <a
                 href="https://coobyk.com"
                 target="_blank"
@@ -61,7 +61,9 @@ export default function App() {
                 Coobyk
               </a>
             </span>
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
+            <details className="font-mono">
+              <summary className="cursor-pointer text-[10px]">Build details</summary>
+              <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>
                 built{' '}
                 <time dateTime={__BUILD_TIME__} title={new Date(__BUILD_TIME__).toUTCString()}>
@@ -81,7 +83,8 @@ export default function App() {
                   <span>({ago})</span>
                 </>
               )}
-            </span>
+              </span>
+            </details>
           </div>
         </footer>
         <Toaster theme={theme} position="bottom-right" closeButton richColors />

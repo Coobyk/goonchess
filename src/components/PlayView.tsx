@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from 'sonner'
-import { Bot, ClipboardCopy, Download, FileText, Film, ImageIcon, Loader2, RotateCcw, Undo2, Trophy, FlipHorizontal2, Timer } from 'lucide-react'
+import { ArrowUpRight, BookOpen, Bot, ClipboardCopy, Download, FileText, Film, ImageIcon, Loader2, MousePointer2, RotateCcw, Undo2, Trophy, FlipHorizontal2, Timer } from 'lucide-react'
 import { GameBoard } from './GameBoard'
+import { PlayLobby } from './PlayLobby'
 import { AnalysisPanel } from './AnalysisPanel'
 import { LiveAnnouncer } from './LiveAnnouncer'
 import { StatsPanel } from './StatsPanel'
@@ -91,7 +92,7 @@ function TeamPlate({
   return (
     <div
       className={cn(
-        'flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2',
+        'team-plate flex w-full max-w-xl items-center gap-3 rounded-lg border px-3 py-2',
         game.turn === team.id && !game.winner ? 'border-foreground bg-secondary' : 'bg-card',
       )}
     >
@@ -224,9 +225,13 @@ function MoveHistoryCard() {
       </CardHeader>
       <CardContent className="px-4">
         <Separator className="mb-2" />
-        <div ref={moveHistoryRef} className="h-48 overflow-y-auto pr-2">
+        <div ref={moveHistoryRef} className="h-40 overflow-y-auto pr-2">
           {fullMoves.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No moves yet.</p>
+            <div className="move-empty flex h-full flex-col items-center justify-center gap-2 text-center">
+              <MousePointer2 className="mb-1 size-6" strokeWidth={1.3} />
+              <p className="text-xs font-medium text-foreground">Every game starts somewhere.</p>
+              <p className="max-w-44 text-[11px] leading-relaxed text-muted-foreground">Make your first move. The story unfolds here.</p>
+            </div>
           ) : (
             <ol className="space-y-1">
               <li>
@@ -339,7 +344,9 @@ export function PlayView() {
   const wide = useMediaQuery('(min-width: 1024px)')
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <div className="play-page space-y-6">
+      {!online && <PlayLobby />}
+      <div className="play-workspace grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
       <WinConfetti />
       <BotPlayer />
       <ClockTicker />
@@ -395,7 +402,14 @@ export function PlayView() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="flex flex-col items-center gap-4">
+      <div className="board-stage flex min-w-0 flex-col items-center gap-4">
+        <div className="stage-heading flex w-full items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="eyebrow mb-1">On the board</p>
+            <h2 className="truncate text-lg font-bold tracking-tight">{variant.name}</h2>
+          </div>
+          <span className="stage-badge shrink-0"><span className="status-dot" />{online ? 'Online' : `${variant.board.width} × ${variant.board.height}`}</span>
+        </div>
         <OnlineBar />
         {game.winner && (
           <Alert className="w-full max-w-xl">
@@ -445,7 +459,7 @@ export function PlayView() {
           pocketPick={pocketPick}
           dark={theme === 'dark'}
         />
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="board-controls flex flex-wrap items-center justify-center gap-2">
           {!online && (
             <>
               <Button variant="outline" size="sm" onClick={resetGame}>
@@ -799,12 +813,17 @@ export function PlayView() {
         </div>
       </div>
 
-      <aside className="flex flex-col gap-4">
+      <aside className="play-sidebar flex min-w-0 flex-col gap-4">
         <LiveAnnouncer />
+        <div className="briefing-card">
+          <p className="eyebrow"><BookOpen className="size-3.5" /> The quick briefing</p>
+          <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{variant.description || 'Your board, your rules. Discover what makes this custom variant different.'}</p>
+          <button type="button" className="briefing-link mt-3 flex items-center gap-2 text-xs font-semibold" onClick={() => useAppStore.getState().setView('rulebook')}>Explore the rules <ArrowUpRight className="size-3.5" /></button>
+        </div>
         {wide ? (
           <>
-            <AnalysisPanel />
             <MoveHistoryCard />
+            <AnalysisPanel />
             <CommunityPanel />
             <StatsPanel />
           </>
@@ -836,7 +855,7 @@ export function PlayView() {
           </Tabs>
         )}
       </aside>
+      </div>
     </div>
   )
 }
-

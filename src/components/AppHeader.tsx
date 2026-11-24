@@ -2,6 +2,7 @@ import { useState, type MouseEvent } from 'react'
 import { toast } from 'sonner'
 import {
   BookOpen,
+  Crown,
   ChevronDown,
   ChevronRight,
   FileJson,
@@ -162,7 +163,6 @@ export function AppHeader() {
     window.history.pushState(null, '', '/')
     window.scrollTo({ top: 0 })
   }
-  const variant = useAppStore((s) => s.variant)
   const soundEnabled = useAppStore((s) => s.soundEnabled)
   const setSoundEnabled = useAppStore((s) => s.setSoundEnabled)
   const soundPack = useAppStore((s) => s.soundPack)
@@ -206,28 +206,22 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-1.5 px-3 sm:px-4 lg:px-8">
+      <header className="app-header sticky top-0 z-40 border-b backdrop-blur-xl">
+        <div className="mx-auto flex h-[76px] w-full max-w-[1660px] items-center gap-1.5 px-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <a
               href="/"
               aria-label="Goonchess home"
               onClick={goHome}
-              className="flex shrink-0 items-center text-xl font-extrabold tracking-tight transition-opacity hover:opacity-90"
+              className="brand flex shrink-0 items-center gap-2.5 text-xl font-extrabold tracking-tight transition-opacity hover:opacity-80"
             >
-              Goon
-              <span className="ml-1 rounded-md bg-primary px-1.5 py-0.5 text-primary-foreground">
-                chess
-              </span>
+              <span className="brand-mark grid size-9 place-items-center rounded-xl"><Crown className="size-5" strokeWidth={2.2} /></span>
+              <span>goon<span className="brand-accent">chess</span><span className="brand-dot">.</span></span>
             </a>
-            <div className="hidden min-w-0 sm:block">
-              <p className="text-muted-foreground hidden max-w-56 truncate text-xs lg:block">
-                {variant.name}
-              </p>
-            </div>
+            <span className="brand-tagline ml-5 hidden border-l pl-5 text-[10px] font-medium uppercase tracking-[0.2em] xl:block">Not your usual chess club</span>
           </div>
 
-          <div className="flex items-center gap-1.5 lg:mx-auto">
+          <nav aria-label="Main navigation" className="primary-navigation flex items-center gap-1.5 lg:mx-auto">
             <ToggleGroup
               type="single"
               value={view}
@@ -238,28 +232,28 @@ export function AppHeader() {
               <ToggleGroupItem
                 value="play"
                 aria-label="Play"
-                className="gap-1.5 px-3 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-none"
+                className="nav-item gap-1.5 px-3 py-1.5"
               >
                 <Swords /> <span className="hidden sm:inline">Play</span>
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="maker"
                 aria-label="Maker"
-                className="gap-1.5 px-3 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-none"
+                className="nav-item gap-1.5 px-3 py-1.5"
               >
                 <Wrench /> <span className="hidden sm:inline">Maker</span>
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="rulebook"
                 aria-label="Learn"
-                className="gap-1.5 px-3 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-none"
+                className="nav-item gap-1.5 px-3 py-1.5"
               >
                 <BookOpen /> <span className="hidden sm:inline">Learn</span>
               </ToggleGroupItem>
             </ToggleGroup>
-          </div>
+          </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1 lg:ml-0">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <div className="hidden items-center gap-1 lg:flex">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

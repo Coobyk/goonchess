@@ -46,7 +46,16 @@ export function MakerView() {
   })()
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)]">
+    <div className="maker-page space-y-6">
+      <div className="workspace-intro">
+        <div>
+          <p className="eyebrow"><span className="status-dot" /> The variant workshop</p>
+          <h1>Make your own <span>kind of chaos.</span></h1>
+          <p>Remix the board. Dream up a piece. Rewrite the rules.</p>
+        </div>
+        <Button size="lg" onClick={() => useAppStore.getState().setView('play')}><Swords /> Play this setup</Button>
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
       <Tabs
         value={makerTab}
         onValueChange={(v) => setMakerTab(v as MakerTab)}
@@ -133,6 +142,7 @@ export function MakerView() {
           </CardContent>
         </Card>
       </aside>
+      </div>
     </div>
   )
 }
