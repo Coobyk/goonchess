@@ -20,7 +20,7 @@ export function watchPersonalResults(): () => void {
       if (!before.every((move, i) => move === after[i])) return
       const sameHistory = prev.undoStack.length > 0
         ? state.undoStack[0] === prev.undoStack[0]
-        : state.undoStack.length === 1 && state.undoStack[0] === game
+        : state.undoStack.length === 1 && state.undoStack[0].moveHistory === game.moveHistory
       if (state.undoStack !== prev.undoStack && !sameHistory) return
     }
     // The opening history entry identifies a game, not its move count or winner.

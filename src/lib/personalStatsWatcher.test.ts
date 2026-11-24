@@ -106,3 +106,25 @@ it('counts separate zero-move online resignations despite a shared opening histo
   }
   expect(loadStats().classic.games).toBe(2)
 })
+
+it('counts a first-move win after restart when another piece transforms', () => {
+  const variant = classicChess()
+  variant.winConditions = [{ id: 'capture', kind: 'kingCapture' }]
+  variant.pieceTypes.find((p) => p.name === 'Knight')!.flags.random = true
+  const placements: [string, string, number, number][] = [
+    ['King', 'white', 0, 7], ['Rook', 'white', 7, 1],
+    ['King', 'black', 7, 0], ['Knight', 'white', 1, 7],
+  ]
+  variant.setup = placements.map(([name, team, x, y]) => ({
+    typeId: variant.pieceTypes.find((p) => p.name === name)!.id, team, x, y,
+  }))
+  useAppStore.getState().playVariant(variant)
+  useAppStore.getState().resetGame()
+  const move = getLegalMoves(useAppStore.getState().game, 7, 1).find((m) => m.finalTo.y === 0)
+  expect(move).toBeDefined()
+  useAppStore.getState().playMove(move!)
+  const state = useAppStore.getState()
+  expect(state.game.winner).toBe('white')
+  expect(state.game).not.toBe(state.undoStack[0])
+  expect(loadStats().classic.games).toBe(1)
+})
