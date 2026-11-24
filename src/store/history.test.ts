@@ -32,14 +32,20 @@ describe('starting a variant after a puzzle', () => {
 })
 
 describe('imported games keep their history', () => {
-  it('reads the live timeout result rather than the unfinished history snapshot', () => {
+  it.each([false, true])('preserves timeout results through review (rewound before timeout: %s)', (rewound) => {
     const result = fromPgn('1. e4')!
     store().loadPosition(result.game, result.states)
+    if (rewound) store().jumpToPly(0)
     useAppStore.setState({
       clock: { minutes: 1, increment: 0 },
       clockState: { times: { white: 60000, black: 0 }, lastMoveAt: Date.now() - 1, running: true },
     })
     store().tickClock()
+    expect(selectLatestGame(store()).winner).toBe('white')
+    store().jumpToPly(0)
+    expect(store().game.moveHistory).toHaveLength(0)
+    expect(selectLatestGame(store()).winner).toBe('white')
+    store().jumpToPly(1)
     expect(store().game.winner).toBe('white')
     expect(selectLatestGame(store())).toBe(store().game)
     useAppStore.setState({ clock: { minutes: 0, increment: 0 } })

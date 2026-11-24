@@ -1292,7 +1292,8 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     tickClock: () => {
-      const { clock, clockState, game } = get()
+      const { clock, clockState, game: displayed, undoStack } = get()
+      const game = selectLatestGame(get())
       if (!clockIsOn(clock) || game.winner) return
       if (!clockState.running || clockState.lastMoveAt === null) return
       const now = Date.now()
@@ -1309,7 +1310,10 @@ export const useAppStore = create<AppState>((set, get) => {
         const fallen = flagFall(game, clockState, side)
         set({
           clockState: fallen.clock,
-          game: fallen.game,
+          game: displayed.moveHistory.length === game.moveHistory.length ? fallen.game : displayed,
+          // A terminal result belongs to the final history position too, so
+          // reviewing an earlier ply cannot discard it or revive the game.
+          undoStack: [...undoStack.slice(0, -1), fallen.game],
           selected: null,
           legalMoves: [],
         })
@@ -1375,11 +1379,8 @@ useAppStore.subscribe((state, prev) => {
  * The position the game is actually on — the top of the history, not the one
  * being reviewed. Read it through `useAppStore(selectLatestGame)`.
  */
-export const selectLatestGame = (s: AppState): GameState => {
-  const latest = s.undoStack[s.undoStack.length - 1]
-  // Timeouts can update the live result without adding another move.
-  return !latest || s.game.moveHistory.length >= latest.moveHistory.length ? s.game : latest
-}
+export const selectLatestGame = (s: AppState): GameState =>
+  s.undoStack[s.undoStack.length - 1] ?? s.game
 
 /** The seat the human plays from — online or against the bot — or null for a
  * spectator, who watches every side. */
