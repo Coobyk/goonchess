@@ -29,6 +29,20 @@ function finish(seat: number | null = 0) {
 
 beforeEach(() => { store().leaveOnline(); socket.send.mockClear() })
 
+describe('returning to a connected room', () => {
+  it('restores Play without reconnecting or losing the room position', () => {
+    const game = finish()
+    const online = store().online
+    socket.close.mockClear()
+    store().setView('rulebook')
+    store().joinOnline('abcdefghjk')
+    expect(store().view).toBe('play')
+    expect(store().online).toBe(online)
+    expect(store().game).toBe(game)
+    expect(socket.close).not.toHaveBeenCalled()
+  })
+})
+
 describe('Play again in online games', () => {
   it.each([0, 1])('seat %i offers a rematch without locally resetting the result', (seat) => {
     const game = finish(seat)

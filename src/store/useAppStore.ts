@@ -1141,7 +1141,11 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     joinOnline: (code) => {
-      if (get().online?.code === code) return
+      if (get().online?.code === code) {
+        // Browser Back may restore this room while Learn is still selected.
+        set({ view: 'play', makerTab: 'board' })
+        return
+      }
       room?.close()
       set({
         view: 'play',
