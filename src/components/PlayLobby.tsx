@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ArrowRight, ArrowUpRight, Bomb, Check, Crown, Orbit, Search, Skull, Sparkles, Wrench } from 'lucide-react'
 import { TEMPLATES } from '@/engine/templates'
 import { selectLatestGame, useAppStore } from '@/store/useAppStore'
@@ -32,11 +32,14 @@ export function PlayLobby() {
   const [browseOpen, setBrowseOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState<Template | null>(null)
+  const browseTrigger = useRef<HTMLButtonElement>(null)
+  const confirmationTrigger = useRef<HTMLElement | null>(null)
 
-  const start = (template: Template) => {
+  const start = (template: Template, trigger: HTMLElement) => {
     // Reviewing the opening must not hide the moves in the live game.
     const game = selectLatestGame(useAppStore.getState())
     if (game.moveHistory.length > 0 && !game.winner) {
+      confirmationTrigger.current = trigger
       setPending(template)
       return
     }
@@ -64,7 +67,7 @@ export function PlayLobby() {
 
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">Choose your chaos <span className="ml-2 text-xs font-normal text-muted-foreground">Find your next obsession.</span></h2>
-        <Button variant="ghost" size="sm" className="browse-variants h-7 text-xs" onClick={() => setBrowseOpen(true)}>
+        <Button ref={browseTrigger} variant="ghost" size="sm" className="browse-variants h-7 text-xs" onClick={() => setBrowseOpen(true)}>
           All {TEMPLATES.length} variants <ArrowRight className="size-3.5" />
         </Button>
       </div>
@@ -78,7 +81,7 @@ export function PlayLobby() {
               key={id}
               className={cn('variant-tile', `variant-${tone}`, active && 'is-selected')}
               aria-pressed={active}
-              onClick={() => start(template)}
+              onClick={(event) => start(template, event.currentTarget)}
             >
               <span className="variant-icon"><Icon className="size-5" /></span>
               <span className="min-w-0 text-left">
@@ -92,7 +95,10 @@ export function PlayLobby() {
       </div>
 
       <Dialog open={browseOpen} onOpenChange={setBrowseOpen}>
-        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          browseTrigger.current?.focus()
+        }}>
           <DialogHeader>
             <DialogTitle>Pick your next plot twist.</DialogTitle>
             <DialogDescription>{TEMPLATES.length} ways to play. Same game, different possibilities.</DialogDescription>
@@ -103,7 +109,7 @@ export function PlayLobby() {
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {matches.map((template) => (
-              <button type="button" key={template.id} onClick={() => start(template)} className="variant-result rounded-xl border p-3 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
+              <button type="button" key={template.id} onClick={(event) => start(template, event.currentTarget)} className="variant-result rounded-xl border p-3 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
                 <span className="flex items-center justify-between gap-2 text-sm font-semibold">{template.name}<ArrowUpRight className="size-3.5 text-muted-foreground" /></span>
                 <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{template.description}</span>
               </button>
@@ -114,7 +120,12 @@ export function PlayLobby() {
       </Dialog>
 
       <Dialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <DialogContent>
+        <DialogContent onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          const trigger = confirmationTrigger.current
+          if (trigger?.isConnected) trigger.focus()
+          else browseTrigger.current?.focus()
+        }}>
           <DialogHeader>
             <DialogTitle>Start {pending?.name}?</DialogTitle>
             <DialogDescription>This replaces the game in progress. Your current moves won’t be kept.</DialogDescription>
@@ -124,6 +135,8 @@ export function PlayLobby() {
             <Button onClick={() => {
               if (!pending) return
               playVariant(pending.build())
+              // Catalog results disappear when a new variant starts.
+              if (browseOpen) confirmationTrigger.current = browseTrigger.current
               setPending(null)
               setBrowseOpen(false)
             }}>Start new game <ArrowRight /></Button>
