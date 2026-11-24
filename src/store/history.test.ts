@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { decodeGame, encodeGame } from '@/lib/encoding'
 import { fromPgn } from '@/lib/pgn'
 import { createInitialState, getLegalMoves, staggerPass } from '@/engine/rules'
-import { bossFight } from '@/engine/templates'
+import { bossFight, miniChess } from '@/engine/templates'
 import { replayMoves, undoPly } from '@/lib/replay'
 import { positionKey } from '@/engine/repetition'
 
@@ -11,6 +11,25 @@ vi.mock('sonner', () => ({ toast: vi.fn() }))
 import { useAppStore } from './useAppStore'
 
 const store = () => useAppStore.getState()
+
+describe('starting a variant after a puzzle', () => {
+  it('restarts the chosen variant rather than the previous puzzle', () => {
+    const puzzle = fromPgn('1. e4 e5 2. Nf3')!.game
+    store().loadPosition(puzzle, [puzzle])
+    store().setPuzzleStart(puzzle)
+    store().setPuzzle({ from: { x: 4, y: 6 }, to: { x: 4, y: 4 }, side: 'white', gain: 1, difficulty: 'easy', themes: [], movesBefore: 3 })
+    store().setPuzzleVerdict(true)
+    const variant = miniChess()
+    store().playVariant(variant)
+    expect(store().puzzleStart).toBeNull()
+    expect(store().puzzle).toBeNull()
+    expect(store().puzzleVerdict).toBeNull()
+    store().resetGame()
+    expect(store().game.variant).toEqual(variant)
+    expect(store().game.board).toHaveLength(6)
+    expect(store().game.moveHistory).toHaveLength(0)
+  })
+})
 
 describe('imported games keep their history', () => {
   it('lets the move list and the graph step through a PGN game', () => {

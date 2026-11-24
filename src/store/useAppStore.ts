@@ -365,6 +365,9 @@ export const useAppStore = create<AppState>((set, get) => {
       selected: null,
       legalMoves: [] as Move[],
       undoStack: [game],
+      puzzleStart: null,
+      puzzle: null,
+      puzzleVerdict: null,
       clockState: initialClockState(get().clock, variant),
       botSide: sideFor(get().bot, variant, get().botSide),
     }
