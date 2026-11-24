@@ -10,6 +10,26 @@ import { watchFinishedGames } from './archiveWatcher'
 import { getLegalMoves } from '@/engine/rules'
 
 describe('archiving a timeout', () => {
+  it('submits a new winning continuation played from a reviewed position', () => {
+    const result = fromPgn('1. f3 e5 2. g4 Nc6')!
+    const store = () => useAppStore.getState()
+    store().loadPosition(result.game, result.states)
+    useAppStore.setState({ puzzle: null, clock: { minutes: 0, increment: 0 } })
+    store().jumpToPly(3)
+    const mate = getLegalMoves(store().game, 3, 0).find((m) => m.finalTo.x === 7 && m.finalTo.y === 4)!
+    expect(mate).toBeDefined()
+    vi.mocked(submitGame).mockClear()
+    const stop = watchFinishedGames()
+    try {
+      store().playMove(mate)
+      expect(store().game.winner).toBe('black')
+      expect(submitGame).toHaveBeenCalledOnce()
+      store().jumpToPly(3)
+      store().jumpToPly(4)
+      expect(submitGame).toHaveBeenCalledOnce()
+    } finally { stop() }
+  })
+
   it('submits a timeout detected by a late move before the scheduled tick', () => {
     const result = fromPgn('1. e4')!
     const store = () => useAppStore.getState()

@@ -13,8 +13,12 @@ export function watchFinishedGames(): () => void {
     // Reviewing a ply only changes the displayed game, not the live result.
     const game = selectLatestGame(state)
     const previous = selectLatestGame(prev)
-    if (game === previous || !game.winner || previous.winner) return
-    if (!continues(previous.moveHistory, game.moveHistory)) return
+    if (game === previous || !game.winner) return
+    // A new result may continue the live game or branch from a reviewed ply.
+    // Merely navigating the move list keeps the live snapshot unchanged above.
+    if (![previous, prev.game].some((before) =>
+      !before.winner && continues(before.moveHistory, game.moveHistory),
+    )) return
     if (state.online || state.puzzle || !loadSharing()) return
     void submitGame(game, state.bot.mode === 'off' ? 'local' : 'bot')
   })
