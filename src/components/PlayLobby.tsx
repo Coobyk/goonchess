@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowRight, ArrowUpRight, Bomb, Check, Crown, Orbit, Search, Skull, Sparkles, Wrench } from 'lucide-react'
 import { TEMPLATES } from '@/engine/templates'
 import { selectLatestGame, useAppStore } from '@/store/useAppStore'
 import { cn } from '@/lib/utils'
+import { packVariant } from '@/lib/variantCodec'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Input } from './ui/input'
@@ -17,7 +18,15 @@ const FEATURED = [
 
 /** Discovery stays out of shared rooms: changing a variant starts a new local game. */
 export function PlayLobby() {
-  const variantId = useAppStore((s) => s.variant.id)
+  const variant = useAppStore((s) => s.variant)
+  // Template IDs survive Maker edits; only an unchanged setup is selected.
+  const activeTemplate = useMemo(() => {
+    const template = TEMPLATES.find((t) => t.id === variant.id)
+    if (!template || !FEATURED.some((t) => t.id === template.id)) return null
+    return JSON.stringify(packVariant(variant)) === JSON.stringify(packVariant(template.build()))
+      ? template.id
+      : null
+  }, [variant])
   const playVariant = useAppStore((s) => s.playVariant)
   const setView = useAppStore((s) => s.setView)
   const [browseOpen, setBrowseOpen] = useState(false)
@@ -62,7 +71,7 @@ export function PlayLobby() {
       <div className="variant-deck">
         {FEATURED.map(({ id, icon: Icon, tone, label }) => {
           const template = TEMPLATES.find((t) => t.id === id)!
-          const active = variantId === id
+          const active = activeTemplate === id
           return (
             <button
               type="button"
