@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUpRight, Check, Search, X } from 'lucide-react'
 import { TEMPLATES } from '@/engine/templates'
 import { useAppStore } from '@/store/useAppStore'
 import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Input } from './ui/input'
 
 const QUICK_PICKS = ['classic', 'chess960', 'atomic', 'crazyhouse']
@@ -18,7 +18,7 @@ export function ClubWelcome() {
   const templates = TEMPLATES.filter((t) => `${t.name} ${t.description}`.toLowerCase().includes(query.toLowerCase()))
 
   return (
-    <>
+    <Dialog open={browseOpen} onOpenChange={setBrowseOpen}>
       {!online && (
         <section className="club-intro" aria-labelledby="club-title">
           <div>
@@ -52,14 +52,15 @@ export function ClubWelcome() {
                 {template.name === 'Classic Chess' ? 'Classic' : template.name}
               </button>
             ))}
-            <button type="button" className="club-browse" onClick={() => { setQuery(''); setBrowseOpen(true) }}>
-              All variants <ArrowDown size={13} />
-            </button>
+            <DialogTrigger asChild>
+              <button type="button" className="club-browse" onClick={() => setQuery('')}>
+                All variants <ArrowDown size={13} />
+              </button>
+            </DialogTrigger>
           </div>
         )}
       </section>
 
-      <Dialog open={browseOpen} onOpenChange={setBrowseOpen}>
         <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <p className="club-eyebrow">The collection / {TEMPLATES.length} ways to play</p>
@@ -82,8 +83,7 @@ export function ClubWelcome() {
           </div>
           {templates.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No variants found. Try a different search.</p>}
         </DialogContent>
-      </Dialog>
-    </>
+    </Dialog>
   )
 }
 
