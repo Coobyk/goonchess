@@ -10,8 +10,13 @@ import { useAppStore } from './useAppStore'
 
 it('leaves the puzzle behind when selecting another variant, including on restart', () => {
   const puzzleStart = createInitialState(classicChess())
+  useAppStore.getState().setPuzzle({
+    from: { x: 4, y: 6 }, to: { x: 4, y: 4 }, side: 'white',
+    gain: 1, difficulty: 'easy', themes: [], movesBefore: 0,
+  })
   useAppStore.getState().setPuzzleStart(puzzleStart)
   useAppStore.getState().setPuzzleVerdict(true)
+  expect(useAppStore.getState().puzzle).not.toBeNull()
 
   const selected = atomic()
   useAppStore.getState().playVariant(selected)
