@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { Library, Save, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
@@ -15,6 +15,33 @@ import { Label } from './ui/label'
 import { ScrollArea } from './ui/scroll-area'
 import { Separator } from './ui/separator'
 
+function SaveVariantForm({
+  initialName,
+  onSave,
+}: {
+  initialName: string
+  onSave: (name: string) => void
+}) {
+  const [name, setName] = useState(initialName)
+
+  return (
+    <div className="flex items-end gap-2">
+      <div className="flex-1 space-y-1.5">
+        <Label htmlFor="save-name">Save current variant as</Label>
+        <Input
+          id="save-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={initialName}
+        />
+      </div>
+      <Button onClick={() => onSave(name.trim() || initialName)}>
+        <Save /> Save
+      </Button>
+    </div>
+  )
+}
+
 export function LibraryDialog({
   open,
   onOpenChange,
@@ -27,12 +54,6 @@ export function LibraryDialog({
   const addCurrentToLibrary = useAppStore((s) => s.addCurrentToLibrary)
   const loadFromLibrary = useAppStore((s) => s.loadFromLibrary)
   const deleteFromLibrary = useAppStore((s) => s.deleteFromLibrary)
-  const [name, setName] = useState(variant.name)
-  // The dialog stays mounted between opens, so the field follows whichever
-  // variant is showing when it next appears.
-  useEffect(() => {
-    if (open) setName(variant.name)
-  }, [open, variant.name])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -46,25 +67,16 @@ export function LibraryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-end gap-2">
-          <div className="flex-1 space-y-1.5">
-            <Label htmlFor="save-name">Save current variant as</Label>
-            <Input
-              id="save-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={variant.name}
-            />
-          </div>
-          <Button
-            onClick={() => {
-              addCurrentToLibrary(name.trim() || variant.name)
-              toast.success('Saved to library')
-            }}
-          >
-            <Save /> Save
-          </Button>
-        </div>
+        {/* The dialog stays mounted between opens, so the field follows whichever
+            variant is showing when it next appears. */}
+        <SaveVariantForm
+          key={open ? `open:${variant.name}` : 'closed'}
+          initialName={variant.name}
+          onSave={(name) => {
+            addCurrentToLibrary(name)
+            toast.success('Saved to library')
+          }}
+        />
 
         <Separator />
 

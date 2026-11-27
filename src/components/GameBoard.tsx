@@ -302,17 +302,14 @@ export function GameBoard() {
   const turnView = useAppStore((s) => s.turnView)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [container, width] = useElementWidth<HTMLDivElement>()
-  // The square the keyboard cursor is on. Arrow keys move it, Enter plays.
-  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
-
   const { variant, board, pieceTypes, turn } = game
   const { width: cols, height: rows } = variant.board
   const cell = boardCellSize(width, cols, 64, 24)
-
-  // Put the cursor on the board as soon as it exists.
-  useEffect(() => {
-    setCursor((current) => current ?? { x: 0, y: Math.max(0, rows - 1) })
-  }, [rows])
+  // The square the keyboard cursor is on. Arrow keys move it, Enter plays.
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(() => ({
+    x: 0,
+    y: Math.max(0, rows - 1),
+  }))
 
   const [drag, setDrag] = useState<{ pieceId: string; clientX: number; clientY: number } | null>(null)
   const dragRef = useRef<{

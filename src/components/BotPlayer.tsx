@@ -21,12 +21,9 @@ export function BotPlayer() {
   const game = useAppStore((s) => s.game)
   const bot = useAppStore((s) => s.bot)
   const botSide = useAppStore((s) => s.botSide)
-  const undoStack = useAppStore((s) => s.undoStack)
   const opponentOpen = useAppStore((s) => s.opponentOpen)
   // A shared game has a person on the other side, never a bot.
   const online = useAppStore((s) => s.online)
-  const clock = useAppStore((s) => s.clock)
-  const clockState = useAppStore((s) => s.clockState)
   const setBotThinking = useAppStore((s) => s.setBotThinking)
   const client = useBotWorker()
   const running = useRef(false)
@@ -36,6 +33,7 @@ export function BotPlayer() {
 
   useEffect(() => {
     const team = game.turn
+    const { undoStack, clock, clockState } = useAppStore.getState()
     const isLatest = game.moveHistory.length === (undoStack[undoStack.length-1]?.moveHistory ?? game.moveHistory).length
     const canPass = !online || (online.connected && online.status === 'playing' &&
       online.seat !== null && game.variant.teams[online.seat]?.id === team)

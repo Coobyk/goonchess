@@ -10,7 +10,6 @@ import {
   POCKET_SQUARE,
   type GameState,
   type Move,
-  type PieceFlags,
   type PieceType,
   type Terrain,
   type Variant,
@@ -72,9 +71,11 @@ import {
 import { pushRoute, routeFromLocation, type MakerTab, type View } from '@/lib/router'
 import { fromPgn } from '@/lib/pgn'
 import { undoPly } from '@/lib/replay'
+import { normalizeVariant, validateVariant } from '@/lib/variantValidation'
 import { proveWork } from '@/lib/captcha'
 import { toast } from 'sonner'
 import {
+  ApiError,
   connect,
   createRoom,
   writeSeatToken,
@@ -276,12 +277,19 @@ export interface Brush {
  * when it held only a variant, so later edits persist; a game that played
  * back out of the hash keeps it, so a reload plays the game again.
  */
+function localVariant(input: unknown): Variant | null {
+  const normalized = normalizeVariant(input)
+  if (!normalized) return null
+  const validation = validateVariant(normalized, { onlinePlay: false })
+  return validation.ok ? validation.value : null
+}
+
 function initialSetup(): { variant: Variant; game: GameState; stack: GameState[] } {
   const fromHash = variantFromHash()
-  let variant = fromHash ? normalizeVariant(fromHash) : null
+  let variant = fromHash ? localVariant(fromHash) : null
   if (!variant) {
     const saved = loadVariant()
-    if (saved) variant = normalizeVariant(saved)
+    if (saved) variant = localVariant(saved)
   }
   if (!variant) variant = defaultVariant()
 
@@ -293,42 +301,6 @@ function initialSetup(): { variant: Variant; game: GameState; stack: GameState[]
   if (fromHash || pgn) clearHash()
   const game = createInitialState(variant)
   return { variant, game, stack: [game] }
-}
-
-function normalizeVariant(input: unknown): Variant | null {
-  if (!input || typeof input !== 'object') return null
-  const v = input as Variant
-  if (!v.board || !Array.isArray(v.pieceTypes) || !Array.isArray(v.teams)) return null
-  if (!v.board.tiles || !Array.isArray(v.board.tiles)) return null
-  return {
-    ...v,
-    schema: 1,
-    teams: v.teams.length ? v.teams : defaultVariant().teams,
-    setup: Array.isArray(v.setup) ? v.setup : [],
-    winConditions: Array.isArray(v.winConditions) ? v.winConditions : [],
-    pieceTypes: v.pieceTypes.map((p) => ({
-      ...p,
-      flags: defaultPieceFlags(p.flags as Partial<PieceFlags> | undefined),
-      effects: p.effects ?? [],
-      capture: p.capture ?? [],
-      move: p.move ?? [],
-      promotion: normalizePromotion(p.promotion),
-    })),
-  }
-}
-
-/** Accepts every shape a promotion target has been stored in over time. */
-function normalizePromotion(promotion: unknown): { typeIds: string[] } | null {
-  if (!promotion || typeof promotion !== 'object') return null
-  const raw = Array.isArray(promotion)
-    ? promotion
-    : 'typeIds' in promotion
-      ? (promotion as { typeIds?: unknown }).typeIds
-      : // Older variants stored the single target as `typeId`.
-        (promotion as { typeId?: unknown }).typeId
-  const list = Array.isArray(raw) ? raw : [raw]
-  const typeIds = list.filter((id): id is string => typeof id === 'string' && !!id)
-  return typeIds.length ? { typeIds } : null
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -1186,8 +1158,16 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     startOnlineGame: async (seat) => {
-      const variant = get().variant
+      const variant = normalizeVariant(get().variant) ?? get().variant
       if (variant.teams.length !== 2) throw new Error('needs_two_teams')
+      const validation = validateVariant(variant)
+      if (!validation.ok) {
+        throw new ApiError(
+          'bad_variant',
+          validation.errors[0] ?? 'The variant is not playable.',
+          validation.errors.slice(0, 8),
+        )
+      }
       // The proof is the only thing standing between a script and a thousand
       // rooms, so it is asked for before the request goes out.
       const proof = await proveWork()
@@ -1339,8 +1319,8 @@ export const useAppStore = create<AppState>((set, get) => {
     importVariant: (json) => {
       try {
         const parsed = JSON.parse(json)
-        const normalized = normalizeVariant(parsed)
-        if (!normalized) return { ok: false, error: 'That JSON does not look like a variant.' }
+        const normalized = localVariant(parsed)
+        if (!normalized) return { ok: false, error: 'That JSON is not a valid variant.' }
         commit(normalized)
         return { ok: true }
       } catch (e) {

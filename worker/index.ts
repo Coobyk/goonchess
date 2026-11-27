@@ -3,7 +3,7 @@ import { GameArchive, archiveStub, ARCHIVE_RECORD_URL } from './archive'
 import { GameRoom } from './game-room'
 import { CREATE_PATH, json } from './http'
 import { CODE_PATTERN, randomCode, randomToken } from './ids'
-import { BOARD_MAX, BOARD_MIN, type Variant } from '../src/engine/types'
+import type { Variant } from '../src/engine/types'
 import { createInitialState } from '../src/engine/rules'
 import {
   archiveEntry,
@@ -16,6 +16,7 @@ import {
   type GameSource,
 } from '../src/lib/archive'
 import type { MoveRequest } from '../src/lib/replay'
+import { normalizeVariant, validateVariant } from '../src/lib/variantValidation'
 
 export { GameArchive, GameRoom }
 
@@ -24,7 +25,6 @@ const allowArchive = rateLimiter(20)
 
 /** A variant bigger than this is not a variant, it is an upload. */
 const MAX_BODY = 192 * 1024
-const MAX_NAME = 80
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -92,10 +92,9 @@ async function createGame(request: Request, env: Env): Promise<Response> {
     return json({ error: 'bad_json' }, 400)
   }
 
-  const variant = body?.variant
-  if (!isPlayableVariant(variant)) {
-    return json({ error: 'bad_variant', message: 'Two teams and a board between 3 and 16 squares fit in a shared game.' }, 400)
-  }
+  const checked = validatePlayableVariant(body?.variant)
+  if (!checked.variant) return badVariant(checked.errors)
+  const variant = checked.variant
 
   const check = await verifyChallenge(secret, body?.captcha?.challenge, body?.captcha?.solution)
   if (!check.ok) return json({ error: check.reason }, 403)
@@ -134,8 +133,9 @@ async function archiveGame(request: Request, env: Env): Promise<Response> {
     return json({ error: 'bad_json' }, 400)
   }
 
-  const variant = body?.variant
-  if (!isPlayableVariant(variant)) return json({ error: 'bad_variant' }, 400)
+  const checked = validatePlayableVariant(body?.variant)
+  if (!checked.variant) return badVariant(checked.errors)
+  const variant = checked.variant
   const source = GAME_SOURCES.includes(body.source as GameSource) ? (body.source as GameSource) : null
   if (!source || source === 'online') return json({ error: 'bad_source' }, 400)
   const requests = parseRequests(body.moves)
@@ -225,39 +225,24 @@ async function stats(url: URL, env: Env): Promise<Response> {
  * Online play is two players for now, so the room only accepts a variant it
  * knows how to seat. Everything else stays a share link.
  */
-function isPlayableVariant(value: unknown): value is Variant {
-  if (!value || typeof value !== 'object') return false
-  const variant = value as Partial<Variant>
-  if (typeof variant.name !== 'string' || variant.name.length > MAX_NAME) return false
-  if (!Array.isArray(variant.teams) || variant.teams.length !== 2) return false
-  if (!Array.isArray(variant.pieceTypes) || variant.pieceTypes.length === 0) return false
-  const board = variant.board
-  if (!board || typeof board !== 'object') return false
-  const { width, height, tiles } = board
-  if (!Number.isInteger(width) || !Number.isInteger(height)) return false
-  if (
-    width < BOARD_MIN ||
-    height < BOARD_MIN ||
-    width > BOARD_MAX ||
-    height > BOARD_MAX
-  ) {
-    return false
-  }
-  if (!Array.isArray(tiles) || tiles.length !== height) return false
-  if (
-    !variant.teams.every(
-      (team) => !!team && typeof team.id === 'string' && typeof team.name === 'string',
-    )
-  ) {
-    return false
-  }
-  // The shape says little about whether the engine can stand the variant up —
-  // the real check is asking it to.
+function validatePlayableVariant(value: unknown): { variant: Variant | null; errors: string[] } {
+  const normalized = normalizeVariant(value)
+  if (!normalized) return { variant: null, errors: ['variant: expected a schema-1 variant object'] }
+  const validation = validateVariant(normalized)
+  if (!validation.ok) return { variant: null, errors: validation.errors }
   try {
-    createInitialState(variant as Variant)
+    createInitialState(validation.value)
   } catch {
-    return false
+    return { variant: null, errors: ['The rules cannot start this variant.'] }
   }
-  return true
+  return { variant: validation.value, errors: [] }
+}
+
+function badVariant(errors: string[]): Response {
+  return json({
+    error: 'bad_variant',
+    message: errors[0] ?? 'The variant is not playable.',
+    details: errors.slice(0, 8),
+  }, 400)
 }
 

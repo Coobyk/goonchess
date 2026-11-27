@@ -1,13 +1,53 @@
-import { useEffect } from 'react'
+import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { AppHeader } from './components/AppHeader'
-import { MakerView } from './components/MakerView'
 import { PlayView } from './components/PlayView'
-import { RulebookView } from './components/RulebookView'
 import { Toaster } from './components/ui/sonner'
 import { TooltipProvider } from './components/ui/tooltip'
 import { pathFor, replaceRoute, routeFromLocation } from './lib/router'
 import { useAppStore } from './store/useAppStore'
 import { watchFinishedGames } from './lib/archiveWatcher'
+
+const MakerView = lazy(() =>
+  import('./components/MakerView').then((module) => ({ default: module.MakerView })),
+)
+const RulebookView = lazy(() =>
+  import('./components/RulebookView').then((module) => ({ default: module.RulebookView })),
+)
+
+class RouteErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div role="alert" className="mx-auto max-w-md py-12 text-center">
+        <p className="font-medium">This page could not be loaded.</p>
+        <p className="text-muted-foreground mt-2 text-sm">
+          The site may have been updated while this tab was open.
+        </p>
+        <button
+          type="button"
+          className="bg-primary text-primary-foreground mt-4 rounded-md px-4 py-2 text-sm font-medium"
+          onClick={() => window.location.reload()}
+        >
+          Reload
+        </button>
+      </div>
+    )
+  }
+}
+
+function RouteLoadingFallback() {
+  return (
+    <div role="status" className="text-muted-foreground py-12 text-center text-sm">
+      Loading…
+    </div>
+  )
+}
 
 const buildDate = new Date(__BUILD_TIME__)
 const buildTimeLabel = buildDate.toISOString().slice(0, 19).replace('T', ' ')
@@ -46,7 +86,11 @@ export default function App() {
       <div className="flex min-h-full flex-col">
         <AppHeader />
         <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-8">
-          {view === 'play' ? <PlayView /> : view === 'maker' ? <MakerView /> : <RulebookView />}
+          <RouteErrorBoundary>
+            <Suspense fallback={<RouteLoadingFallback />}>
+              {view === 'play' ? <PlayView /> : view === 'maker' ? <MakerView /> : <RulebookView />}
+            </Suspense>
+          </RouteErrorBoundary>
         </main>
         <footer className="border-t">
           <div className="text-muted-foreground mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 text-xs lg:px-8">

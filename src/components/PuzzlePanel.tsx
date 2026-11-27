@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Flame, Lightbulb, Loader2, Puzzle as PuzzleIcon, Repeat, SkipForward } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
@@ -51,7 +51,6 @@ export function PuzzlePanel() {
   const [stats, setStats] = useState(loadPuzzleStats)
   const [streakMode, setStreakMode] = useState(false)
   const streakModeRef = useRef(streakMode)
-  streakModeRef.current = streakMode
 
   // Another variant means another puzzle. The panel remounts whenever the
   // player comes back from the board, so only a real change of variant — or a
@@ -70,7 +69,7 @@ export function PuzzlePanel() {
     }
   }, [variantId, setPuzzle, setPuzzleStart])
 
-  const loadPuzzle = async () => {
+  const loadPuzzle = useCallback(async () => {
     setBusy(true)
     try {
       const result = await client.findPuzzle(variant, Math.floor(Math.random() * 1e9))
@@ -96,9 +95,9 @@ export function PuzzlePanel() {
     } finally {
       setBusy(false)
     }
-  }
+  }, [client, variant, setPuzzle, setPuzzleStart])
 
-  const recordAnswer = (right: boolean) => {
+  const recordAnswer = useCallback((right: boolean) => {
     setStats((current) => {
       const next = {
         streak: right ? current.streak + 1 : 0,
@@ -107,7 +106,12 @@ export function PuzzlePanel() {
       savePuzzleStats(next)
       return next
     })
-  }
+  }, [])
+
+  const updateStreakMode = useCallback((enabled: boolean) => {
+    streakModeRef.current = enabled
+    setStreakMode(enabled)
+  }, [])
 
   // Watch for the player's answer.
   useEffect(() => {
@@ -135,7 +139,7 @@ export function PuzzlePanel() {
       }, right ? 1200 : 2200)
       return () => window.clearTimeout(timer)
     }
-  }, [game, puzzle, verdict, setVerdict])
+  }, [game, puzzle, verdict, setVerdict, loadPuzzle, recordAnswer])
 
   // Starting the puzzle over clears the verdict on it.
   useEffect(() => {
@@ -213,7 +217,7 @@ export function PuzzlePanel() {
                 <Switch
                   aria-label="Streak mode: keep dealing puzzles"
                   checked={streakMode}
-                  onCheckedChange={setStreakMode}
+                  onCheckedChange={updateStreakMode}
                 />
               </span>
             </div>
@@ -240,7 +244,7 @@ export function PuzzlePanel() {
                 <Switch
                   aria-label="Streak mode: keep dealing puzzles"
                   checked={streakMode}
-                  onCheckedChange={setStreakMode}
+                  onCheckedChange={updateStreakMode}
                 />
               </span>
             </div>

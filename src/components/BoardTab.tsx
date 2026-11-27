@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Eraser, Grid3x3, Paintbrush } from 'lucide-react'
 import { BOARD_MAX, BOARD_MIN } from '@/engine/types'
 import type { Terrain } from '@/engine/types'
@@ -18,6 +18,65 @@ const TERRAINS: { id: Terrain; label: string; hint: string }[] = [
   { id: 'oneway', label: 'One-way', hint: 'Click source then destination' },
 ]
 
+function BoardSizeControls({
+  width,
+  height,
+  onApply,
+}: {
+  width: number
+  height: number
+  onApply: (width: number, height: number) => void
+}) {
+  const [w, setW] = useState(width)
+  const [h, setH] = useState(height)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Grid3x3 className="size-4" /> Board size
+        </CardTitle>
+        <CardDescription>From tiny 3×3 duels to sprawling 16×16 campaigns.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="board-w">Columns</Label>
+            <Input
+              id="board-w"
+              type="number"
+              min={BOARD_MIN}
+              max={BOARD_MAX}
+              className="w-24"
+              value={w}
+              onChange={(e) => setW(Number(e.target.value))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="board-h">Rows</Label>
+            <Input
+              id="board-h"
+              type="number"
+              min={BOARD_MIN}
+              max={BOARD_MAX}
+              className="w-24"
+              value={h}
+              onChange={(e) => setH(Number(e.target.value))}
+            />
+          </div>
+          <Button onClick={() => onApply(w, h)}>Apply size</Button>
+          <Badge variant="secondary">
+            {width} × {height}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Shrinking the board trims pieces and terrain outside the new bounds.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function BoardTab() {
   const variant = useAppStore((s) => s.variant)
   const resizeBoard = useAppStore((s) => s.resizeBoard)
@@ -26,14 +85,6 @@ export function BoardTab() {
   const setBrush = useAppStore((s) => s.setBrush)
   const portalPending = useAppStore((s) => s.portalPending)
   const setPortalPending = useAppStore((s) => s.setPortalPending)
-
-  const [w, setW] = useState(variant.board.width)
-  const [h, setH] = useState(variant.board.height)
-
-  useEffect(() => {
-    setW(variant.board.width)
-    setH(variant.board.height)
-  }, [variant.board.width, variant.board.height])
 
   const counts = variant.board.tiles
     .flat()
@@ -44,49 +95,12 @@ export function BoardTab() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Grid3x3 className="size-4" /> Board size
-          </CardTitle>
-          <CardDescription>From tiny 3×3 duels to sprawling 16×16 campaigns.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="board-w">Columns</Label>
-              <Input
-                id="board-w"
-                type="number"
-                min={BOARD_MIN}
-                max={BOARD_MAX}
-                className="w-24"
-                value={w}
-                onChange={(e) => setW(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="board-h">Rows</Label>
-              <Input
-                id="board-h"
-                type="number"
-                min={BOARD_MIN}
-                max={BOARD_MAX}
-                className="w-24"
-                value={h}
-                onChange={(e) => setH(Number(e.target.value))}
-              />
-            </div>
-            <Button onClick={() => resizeBoard(w, h)}>Apply size</Button>
-            <Badge variant="secondary">
-              {variant.board.width} × {variant.board.height}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Shrinking the board trims pieces and terrain outside the new bounds.
-          </p>
-        </CardContent>
-      </Card>
+      <BoardSizeControls
+        key={`${variant.board.width}x${variant.board.height}`}
+        width={variant.board.width}
+        height={variant.board.height}
+        onApply={resizeBoard}
+      />
 
       <Card>
         <CardHeader>

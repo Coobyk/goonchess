@@ -31,7 +31,6 @@ import { CLOCK_PRESETS, clockIsOn } from '@/lib/clock'
 import { toFen } from '@/lib/fen'
 import { toPgn } from '@/lib/pgn'
 import { downloadBlob, fileNameFor, positionName, renderBoardImage } from '@/lib/image'
-import { exportGameVideo } from '@/lib/videoExport'
 import { playSound } from '@/lib/sound'
 import { isPocketSquare, type GameState, type TeamConfig, type Variant } from '@/engine/types'
 
@@ -675,6 +674,7 @@ export function PlayView() {
                     }
                     setRendering(0)
                     try {
+                      const { exportGameVideo } = await import('@/lib/videoExport')
                       const blob = await exportGameVideo(states, {
                         packId: soundPack,
                         onProgress: setRendering,

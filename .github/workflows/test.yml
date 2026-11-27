@@ -11,6 +11,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,3 +33,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Uses a temporary local `wrangler dev` with the test-only
+      # `--var CAPTCHA_SECRET:goonchess-room-e2e`; no deployment secret is used.
+      # The script signals Wrangler's Linux process group so workerd is cleaned up.
+      - name: Test online room end to end
+        run: npm run test:room

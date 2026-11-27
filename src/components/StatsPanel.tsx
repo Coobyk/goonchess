@@ -17,6 +17,26 @@ import {
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
+/** The local calendar day, updated when midnight passes. */
+function useToday() {
+  const [today, setToday] = useState(() => dayKey(new Date()))
+  useEffect(() => {
+    let timer: number | undefined
+    const schedule = () => {
+      const now = new Date()
+      const midnight = new Date(now)
+      midnight.setHours(24, 0, 0, 0)
+      timer = window.setTimeout(() => {
+        setToday(dayKey(new Date()))
+        schedule()
+      }, Math.max(1, midnight.getTime() - now.getTime()))
+    }
+    schedule()
+    return () => window.clearTimeout(timer)
+  }, [])
+  return today
+}
+
 /**
  * Keeps track of how the games went.
  *
@@ -31,6 +51,7 @@ export function StatsPanel() {
   const [stats, setStats] = useState<Stats>(() => loadStats())
   const [streak, setStreak] = useState<PlayStreak>(() => loadStreak())
   const [recorded, setRecorded] = useState<string | null>(null)
+  const today = useToday()
 
   // Note the result once the game is over. A finished game — win, loss or
   // draw — marks the day as played and keeps the streak going.
@@ -50,12 +71,12 @@ export function StatsPanel() {
     const next = recordResult(loadStats(), variant.id, result)
     saveStats(next)
     setStats(next)
-    const today = dayKey(new Date())
-    const nextStreak = recordPlayDay(loadStreak(), today)
+    const finishedToday = dayKey(new Date())
+    const nextStreak = recordPlayDay(loadStreak(), finishedToday)
     saveStreak(nextStreak)
     setStreak(nextStreak)
     // First finished game of the day: announce the streak.
-    if (streak.lastDay !== today) {
+    if (streak.lastDay !== finishedToday) {
       if (nextStreak.days === 1) {
         toast('Your streak started! 🔥', {
           description: 'Come back tomorrow to make it 2 days in a row.',
@@ -70,7 +91,7 @@ export function StatsPanel() {
 
   const row = stats[variant.id]
   const others = Object.entries(stats).filter(([id]) => id !== variant.id)
-  const streakDays = liveStreakDays(streak, dayKey(new Date()))
+  const streakDays = liveStreakDays(streak, today)
 
   return (
     <Card className="py-4">

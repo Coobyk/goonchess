@@ -47,9 +47,11 @@ export function AnalysisPanel() {
   const over = full.status !== 'active'
   // The graph belongs to a finished game, so a game being played again — a new
   // one, or one taken back — drops the picture of the old one.
-  useEffect(() => {
+  const [wasOver, setWasOver] = useState(over)
+  if (wasOver !== over) {
+    setWasOver(over)
     if (!over) setGraph(null)
-  }, [over])
+  }
 
   // The live analysis of the position on the board.
   useEffect(() => {

@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { ClipboardType, Copy, Download, FileJson, FileText, Link2, Loader2, Upload, Users } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { captchaMessage } from '@/lib/captcha'
+import { ApiError } from '@/lib/online'
 import { copyText } from '@/lib/clipboard'
 import { fileNameFor } from '@/lib/image'
 import { gameToHash, variantToHash } from '@/lib/encoding'
@@ -64,8 +65,17 @@ export function ShareDialog({
       if (!wrote) toast.info('Send it to whoever you want to play.')
       onOpenChange(false)
     } catch (cause) {
-      const code = cause instanceof Error ? cause.message : 'unknown'
-      setPlayError(captchaMessage(code))
+      if (cause instanceof ApiError && cause.code === 'bad_variant') {
+        const details = cause.details.length ? cause.details.join('; ') : cause.message
+        setPlayError(`This variant cannot be played online: ${details}`)
+      } else {
+        const code = cause instanceof ApiError
+          ? cause.code
+          : cause instanceof Error
+            ? cause.message
+            : 'unknown'
+        setPlayError(captchaMessage(code))
+      }
     } finally {
       setCreating(false)
     }

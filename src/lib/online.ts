@@ -30,6 +30,18 @@ export function writeSeatToken(code: string, token: string): void {
   }
 }
 
+export class ApiError extends Error {
+  readonly code: string
+  readonly details: string[]
+
+  constructor(code: string, message?: string, details: string[] = []) {
+    super(message ?? code)
+    this.name = 'ApiError'
+    this.code = code
+    this.details = details
+  }
+}
+
 export interface CreateResult {
   code: string
   token: string
@@ -48,8 +60,15 @@ export async function createRoom(
     body: JSON.stringify({ variant, captcha, clock, seat }),
   })
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string }
-    throw new Error(body.error ?? `create_failed_${response.status}`)
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string
+      message?: string
+      details?: unknown
+    }
+    const details = Array.isArray(body.details)
+      ? body.details.filter((item): item is string => typeof item === 'string').slice(0, 8)
+      : []
+    throw new ApiError(body.error ?? `create_failed_${response.status}`, body.message, details)
   }
   return (await response.json()) as CreateResult
 }
