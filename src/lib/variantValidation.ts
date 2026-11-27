@@ -201,6 +201,7 @@ const VARIANT_RULES = new Set([
   'loyalty',
   'hypergamy',
   'spinning',
+  'turning',
 ])
 const PIECE_FLAG_KEYS = [
   'jump',

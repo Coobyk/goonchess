@@ -557,6 +557,22 @@ export function spinningChess(): Variant {
   }
 }
 
+export function turnChess(seed = Math.floor(Math.random() * 2 ** 31)): Variant {
+  const base = classicChess()
+  return {
+    ...base,
+    id: 'turn',
+    name: 'Turn Chess',
+    description: 'After a piece moves, it randomly turns 45° left or right, and its moves turn with it.',
+    rules: ['turning'],
+    randomSeed: seed,
+  }
+}
+
+export function reseedTurnChess(variant: Variant): Variant {
+  return { ...variant, randomSeed: Math.floor(Math.random() * 2 ** 31) }
+}
+
 /* ----------------------------------------------------------------- blank */
 
 export function blankVariant(width = 8, height = 8): Variant {
@@ -1007,6 +1023,13 @@ export const TEMPLATES: {
     name: 'Spinning Chess',
     description: 'Regular chess, every piece spinning',
     build: spinningChess,
+  },
+  {
+    id: 'turn',
+    name: 'Turn Chess',
+    description: 'Pieces randomly turn 45° after moving',
+    build: turnChess,
+    freshSetup: reseedTurnChess,
   },
 ]
 

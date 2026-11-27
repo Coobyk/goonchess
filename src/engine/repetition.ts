@@ -45,6 +45,9 @@ export function positionKey(state: GameState): string {
   const staggered = state.board.flat().map((id) => id && state.pieces[id].staggered
     ? state.pieces[id].staggerRecovered ? '2' : '1' : '0').join('')
   if (/[12]/.test(staggered)) parts.push(`stagger:${staggered}`)
+  if (variant.rules?.includes('turning')) {
+    parts.push(state.board.flat().map((id) => id ? (state.pieces[id].orientation ?? 0).toString(8) : '.').join(''))
+  }
   // Three-Check: two positions with the same pieces are different games when
   // the checks have been counted differently. Every other game keeps the
   // keys it has always had.

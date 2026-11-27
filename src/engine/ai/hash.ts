@@ -108,6 +108,11 @@ export function hashPosition(state: GameState, out: Fingerprint): void {
       const lives = inst.lives ?? state.pieceTypes[inst.typeId]?.lives ?? 1
       h1 = mix(h1, lives)
       h2 = mix(h2, lives)
+      if (variant.rules?.includes('turning')) {
+        const orientation = inst.orientation ?? 0
+        h1 = mix(h1, orientation + 0x31)
+        h2 = mix(h2, orientation)
+      }
       if (inst.staggered) {
         h1 = mix(h1, 0x4d219ba7)
         h2 = mix(h2, 0x16a3c95f)
@@ -124,6 +129,12 @@ export function hashPosition(state: GameState, out: Fingerprint): void {
         h2 = mix(h2, 0x27d4eb2f)
       }
     }
+  }
+
+  if (variant.rules?.includes('turning') || variant.pieceTypes.some((piece) => piece.flags.random)) {
+    const seed = state.randomSeed ?? variant.randomSeed ?? 1
+    h1 = mix(h1, seed)
+    h2 = mix(h2, seed)
   }
 
   // Whose turn it is.

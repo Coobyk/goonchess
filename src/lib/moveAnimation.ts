@@ -44,6 +44,7 @@ export interface Flight {
   kind: FlightKind
   duration: number
   delay: number
+  orientation?: number
 }
 
 export interface Dissolve {
@@ -137,6 +138,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
     kind,
     duration,
     delay,
+    orientation: prev.pieces[pieceId]?.orientation ?? 0,
   })
 
   // A portal hop ends on a different square than the one that was stepped on.

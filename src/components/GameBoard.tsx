@@ -210,6 +210,7 @@ function PendingPromotion({
   pieceType,
   pieceTypes,
   rotatePieces,
+  orientation = 0,
   spinning,
   onChoose,
   onCancel,
@@ -224,6 +225,7 @@ function PendingPromotion({
   pieceType: PieceType
   pieceTypes: Record<string, PieceType>
   rotatePieces: boolean
+  orientation?: number
   spinning: boolean
   onChoose: (typeId: string) => void
   onCancel: () => void
@@ -238,6 +240,7 @@ function PendingPromotion({
   }, [travel])
 
   const size = Math.round(cell * 0.78)
+  const facing = (rotatePieces ? 180 : 0) + orientation * 45
   const left = (flipBoard ? cols - 1 - start.x : start.x) * cell
   const top = (flipBoard ? rows - 1 - start.y : start.y) * cell
   const dx = (move.finalTo.x - start.x) * cell * (flipBoard ? -1 : 1)
@@ -262,7 +265,7 @@ function PendingPromotion({
         <span className="piece-lift flex h-full w-full items-center justify-center">
           <span
             className="inline-flex"
-            style={{ transform: rotatePieces ? 'rotate(180deg)' : undefined }}
+            style={{ transform: facing ? `rotate(${facing}deg)` : undefined }}
           >
             <Spin on={spinning}>
               <PieceGlyph piece={pieceType} teamIndex={teamIndex} size={size} />
@@ -432,6 +435,11 @@ export function GameBoard() {
   const flipBoard = (viewerSeat !== null || turnView === 'board') && orientation === 1
   const rotatePieces = viewerSeat === null && turnView === 'pieces' && orientation === 1
   const spinning = !!variant.rules?.includes('spinning')
+  const turning = !!variant.rules?.includes('turning')
+  const facingTransform = (piece?: { orientation?: number } | null) => {
+    const degrees = (rotatePieces ? 180 : 0) + (turning ? (piece?.orientation ?? 0) * 45 : 0)
+    return degrees ? `rotate(${degrees}deg)` : undefined
+  }
 
   // Play a blast animation when a *new* move sets off an explosion (not on undo).
   const [blast, setBlast] = useState<{ id: number; x: number; y: number; radius: number } | null>(null)
@@ -639,6 +647,7 @@ export function GameBoard() {
                 pieceType={pendingType}
                 pieceTypes={pieceTypes}
                 rotatePieces={rotatePieces}
+                orientation={pendingMover?.orientation ?? 0}
                 spinning={spinning}
                 onChoose={choosePromotion}
                 onCancel={cancelPromotion}
@@ -723,7 +732,7 @@ export function GameBoard() {
                     <span
                       className="inline-flex"
                       style={{
-                        transform: rotatePieces ? 'rotate(180deg)' : undefined,
+                        transform: facingTransform(piece),
                         transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
                       }}
                     >
@@ -786,7 +795,7 @@ export function GameBoard() {
             <span className="piece-dragging inline-flex drop-shadow-2xl">
               <span
                 className="inline-flex"
-                style={{ transform: rotatePieces ? 'rotate(180deg)' : undefined }}
+                style={{ transform: facingTransform(inst) }}
               >
                 <Spin on={spinning}>
                   <PieceGlyph

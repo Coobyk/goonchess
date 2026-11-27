@@ -63,6 +63,7 @@ const RULES = of<VariantRule>({
   loyalty: true,
   hypergamy: true,
   spinning: true,
+  turning: true,
 })
 const ICONS: PieceIcon[] = PIECE_ICONS.map((i) => i.id)
 const SHAPES: ArtShape[] = ART_SHAPES

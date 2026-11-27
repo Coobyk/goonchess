@@ -419,6 +419,10 @@ export class GameRoom {
         send(ws, { t: 'seat', seat })
       }
     }
+    if (meta.variant.rules?.includes('turning')) {
+      meta.variant = { ...meta.variant, randomSeed: Math.floor(Math.random() * 2 ** 31) }
+      await this.ctx.storage.put('meta', meta)
+    }
     const fresh = createInitialState(meta.variant)
     const clock = clockIsOn(meta.clock)
       ? initialClockState(meta.clock, fresh.variant)

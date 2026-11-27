@@ -113,6 +113,10 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
     name: 'Spinning pieces',
     hint: 'Every piece on the board spins round and round, all game long. The rules are the ordinary ones — only your eyes have to keep up.',
   },
+  turning: {
+    name: 'Turning pieces',
+    hint: 'After a piece moves, it randomly turns 45° left or right. Its movement turns with it, rounded to the squares of the board: a rook can become a bishop, a bishop a rook, and a pawn can start walking sideways.',
+  },
 }
 
 const TURN_VIEW_COPY = {

@@ -11,7 +11,7 @@ import type {
   Vec,
 } from './types'
 import { positionKey } from './repetition'
-import { nextSeed } from './rand'
+import { mulberry32, nextSeed } from './rand'
 import { PASS_SQUARE, SAN_LETTERS } from './types'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
@@ -112,9 +112,17 @@ function isBlocking(tile: Tile | null) {
  * A team that advances downwards sees the board mirrored, so a step that goes
  * "forward" in the pattern goes the other way on the board.
  */
-function orient(piece: PieceType, forward: 'up' | 'down', v: Vec): Vec {
-  if (!piece.flags.mirror || forward !== 'down') return v
-  return { x: v.x, y: -v.y }
+function orient(piece: PieceType, forward: 'up' | 'down', v: Vec, orientation = 0): Vec {
+  const mirrored = piece.flags.mirror && forward === 'down' ? { x: v.x, y: -v.y } : v
+  const steps = ((Math.round(orientation) % 8) + 8) % 8
+  if (!steps) return mirrored
+  const angle = steps * Math.PI / 4
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  return {
+    x: Math.round(mirrored.x * cos - mirrored.y * sin),
+    y: Math.round(mirrored.x * sin + mirrored.y * cos),
+  }
 }
 
 /* ----------------------------------------------------------- state setup */
@@ -316,7 +324,7 @@ function generateMoves(state: GameState, x: number, y: number, seen: Uint8Array)
     for (const pattern of list) {
       if (pattern.firstMoveOnly && inst.hasMoved) continue
       for (const raw of pattern.vectors) {
-        const v = orient(piece, forward, raw)
+        const v = orient(piece, forward, raw, inst.orientation ?? 0)
         if (pattern.kind === 'leaper') {
           push(x + v.x, y + v.y, mode, allowCapture)
           continue
@@ -514,7 +522,7 @@ function enPassantMove(
   const patterns = piece.capture.length > 0 ? piece.capture : piece.move
   const attacksIt = patterns.some((pattern) =>
     pattern.vectors.some((raw) => {
-      const v = orient(piece, forward, raw)
+      const v = orient(piece, forward, raw, inst.orientation ?? 0)
       return x + v.x === skipped.x && y + v.y === skipped.y
     }),
   )
@@ -904,6 +912,7 @@ function slidesAlong(
   teamId: string,
   dx: number,
   dy: number,
+  orientation = 0,
 ): boolean {
   // A piece with its own capture patterns attacks along a different set of
   // lines, so do not guess — treat it as able to slide.
@@ -916,7 +925,7 @@ function slidesAlong(
     }
     const forward = geometryFor(state.variant).forward[teamId] ?? 'up'
     for (const raw of pattern.vectors) {
-      const v = orient(piece, forward, raw)
+      const v = orient(piece, forward, raw, orientation)
       if ((v.x === dx && v.y === dy) || (v.x === -dx && v.y === -dy)) return true
     }
   }
@@ -999,7 +1008,7 @@ function exposedSquares(
     const enemyPiece = state.pieceTypes[enemyInst.typeId]
     if (!enemyPiece) continue
     if (enemyPiece.flags.movesOnce && enemyInst.hasMoved) continue
-    if (!slidesAlong(state, enemyPiece, enemyInst.team, dir.x, dir.y)) continue
+    if (!slidesAlong(state, enemyPiece, enemyInst.team, dir.x, dir.y, enemyInst.orientation ?? 0)) continue
     exposed[first.y * width + first.x] = 1
   }
 }
@@ -1650,6 +1659,20 @@ export function applyMove(
         }
       }
     }
+  }
+
+  if (
+    next.variant.rules?.includes('turning') &&
+    !hit &&
+    !move.drop &&
+    next.pieces[move.pieceId]
+  ) {
+    const seed = nextSeed(next.randomSeed ?? next.variant.randomSeed ?? 1)
+    next.randomSeed = seed
+    const delta = mulberry32(seed)() < 0.5 ? -1 : 1
+    touch(move.pieceId)
+    const turned = next.pieces[move.pieceId]
+    turned.orientation = (((turned.orientation ?? 0) + delta) % 8 + 8) % 8
   }
 
   expireStagger(state, next, inst.team, wounded)

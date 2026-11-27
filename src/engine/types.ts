@@ -290,6 +290,7 @@ export type VariantRule =
   | 'hypergamy'
   /** Every piece spins round and round, all game long. Changes only how the pieces look. */
   | 'spinning'
+  | 'turning'
 
 export interface Variant {
   schema: 1
@@ -370,6 +371,7 @@ export interface MoveRecord {
 }
 
 export interface PieceInstance {
+  orientation?: number
   lives?: number
   staggered?: boolean
   staggerRecovered?: boolean

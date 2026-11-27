@@ -43,6 +43,10 @@ export function MoveAnimationLayer({
   const left = (x: number) => (flip ? cols - 1 - x : x) * cell
   const top = (y: number) => (flip ? rows - 1 - y : y) * cell
   const spin = rotation ? `rotate(${rotation}deg)` : undefined
+  const spinFor = (pieceId: string, orientation?: number) => {
+    const degrees = rotation + (orientation ?? pieces[pieceId]?.orientation ?? 0) * 45
+    return degrees ? `rotate(${degrees}deg)` : undefined
+  }
 
   return (
     <div key={anim.id} className="pointer-events-none absolute inset-0 z-30">
@@ -90,7 +94,7 @@ export function MoveAnimationLayer({
               } as CSSProperties
             }
           >
-            <span className="inline-flex" style={{ transform: spin }}>
+            <span className="inline-flex" style={{ transform: spinFor(p.pieceId) }}>
               <Spin on={spinning}>
                 <PieceGlyph piece={type} teamIndex={teamIndex(p.team)} size={size} />
               </Spin>
@@ -126,7 +130,7 @@ export function MoveAnimationLayer({
                   : 'flex h-full w-full items-center justify-center'
               }
             >
-              <span className="inline-flex" style={{ transform: spin }}>
+              <span className="inline-flex" style={{ transform: spinFor(f.pieceId, f.orientation) }}>
                 <Spin on={spinning}>
                   <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} lives={pieces[f.pieceId]?.lives} staggered={pieces[f.pieceId]?.staggered} />
                 </Spin>
