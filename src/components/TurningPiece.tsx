@@ -38,7 +38,10 @@ export function TurningPiece({
   return (
     <span
       className={className}
-      style={{ transform: baseRotation ? `rotate(${baseRotation}deg)` : undefined }}
+      style={{
+        transform: baseRotation ? `rotate(${baseRotation}deg)` : undefined,
+        transition: `transform ${TURN_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+      }}
     >
       <span
         className="inline-flex"
