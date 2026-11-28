@@ -430,9 +430,14 @@ export function GameBoard() {
   const [orientation, setOrientation] = useState(targetOrientation)
   useEffect(() => {
     if (orientation === targetOrientation) return
-    const timer = window.setTimeout(() => setOrientation(targetOrientation), moveDuration + 120)
+    // In a turning game with flipped pieces the flip joins the post-move
+    // turn: the piece rotation is already gated by the turn delay, so the
+    // flip applies at once and both rotations merge into a single glide.
+    const pieceFlip = viewerSeat === null && turnView === 'pieces'
+    const mergeWithTurn = pieceFlip && !!variant.rules?.includes('turning')
+    const timer = window.setTimeout(() => setOrientation(targetOrientation), mergeWithTurn ? 0 : moveDuration + 120)
     return () => window.clearTimeout(timer)
-  }, [orientation, targetOrientation, moveDuration])
+  }, [orientation, targetOrientation, moveDuration, viewerSeat, turnView, variant])
   const flipBoard = (viewerSeat !== null || turnView === 'board') && orientation === 1
   const rotatePieces = viewerSeat === null && turnView === 'pieces' && orientation === 1
   const spinning = !!variant.rules?.includes('spinning')

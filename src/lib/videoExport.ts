@@ -6,7 +6,7 @@ import {
   type Vec,
 } from '@/engine/types'
 import { isInCheck } from '@/engine/rules'
-import { BLAST_STAGGER, parryTravel, planMove, POP_MS, TURN_MS, type Anim } from './moveAnimation'
+import { BLAST_STAGGER, parryTravel, planMove, POP_MS, TURN_MS, turnDelta, type Anim } from './moveAnimation'
 import { boardColors, portalRgba } from './palette'
 import { artToUri, rainbowUri, SHAPE_OF_ICON } from './pieceArt'
 import { findPack } from './soundPacks'
@@ -77,18 +77,12 @@ function normalizeTurn(orientation: number): number {
   return ((Math.round(orientation) % 8) + 8) % 8
 }
 
-function turnDifference(from: number, to: number): number {
-  let diff = (to - from) % 8
-  if (diff > 4) diff -= 8
-  if (diff < -4) diff += 8
-  return diff
-}
 
 function turningAngle(fromOrientation: number, toOrientation: number, progress: number): number {
   const from = normalizeTurn(fromOrientation)
   const to = normalizeTurn(toOrientation)
   const p = Math.max(0, Math.min(1, progress))
-  return (from + turnDifference(from, to) * EASE_SLIDE(p)) * 45
+  return (from + turnDelta(from, to) * EASE_SLIDE(p)) * 45
 }
 
 interface Segment {

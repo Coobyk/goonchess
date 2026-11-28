@@ -27,6 +27,14 @@ export function turnDelta(from: number, to: number): number {
   return diff
 }
 
+/** The shortest signed rotation between two angles, in degrees. */
+export function shortestRotation(from: number, to: number): number {
+  let diff = (to - from) % 360
+  if (diff > 180) diff -= 360
+  if (diff <= -180) diff += 360
+  return diff
+}
+
 /** Stagger between captured pieces fading out, one after another. */
 const FADE_STAGGER = 30
 
