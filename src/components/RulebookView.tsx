@@ -115,7 +115,7 @@ const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
   },
   turning: {
     name: 'Turning pieces',
-    hint: 'After a piece moves, it randomly turns 45° left or right. Its movement turns with it, rounded to the squares of the board: a rook can become a bishop, a bishop a rook, and a pawn can start walking sideways.',
+    hint: 'After every move, each piece randomly turns 45° left or right. Its movement turns with it, rounded to the squares of the board: a rook can become a bishop, a bishop a rook, and a pawn can start walking sideways.',
   },
 }
 

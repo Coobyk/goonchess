@@ -6,7 +6,7 @@ import {
   type Vec,
 } from '@/engine/types'
 import { isInCheck } from '@/engine/rules'
-import { BLAST_STAGGER, parryTravel, planMove, type Anim } from './moveAnimation'
+import { BLAST_STAGGER, parryTravel, planMove, POP_MS, TURN_MS, type Anim } from './moveAnimation'
 import { boardColors, portalRgba } from './palette'
 import { artToUri, rainbowUri, SHAPE_OF_ICON } from './pieceArt'
 import { findPack } from './soundPacks'
@@ -34,7 +34,6 @@ const SOUND_NAMES: SoundName[] = [
 ]
 
 const BLAST_MS = 620
-const POP_MS = 260
 const HOLD_FIRST_MS = 500
 const HOLD_MS = 160
 const SETTLE_MS = 220
@@ -73,6 +72,24 @@ const EASE_DISSOLVE = bezier(0.4, 0, 1, 1)
 const EASE_VANISH = bezier(0.4, 0, 0.2, 1)
 const EASE_EMERGE = bezier(0.34, 1.3, 0.64, 1)
 const EASE_BLAST = bezier(0.16, 1, 0.3, 1)
+
+function normalizeTurn(orientation: number): number {
+  return ((Math.round(orientation) % 8) + 8) % 8
+}
+
+function turnDifference(from: number, to: number): number {
+  let diff = (to - from) % 8
+  if (diff > 4) diff -= 8
+  if (diff < -4) diff += 8
+  return diff
+}
+
+function turningAngle(fromOrientation: number, toOrientation: number, progress: number): number {
+  const from = normalizeTurn(fromOrientation)
+  const to = normalizeTurn(toOrientation)
+  const p = Math.max(0, Math.min(1, progress))
+  return (from + turnDifference(from, to) * EASE_SLIDE(p)) * 45
+}
 
 interface Segment {
   prev: GameState
@@ -162,6 +179,7 @@ export async function exportGameVideo(
   const cols = variant.board.width
   const rows = variant.board.height
   const teamIndex = (id: string) => variant.teams.findIndex((t) => t.id === id)
+  const turning = !!variant.rules?.includes('turning')
 
   const cell = Math.max(48, Math.min(96, Math.round(980 / Math.max(cols, rows))))
   const pad = Math.round(cell * 0.42)
@@ -279,11 +297,13 @@ export async function exportGameVideo(
     cy: number,
     scale: number,
     alpha: number,
+    rotation = 0,
   ) => {
     const sprite = sprites.get(`${typeId}:${teamIndex(team)}`)
     if (!sprite) return
     ctx.save()
     ctx.translate(cx, cy)
+    ctx.rotate((rotation * Math.PI) / 180)
     ctx.scale(scale, scale)
     ctx.globalAlpha *= Math.max(0, Math.min(1, alpha))
     ctx.drawImage(sprite, -pieceSize / 2, -pieceSize / 2, pieceSize, pieceSize)
@@ -368,14 +388,22 @@ export async function exportGameVideo(
     }
   }
 
-  const drawStaticPieces = (state: GameState, skip: Set<string>) => {
+  const drawStaticPieces = (
+    state: GameState,
+    skip: Set<string>,
+    turn?: { prev: GameState; tau: number; delay: number },
+  ) => {
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const id = state.board[y][x]
         if (!id || skip.has(id)) continue
         const inst = state.pieces[id]
         if (!inst) continue
-        drawPiece(inst.typeId, inst.team, sx({ x, y }) + cell / 2, sy({ x, y }) + cell / 2, 1, 1)
+        const target = inst.orientation ?? 0
+        const rotation = turn && turning
+          ? turningAngle(turn.prev.pieces[id]?.orientation ?? 0, target, (turn.tau - turn.delay) / TURN_MS)
+          : normalizeTurn(target) * 45
+        drawPiece(inst.typeId, inst.team, sx({ x, y }) + cell / 2, sy({ x, y }) + cell / 2, 1, 1, rotation)
       }
     }
   }
@@ -486,7 +514,7 @@ export async function exportGameVideo(
         for (const f of anim.flights) skip.add(f.pieceId)
         for (const p of anim.pops) skip.add(p.pieceId)
       }
-      drawStaticPieces(seg.next, skip)
+      drawStaticPieces(seg.next, skip, { prev: seg.prev, tau, delay: anim?.turnDelay ?? 0 })
 
       if (anim) {
         for (const d of anim.dissolves) {
@@ -500,14 +528,20 @@ export async function exportGameVideo(
             sy(d.at) + cell / 2,
             1 - 0.65 * e,
             1 - e,
+            normalizeTurn(d.orientation ?? 0) * 45,
           )
         }
         for (const f of anim.flights) {
           const local = tau - f.delay
+          const initialOrientation = f.orientation ?? 0
+          const targetOrientation = seg.next.pieces[f.pieceId]?.orientation ?? initialOrientation
+          const rotation = turning && f.kind !== 'vanish'
+            ? turningAngle(initialOrientation, targetOrientation, (tau - (anim.turnDelay ?? 0)) / TURN_MS)
+            : normalizeTurn(initialOrientation) * 45
           if (local < 0) {
             // A delayed flight still sits at its origin (emerge pieces don't).
             if (f.kind !== 'emerge') {
-              drawPiece(f.typeId, f.team, sx(f.from) + cell / 2, sy(f.from) + cell / 2, 1, 1)
+              drawPiece(f.typeId, f.team, sx(f.from) + cell / 2, sy(f.from) + cell / 2, 1, 1, rotation)
             }
             continue
           }
@@ -522,6 +556,7 @@ export async function exportGameVideo(
               sy(f.from) + cell / 2 + (f.to.y - f.from.y) * cell * e,
               lift,
               1,
+              rotation,
             )
           } else if (f.kind === 'parry') {
             const e = parryTravel(p)
@@ -532,6 +567,7 @@ export async function exportGameVideo(
               sy(f.from) + cell / 2 + (f.to.y - f.from.y) * cell * e,
               1,
               1,
+              rotation,
             )
           } else if (f.kind === 'vanish') {
             const e = EASE_VANISH(p)
@@ -544,15 +580,21 @@ export async function exportGameVideo(
               sy(f.from) + cell / 2 + (f.to.y - f.from.y) * cell * e,
               scale,
               alpha,
+              rotation,
             )
           } else {
             // emerge: grow out of the landing square, overshooting a touch.
             const scale = 0.1 + 0.9 * EASE_EMERGE(p)
-            drawPiece(f.typeId, f.team, sx(f.to) + cell / 2, sy(f.to) + cell / 2, scale, Math.min(1, p / 0.45))
+            drawPiece(f.typeId, f.team, sx(f.to) + cell / 2, sy(f.to) + cell / 2, scale, Math.min(1, p / 0.45), rotation)
           }
         }
         for (const p of anim.pops) {
           const local = tau - p.delay
+          const initialOrientation = p.orientation ?? 0
+          const targetOrientation = seg.next.pieces[p.pieceId]?.orientation ?? initialOrientation
+          const rotation = turning
+            ? turningAngle(initialOrientation, targetOrientation, (tau - (anim.turnDelay ?? 0)) / TURN_MS)
+            : normalizeTurn(initialOrientation) * 45
           if (local < 0) continue
           // The pop settles at full size: once the grow is done it keeps
           // standing, since the static pass still skips it.
@@ -564,6 +606,7 @@ export async function exportGameVideo(
             sy(p.at) + cell / 2,
             0.35 + 0.65 * e,
             Math.min(1, local / (POP_MS * 0.45)),
+            rotation,
           )
         }
       }

@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react'
 import type { PieceInstance, PieceType } from '@/engine/types'
-import type { Flight, Anim } from '@/lib/moveAnimation'
+import { type Flight, type Anim } from '@/lib/moveAnimation'
 import { PieceGlyph } from './PieceGlyph'
 import { Spin } from './Spin'
+import { TurningPiece } from './TurningPiece'
 
 const FLIGHT_CLASS: Record<Flight['kind'], string> = {
   slide: 'piece-fly',
@@ -42,12 +43,10 @@ export function MoveAnimationLayer({
   const size = Math.round(cell * 0.78)
   const left = (x: number) => (flip ? cols - 1 - x : x) * cell
   const top = (y: number) => (flip ? rows - 1 - y : y) * cell
-  const spin = rotation ? `rotate(${rotation}deg)` : undefined
-  const spinFor = (pieceId: string, orientation?: number) => {
-    const degrees = rotation + (orientation ?? pieces[pieceId]?.orientation ?? 0) * 45
+  const spinValue = (orientation = 0) => {
+    const degrees = rotation + orientation * 45
     return degrees ? `rotate(${degrees}deg)` : undefined
   }
-
   return (
     <div key={anim.id} className="pointer-events-none absolute inset-0 z-30">
       {anim.dissolves.map((d) => {
@@ -68,7 +67,7 @@ export function MoveAnimationLayer({
               } as CSSProperties
             }
           >
-            <span className="inline-flex" style={{ transform: spin }}>
+            <span className="inline-flex" style={{ transform: spinValue(d.orientation) }}>
               <Spin on={spinning}>
                 <PieceGlyph piece={type} teamIndex={teamIndex(d.team)} size={size} />
               </Spin>
@@ -94,11 +93,16 @@ export function MoveAnimationLayer({
               } as CSSProperties
             }
           >
-            <span className="inline-flex" style={{ transform: spinFor(p.pieceId) }}>
+            <TurningPiece
+              orientation={pieces[p.pieceId]?.orientation ?? p.orientation ?? 0}
+              initialOrientation={p.orientation}
+              baseRotation={rotation}
+              delay={anim.turnDelay ?? 0}
+            >
               <Spin on={spinning}>
                 <PieceGlyph piece={type} teamIndex={teamIndex(p.team)} size={size} />
               </Spin>
-            </span>
+            </TurningPiece>
           </span>
         )
       })}
@@ -106,6 +110,9 @@ export function MoveAnimationLayer({
       {anim.flights.map((f) => {
         const type = pieceTypes[f.typeId]
         if (!type) return null
+        const targetOrientation = pieces[f.pieceId]?.orientation ?? f.orientation ?? 0
+        const initialOrientation = f.orientation ?? targetOrientation
+        const flightOrientation = f.kind === 'vanish' ? initialOrientation : targetOrientation
         return (
           <span
             key={f.key}
@@ -130,11 +137,16 @@ export function MoveAnimationLayer({
                   : 'flex h-full w-full items-center justify-center'
               }
             >
-              <span className="inline-flex" style={{ transform: spinFor(f.pieceId, f.orientation) }}>
+              <TurningPiece
+                orientation={flightOrientation}
+                initialOrientation={initialOrientation}
+                baseRotation={rotation}
+                delay={anim.turnDelay ?? 0}
+              >
                 <Spin on={spinning}>
                   <PieceGlyph piece={type} teamIndex={teamIndex(f.team)} size={size} lives={pieces[f.pieceId]?.lives} staggered={pieces[f.pieceId]?.staggered} />
                 </Spin>
-              </span>
+              </TurningPiece>
             </span>
           </span>
         )

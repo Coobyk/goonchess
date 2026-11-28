@@ -761,6 +761,26 @@ export function rollRandomPieces(state: GameState, exceptPieceId?: string): Game
   return { ...state, pieceTypes, pieces, randomSeed: seed }
 }
 
+function turnPieces(state: GameState): void {
+  if (!state.variant.rules?.includes('turning')) return
+  const ids = Object.keys(state.pieces).sort()
+  if (!ids.length) return
+  let seed = (state.randomSeed ?? state.variant.randomSeed ?? 1) >>> 0
+  const pieces: GameState['pieces'] = {}
+  for (const id in state.pieces) pieces[id] = state.pieces[id]
+  for (const id of ids) {
+    seed = nextSeed(seed)
+    const delta = mulberry32(seed)() < 0.5 ? -1 : 1
+    const inst = pieces[id]
+    pieces[id] = {
+      ...inst,
+      orientation: (((inst.orientation ?? 0) + delta) % 8 + 8) % 8,
+    }
+  }
+  state.pieces = pieces
+  state.randomSeed = seed
+}
+
 export function cloneState(state: GameState): GameState {
   // Copying the piece table by hand is measurably faster than the spread
   // operator, and the search copies it once for every move it tries.
@@ -1356,6 +1376,7 @@ export function applyMove(
       if (inst.team === state.turn && inst.staggered) next.pieces[id] = { ...inst, staggerRecovered: true }
     }
     expireStagger(state, next, state.turn)
+    turnPieces(next)
     return finishMove(next, {
       move, team: state.turn, notation: 'pass', san: options.san ? 'pass' : undefined,
     }, options)
@@ -1661,20 +1682,6 @@ export function applyMove(
     }
   }
 
-  if (
-    next.variant.rules?.includes('turning') &&
-    !hit &&
-    !move.drop &&
-    next.pieces[move.pieceId]
-  ) {
-    const seed = nextSeed(next.randomSeed ?? next.variant.randomSeed ?? 1)
-    next.randomSeed = seed
-    const delta = mulberry32(seed)() < 0.5 ? -1 : 1
-    touch(move.pieceId)
-    const turned = next.pieces[move.pieceId]
-    turned.orientation = (((turned.orientation ?? 0) + delta) % 8 + 8) % 8
-  }
-
   expireStagger(state, next, inst.team, wounded)
 
   // Loyalty Chess: the king is jealous of his queen. A queen that looks the
@@ -1755,6 +1762,8 @@ export function applyMove(
       predatorAtePrey = capturedInst.team
     }
   }
+
+  turnPieces(next)
 
   const record: MoveRecord = {
     move: { ...move, promotionTypeId },

@@ -563,7 +563,7 @@ export function turnChess(seed = Math.floor(Math.random() * 2 ** 31)): Variant {
     ...base,
     id: 'turn',
     name: 'Turn Chess',
-    description: 'After a piece moves, it randomly turns 45° left or right, and its moves turn with it.',
+    description: 'After every move, each piece randomly turns 45° left or right, and its moves turn with it.',
     rules: ['turning'],
     randomSeed: seed,
   }
@@ -1027,7 +1027,7 @@ export const TEMPLATES: {
   {
     id: 'turn',
     name: 'Turn Chess',
-    description: 'Pieces randomly turn 45° after moving',
+    description: 'Every piece randomly turns 45° after each move',
     build: turnChess,
     freshSetup: reseedTurnChess,
   },

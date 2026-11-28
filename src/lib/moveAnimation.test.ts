@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyMove, createInitialState, getLegalMoves } from '@/engine/rules'
-import { classicChess } from '@/engine/templates'
-import { parryTravel, planBoardTransition, planMove } from './moveAnimation'
+import { classicChess, turnChess } from '@/engine/templates'
+import { parryTravel, planBoardTransition, planMove, TURN_MS } from './moveAnimation'
 
 type State = ReturnType<typeof createInitialState>
 
@@ -34,6 +34,16 @@ describe('planMove', () => {
     expect(anim!.flights[0].kind).toBe('slide')
     expect(anim!.dissolves).toHaveLength(0)
     expect(anim!.pops).toHaveLength(0)
+  })
+
+  it('keeps a turning piece in the move layer until its post-move turn can finish', () => {
+    const before = createInitialState(turnChess(123))
+    const after = play(before, [4, 6], [4, 4])
+    const anim = planMove(before, after)
+    expect(anim).not.toBeNull()
+    expect(anim!.turnDelay).toBe(anim!.duration)
+    expect(anim!.total).toBeGreaterThanOrEqual(anim!.duration + TURN_MS)
+    expect(anim!.flights[0].orientation).toBe(before.pieces[anim!.flights[0].pieceId]?.orientation ?? 0)
   })
 
   it('dissolves a captured piece where it stood', () => {

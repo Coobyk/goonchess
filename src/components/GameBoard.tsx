@@ -6,6 +6,7 @@ import { boardCellSize, useElementWidth } from '@/lib/boardMetrics'
 import { EvalBar } from './EvalBar'
 import { MoveAnimationLayer } from './MoveAnimationLayer'
 import { Spin } from './Spin'
+import { TurningPiece } from './TurningPiece'
 import { ThreatArrows } from './ThreatArrows'
 import { BestMoveArrow } from './BestMoveArrow'
 import { useAppStore, selectViewerSeat } from '@/store/useAppStore'
@@ -729,12 +730,10 @@ export function GameBoard() {
                     )}
                     key={`${piece.id}-${piece.lives ?? 1}`}
                   >
-                    <span
-                      className="inline-flex"
-                      style={{
-                        transform: facingTransform(piece),
-                        transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
-                      }}
+                    <TurningPiece
+                      orientation={turning ? piece.orientation ?? 0 : 0}
+                      baseRotation={rotatePieces ? 180 : 0}
+                      delay={anim?.turnDelay ?? 0}
                     >
                       <Spin on={spinning}>
                         <PieceGlyph
@@ -746,7 +745,7 @@ export function GameBoard() {
                           size={Math.round(cell * 0.78)}
                         />
                       </Spin>
-                    </span>
+                    </TurningPiece>
                   </span>
                 )}
 

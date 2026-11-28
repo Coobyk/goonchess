@@ -15,8 +15,17 @@ const BASE_MS = 120
 const PER_SQUARE_MS = 70
 const MAX_MS = 480
 const DISSOLVE_MS = 200
-const POP_MS = 260
+export const POP_MS = 260
 const EMERGE_MS = 190
+export const TURN_MS = 380
+
+/** The shortest signed turn between two orientations, in eighth-turns. */
+export function turnDelta(from: number, to: number): number {
+  let diff = (to - from) % 8
+  if (diff > 4) diff -= 8
+  if (diff < -4) diff += 8
+  return diff
+}
 
 /** Stagger between captured pieces fading out, one after another. */
 const FADE_STAGGER = 30
@@ -54,6 +63,7 @@ export interface Dissolve {
   at: Vec
   delay: number
   duration: number
+  orientation?: number
 }
 
 export interface Pop {
@@ -63,6 +73,7 @@ export interface Pop {
   team: string
   at: Vec
   delay: number
+  orientation?: number
 }
 
 /**
@@ -80,6 +91,8 @@ export interface Anim {
   duration: number
   /** Time until every animation of the move has finished. */
   total: number
+  /** When the post-move turn begins, in a game of Turn Chess. */
+  turnDelay?: number
 }
 
 function inBounds(game: GameState, x: number, y: number) {
@@ -102,6 +115,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
   const move = record.move
   const mover = prev.pieces[move.pieceId]
   if (!mover && !move.drop) return null
+  const turning = !!game.variant.rules?.includes('turning')
 
   const flights: Flight[] = []
   const dissolves: Dissolve[] = []
@@ -117,6 +131,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
       team: record.team,
       at: move.finalTo,
       delay: 0,
+      orientation: 0,
     })
     return {
       id: game.moveHistory.length,
@@ -124,7 +139,8 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
       dissolves,
       pops,
       duration: 0,
-      total: POP_MS,
+      total: POP_MS + (turning ? TURN_MS : 0),
+      turnDelay: turning ? POP_MS : undefined,
     }
   }
 
@@ -168,6 +184,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
         team: mover.team,
         at: move.finalTo,
         delay: 0,
+        orientation: mover.orientation ?? 0,
       })
     }
     landing = 0
@@ -216,6 +233,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
         at: move.capturedAt ?? move.finalTo,
         delay: Math.max(0, landing - fade),
         duration: fade,
+        orientation: captured.orientation ?? 0,
       })
     }
   }
@@ -224,6 +242,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
     dissolves.push({
       key: 'striker', typeId: mover.typeId, team: mover.team,
       at: move.finalTo, delay: landing, duration: DISSOLVE_MS,
+      orientation: mover.orientation ?? 0,
     })
   }
 
@@ -242,6 +261,7 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
         at: victim,
         delay: landing + ring * BLAST_STAGGER,
         duration: DISSOLVE_MS,
+        orientation: inst.orientation ?? 0,
       })
     }
   }
@@ -262,17 +282,32 @@ export function planMove(prev: GameState, game: GameState): Anim | null {
       team: mover.team,
       at,
       delay: landing,
+      orientation: 0,
     })
   }
 
-  const total = Math.max(
+  // Everything has landed or popped in — captures may still be fading, but
+  // no piece is still travelling. The whole board turns together at this
+  // moment, so `total` only needs to cover the turn past this point.
+  const settle = Math.max(
     landing,
     ...flights.map((f) => f.delay + f.duration),
-    ...dissolves.map((d) => d.delay + d.duration),
     ...pops.map((p) => p.delay + POP_MS),
   )
+  const total = Math.max(
+    settle,
+    ...dissolves.map((d) => d.delay + d.duration),
+  ) + (turning ? TURN_MS : 0)
 
-  return { id: game.moveHistory.length, flights, dissolves, pops, duration: landing, total }
+  return {
+    id: game.moveHistory.length,
+    flights,
+    dissolves,
+    pops,
+    duration: landing,
+    total,
+    turnDelay: turning ? settle : undefined,
+  }
 }
 
 /** A piece standing on the board, in the terms the animator cares about. */
@@ -282,6 +317,7 @@ interface PieceSpot {
   y: number
   typeId: string
   team: string
+  orientation?: number
 }
 
 function collectPieces(game: GameState): PieceSpot[] {
@@ -291,7 +327,7 @@ function collectPieces(game: GameState): PieceSpot[] {
       const pieceId = game.board[y][x]
       if (!pieceId) continue
       const piece = game.pieces[pieceId]
-      if (piece) spots.push({ pieceId, x, y, typeId: piece.typeId, team: piece.team })
+      if (piece) spots.push({ pieceId, x, y, typeId: piece.typeId, team: piece.team, orientation: piece.orientation ?? 0 })
     }
   }
   return spots
@@ -358,6 +394,7 @@ export function planBoardTransition(prev: GameState, game: GameState): Anim | nu
           team: spot.team,
           at: { x: spot.x, y: spot.y },
           delay: 0,
+          orientation: was.orientation ?? 0,
         })
       }
       continue
@@ -372,6 +409,7 @@ export function planBoardTransition(prev: GameState, game: GameState): Anim | nu
       kind: 'slide',
       duration: travelMs({ x: was.x, y: was.y }, { x: spot.x, y: spot.y }),
       delay: 0,
+      orientation: was.orientation ?? 0,
     })
   }
 
@@ -404,6 +442,7 @@ export function planBoardTransition(prev: GameState, game: GameState): Anim | nu
           kind: 'slide',
           duration: travelMs({ x: best.x, y: best.y }, { x: spot.x, y: spot.y }),
           delay: 0,
+          orientation: best.orientation ?? 0,
         })
       }
     } else {
@@ -414,6 +453,7 @@ export function planBoardTransition(prev: GameState, game: GameState): Anim | nu
         team: spot.team,
         at: { x: spot.x, y: spot.y },
         delay: 0,
+        orientation: spot.orientation ?? 0,
       })
     }
   }
@@ -429,6 +469,7 @@ export function planBoardTransition(prev: GameState, game: GameState): Anim | nu
       at: { x: was.x, y: was.y },
       delay: fading * FADE_STAGGER,
       duration: DISSOLVE_MS,
+      orientation: was.orientation ?? 0,
     })
     fading++
   }

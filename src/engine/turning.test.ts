@@ -53,6 +53,21 @@ describe('turn chess', () => {
     expect(seen).toEqual(new Set([1, 7]))
   })
 
+  it('turns every surviving piece independently after a move', () => {
+    let sawMixed = false
+    for (let seed = 1; seed <= 30; seed++) {
+      const game = createInitialState(turnChess(seed))
+      const move = getLegalMoves(game, 4, 6).find((candidate) => candidate.finalTo.x === 4 && candidate.finalTo.y === 4)
+      expect(move).toBeTruthy()
+      const next = applyMove(game, move!)
+      const orientations = Object.values(next.pieces).map((piece) => piece.orientation)
+      expect(orientations).toHaveLength(32)
+      expect(orientations.every((orientation) => orientation === 1 || orientation === 7)).toBe(true)
+      if (new Set(orientations).size > 1) sawMixed = true
+    }
+    expect(sawMixed).toBe(true)
+  })
+
   it('turns a rook’s orthogonal slide into a diagonal slide', () => {
     const game = bare()
     place(game, 'King', 'white', 7, 0)
