@@ -47,6 +47,7 @@ export interface BotReply {
     state: GameState
     from: { x: number; y: number }
     to: { x: number; y: number }
+    promotionTypeId?: string
     side: string
     gain: number
     difficulty: string
@@ -116,6 +117,7 @@ scope.onmessage = (event) => {
               state: found.state,
               from: { x: found.solution.from.x, y: found.solution.from.y },
               to: { x: found.solution.finalTo.x, y: found.solution.finalTo.y },
+              promotionTypeId: found.solution.promotionTypeId,
               side: found.side,
               gain: found.gain,
               difficulty: found.difficulty,

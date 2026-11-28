@@ -1,228 +1,135 @@
+import { useState, type ComponentType } from 'react'
 import {
   ArrowRight,
-  BookOpen,
+  Ban,
   Bomb,
+  BookOpen,
+  Compass,
+  Crown,
+  Dices,
   Flag,
-  FlipHorizontal2,
+  Flame,
+  Grid2x2,
+  HeartCrack,
+  Layers,
   Map,
+  Mountain,
+  Package,
+  Puzzle,
+  RefreshCw,
+  RotateCw,
   ShieldAlert,
+  Skull,
   Sparkles,
   Swords,
-  Volume2,
-  VolumeX,
+  Target,
   Wrench,
+  Zap,
 } from 'lucide-react'
-import { TerrainSwatch } from './TerrainOverlay'
-import { vecKey, type Effect, type MovePattern, type PieceType, type TeamConfig, type Terrain, type Vec, type VariantRule, type WinConditionKind } from '@/engine/types'
-import { ALL8, DIAG, KNIGHT, ORTH } from '@/engine/templates'
-import type { ThreatSettings } from '@/engine/threats'
+import { TEMPLATES } from '@/engine/templates'
+import type { TeamConfig, Terrain, VariantRule, WinConditionKind } from '@/engine/types'
+import { RULE_COPY, TERRAIN_COPY, WIN_COPY } from '@/lib/learnCopy'
 import { useAppStore } from '@/store/useAppStore'
-import { findPack } from '@/lib/soundPacks'
+import { InteractiveStartBoard } from './learn/InteractiveStartBoard'
+import { ModeAtlas } from './learn/ModeAtlas'
+import { PieceDiagram } from './learn/PieceDiagram'
+import { PiecePlayground } from './learn/PiecePlayground'
+import { TacticsTrainer } from './learn/TacticsTrainer'
+import { PieceGlyph } from './PieceGlyph'
+import { TerrainSwatch } from './TerrainOverlay'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Separator } from './ui/separator'
-import { MakerBoard } from './MakerBoard'
-import { PieceGlyph } from './PieceGlyph'
-import { PuzzlePanel } from './PuzzlePanel'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
-const ORTH_KEY = setKey(ORTH)
-const DIAG_KEY = setKey(DIAG)
-const ALL8_KEY = setKey(ALL8)
-const KNIGHT_KEY = setKey(KNIGHT)
+type LearnTab = 'overview' | 'pieces' | 'tactics' | 'modes'
 
-const TERRAIN_COPY: Record<Terrain, { name: string; hint: string }> = {
-  normal: { name: 'Normal', hint: 'Open ground. Any piece may enter or pass through.' },
-  wall: { name: 'Wall', hint: 'Blocks movement and captures. Sliders cannot see past it.' },
-  void: { name: 'Void', hint: 'A hole in the board. Nothing can stand on it or cross it.' },
-  portal: { name: 'Portal', hint: 'Stepping on one teleports the piece to its linked square.' },
-  oneway: { name: 'One-way portal', hint: 'A portal that only sends pieces in one direction.' },
+const RULE_ICON: Record<VariantRule, ComponentType<{ className?: string }>> = {
+  atomic: Bomb,
+  crazyhouse: Package,
+  forcedCapture: Swords,
+  noCheck: Ban,
+  noCastle: ShieldAlert,
+  predator: Flame,
+  loyalty: HeartCrack,
+  hypergamy: Crown,
+  spinning: RefreshCw,
+  turning: RotateCw,
 }
 
-const WIN_COPY: Record<WinConditionKind, { name: string; hint: string }> = {
-  checkmate: {
-    name: 'Checkmate',
-    hint: 'Trap the enemy royal piece so it is attacked and has no legal escape.',
-  },
-  kingCapture: {
-    name: 'Capture the royal',
-    hint: 'The game ends the moment a royal piece is captured.',
-  },
-  elimination: { name: 'Elimination', hint: 'Win by removing every enemy piece from the board.' },
-  points: {
-    name: 'Point target',
-    hint: 'Win by capturing material until you reach the point target.',
-  },
-  center: {
-    name: 'King of the Hill',
-    hint: 'Walk your king onto one of the four centre squares and the game is yours at once.',
-  },
-  threeCheck: {
-    name: 'Three checks',
-    hint: 'Give check three times — the third one ends the game.',
-  },
-  antichess: {
-    name: 'Losing chess',
-    hint: 'Lose every piece, or be left with no move at all, and you win.',
-  },
-  race: {
-    name: 'The race',
-    hint: 'The first king to reach the far rank wins the game. If White lands there first, Black gets one reply — reaching the far rank with it is a draw.',
-  },
-  predator: {
-    name: 'Slay the Predator',
-    hint: 'Only a king can slay a Predator for good. Win by slaying the enemy one, or — as the Predator — by eating every pawn and minor piece.',
-  },
-}
-
-/** The rules a variant can be played under, beyond how its pieces move. */
-const RULE_COPY: Record<VariantRule, { name: string; hint: string }> = {
-  atomic: {
-    name: 'Atomic',
-    hint: 'A capture explodes. The square it landed on is cleared, and everything around it goes up too — friendly and enemy alike — except pawns, which shrug the blast off. No king ever takes anything, and a blast that catches a king ends the game at once.',
-  },
-  crazyhouse: {
-    name: 'Pockets',
-    hint: 'Every piece you capture changes sides into your pocket. On your turn you may drop one of them onto an empty square instead of moving a piece. A captured pawn comes back as a pawn, and a pawn may never be dropped on the back rank.',
-  },
-  forcedCapture: {
-    name: 'Capture is compulsory',
-    hint: 'When a capture is on the board, taking it is the only move allowed.',
-  },
-  noCheck: {
-    name: 'Checks are forbidden',
-    hint: 'Giving check is against the rules as much as standing in one: a move may not leave the enemy king attacked, and may not attack it either.',
-  },
-  noCastle: {
-    name: 'No castling',
-    hint: 'The king and the rook never swap places.',
-  },
-  predator: {
-    name: 'Predators',
-    hint: 'A Predator must take the pawn or minor piece it sees, come back when anything but a king takes it, and only a king can slay it for good.',
-  },
-  loyalty: {
-    name: 'Loyalty',
-    hint: 'The king is jealous of his queen. If she looks the enemy king in the eye — however the line opened — he explodes where he stands, and her side loses the game on the spot. Her gaze is a trap too: a king may step into it on purpose, and a pinned piece may unveil him, to blow up the king who owns her.',
-  },
-  hypergamy: {
-    name: 'Hypergamy',
-    hint: 'A piece may only take a piece worth as much as itself or more. A pawn takes anything, knights and bishops hunt each other, a rook reaches rooks and queens — and the queen can only ever be taken down by another queen. The king stands outside the order: worth nothing, he may take anyone, and being beneath nobody, anyone may take him.',
-  },
-  spinning: {
-    name: 'Spinning pieces',
-    hint: 'Every piece on the board spins round and round, all game long. The rules are the ordinary ones — only your eyes have to keep up.',
-  },
-  turning: {
-    name: 'Turning pieces',
-    hint: 'After every move, each piece randomly turns 45° left, right, or not at all. Its movement turns with it, rounded to the squares of the board: a rook can become a bishop, a bishop a rook, a horse walks two square steps diagonally, and a pawn can start walking sideways.',
-  },
-}
-
-const TURN_VIEW_COPY = {
-  off: 'Off — the board never rotates between turns.',
-  board: 'Flip board — after each move the whole board rotates 180° so the side to move is at the bottom.',
-  pieces:
-    'Turn pieces — the squares stay put and the pieces rotate to face the player whose turn it is. Useful when two players share one screen from opposite ends.',
-} as const
-
-function setKey(vectors: Vec[]) {
-  return vectors.map(vecKey).sort().join('|')
-}
-
-function offsetText(v: Vec) {
-  const parts: string[] = []
-  if (v.y < 0) parts.push(`${-v.y} forward`)
-  if (v.y > 0) parts.push(`${v.y} back`)
-  if (v.x > 0) parts.push(`${v.x} right`)
-  if (v.x < 0) parts.push(`${-v.x} left`)
-  return parts.join(' and ') || 'in place'
-}
-
-function directionText(vectors: Vec[]): string {
-  const key = setKey(vectors)
-  if (key === ALL8_KEY) return 'in any of the eight directions'
-  if (key === ORTH_KEY) return 'forward, back, left or right'
-  if (key === DIAG_KEY) return 'diagonally'
-  if (key === KNIGHT_KEY) return 'in an L: two squares one way and one square across'
-  if (vectors.length === 1) return offsetText(vectors[0])
-  return vectors.map(offsetText).join(', ')
-}
-
-function patternText(pattern: MovePattern): string {
-  const first = pattern.firstMoveOnly ? ' on its first move only' : ''
-  if (pattern.kind === 'slider') {
-    const range =
-      pattern.maxRange > 0
-        ? `up to ${pattern.maxRange} square${pattern.maxRange === 1 ? '' : 's'}`
-        : 'any number of squares'
-    return `slides ${range} ${directionText(pattern.vectors)}${first}`
-  }
-  return `leaps ${directionText(pattern.vectors)}${first}`
-}
-
-function effectText(effect: Effect, pieceName: (id: string) => string): string {
-  if (effect.kind === 'swap') return 'when it captures, it swaps places with the captured piece'
-  if (effect.kind === 'explosion') {
-    return `after it lands, everything within ${effect.radius} square${
-      effect.radius === 1 ? '' : 's'
-    } is destroyed — only enemy pieces are harmed`
-  }
-  return `after it moves, it leaves a ${pieceName(effect.pieceTypeId)} ${offsetText(
-    effect.offset,
-  )} of its starting square (if that square is empty)`
+const WIN_ICON: Record<WinConditionKind, ComponentType<{ className?: string }>> = {
+  checkmate: Crown,
+  kingCapture: Swords,
+  elimination: Skull,
+  points: Target,
+  center: Mountain,
+  threeCheck: Zap,
+  antichess: Skull,
+  race: Flag,
+  predator: Flame,
 }
 
 function teamPieces(variant: { setup: { typeId: string; team: string }[] }, teamId: string) {
   return variant.setup.filter((s) => s.team === teamId).length
 }
 
-function flagCopy(piece: PieceType): string[] {
-  const out: string[] = []
-  if (piece.flags.royal) out.push('Royal — if it is lost, the game can end.')
-  if (piece.flags.uncapturable) out.push('Cannot be captured by anything.')
-  if (piece.flags.mustCapture) out.push('May only move when capturing.')
-  if (piece.flags.movesOnce) out.push('May only move once per game.')
-  if (piece.flags.enPassant)
-    out.push('May capture en passant: take a piece that just ran two squares past an attacked square.')
-  if (piece.flags.jump) out.push('Jumps over pieces in the way.')
-  if (!piece.flags.mirror) out.push('Keeps its pattern unmirrored when played by the other army.')
-  return out
+function ordinal(index: number) {
+  const n = index + 1
+  const mod100 = n % 100
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`
+  if (n % 10 === 1) return `${n}st`
+  if (n % 10 === 2) return `${n}nd`
+  if (n % 10 === 3) return `${n}rd`
+  return `${n}th`
 }
 
-function ArmyBadge({ team, teamIndex }: { team: TeamConfig; teamIndex: number }) {
+function ArmyRow({
+  team,
+  teamIndex,
+  count,
+}: {
+  team: TeamConfig
+  teamIndex: number
+  count: number
+}) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span
-        className="size-3 rounded-full ring-1 ring-black/20"
-        style={{ backgroundColor: team.color }}
-        aria-hidden
-      />
-      <span className="font-medium">{team.name}</span>
-      <span className="text-muted-foreground text-xs">
-        advances {team.forward === 'up' ? 'up' : 'down'}
-      </span>
-      <span className="text-muted-foreground ml-auto font-mono text-xs">
-        {teamIndex === 0 ? 'first' : 'second'}
-      </span>
+    <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span
+          className="size-3.5 shrink-0 rounded-full ring-1 ring-black/25 dark:ring-white/25"
+          style={{ backgroundColor: team.color }}
+          aria-hidden
+        />
+        <div className="min-w-0">
+          <p className="truncate font-medium leading-tight">{team.name}</p>
+          <p className="text-muted-foreground text-xs">
+            Moves {team.forward === 'up' ? 'upward' : 'downward'} · {count} piece
+            {count === 1 ? '' : 's'}
+          </p>
+        </div>
+      </div>
+      <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
+        {ordinal(teamIndex)}
+      </Badge>
     </div>
   )
 }
 
 export function RulebookView() {
   const variant = useAppStore((s) => s.variant)
-  const canCastle =
-    variant.pieceTypes.some((p) => p.flags.royal) &&
-    variant.pieceTypes.some((p) => p.icon === 'rook') &&
-    !variant.rules?.includes('noCastle')
   const setView = useAppStore((s) => s.setView)
   const setMakerTab = useAppStore((s) => s.setMakerTab)
-  const threats = useAppStore((s) => s.threats)
-  const turnView = useAppStore((s) => s.turnView)
-  const soundEnabled = useAppStore((s) => s.soundEnabled)
-  const soundPack = useAppStore((s) => s.soundPack)
+  const setSelectedPieceType = useAppStore((s) => s.setSelectedPieceType)
+
+  const [tab, setTab] = useState<LearnTab>('overview')
+  const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null)
 
   const { board, teams, pieceTypes, setup, winConditions } = variant
+  const rules = variant.rules ?? []
+  const canCastle =
+    pieceTypes.some((p) => p.flags.royal) &&
+    pieceTypes.some((p) => p.icon === 'rook') &&
+    !rules.includes('noCastle')
 
   const terrainCounts = board.tiles.flat().reduce<Record<Terrain, number>>(
     (acc, tile) => {
@@ -231,510 +138,509 @@ export function RulebookView() {
     },
     { normal: 0, wall: 0, void: 0, portal: 0, oneway: 0 },
   )
-  const presentTerrain = (Object.keys(TERRAIN_COPY) as Terrain[]).filter(
-    (t) => t === 'normal' || terrainCounts[t] > 0,
+  const specialTerrain = (['wall', 'void', 'portal', 'oneway'] as Terrain[]).filter(
+    (t) => terrainCounts[t] > 0,
   )
-  const portalLinks = board.tiles.flat().filter((t) => t.terrain === 'portal').length
+  const portalLinks = terrainCounts.portal
   const oneways = terrainCounts.oneway
-
-  const pieceName = (id: string) => pieceTypes.find((p) => p.id === id)?.name ?? 'piece'
-  // The kinds that are rolled anew after every move.
   const randomPieces = pieceTypes.filter((p) => p.flags.random).map((p) => p.name)
+  const dicePieces = pieceTypes.filter((p) => p.flags.dice).map((p) => p.name)
+  const hasEffects = pieceTypes.some((p) => p.effects.length > 0)
 
   const teamForPiece = (pieceId: string) => {
     const first = setup.find((s) => s.typeId === pieceId)
     return Math.max(0, teams.findIndex((t) => t.id === first?.team))
   }
 
-  const threatCopy = (settings: ThreatSettings) => {
-    if (!settings.show) return 'Off'
-    const layers = [
-      settings.arrows && 'threat arrows',
-      settings.coverage && 'attacked squares',
-      settings.hanging && 'hanging pieces',
-      settings.defended && 'defended pieces',
-    ].filter(Boolean)
-    const scope = settings.scope === 'both' ? 'both armies' : 'the side to move'
-    return `On — ${layers.join(', ') || 'no layers selected'}; showing ${scope}.`
+  const openPieceInLab = (pieceId: string) => {
+    setSelectedPieceId(pieceId)
+    setTab('pieces')
+  }
+
+  const editPieceInMaker = (pieceId: string) => {
+    setSelectedPieceType(pieceId)
+    setMakerTab('pieces')
+    setView('maker')
   }
 
   return (
     <div className="space-y-6">
-      <PuzzlePanel />
       <Card className="overflow-hidden py-0">
-        <CardContent className="relative px-6 py-8 sm:px-8">
-          <div className="pointer-events-none absolute -right-16 -top-20 size-60 rounded-full bg-primary/10 blur-3xl" />
-          <div className="relative max-w-3xl space-y-4">
-            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-primary">
-              <BookOpen className="size-4" /> Learn
+        <CardContent className="relative px-5 py-6 sm:px-7 sm:py-7">
+          <div className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-primary/12 blur-3xl" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                  <BookOpen className="size-3.5" /> Learn
+                </span>
+                <span className="text-muted-foreground/50">·</span>
+                <span className="text-muted-foreground font-mono text-xs">
+                  {board.width}×{board.height} · {pieceTypes.length} piece
+                  {pieceTypes.length === 1 ? '' : 's'} · {teams.length} armies
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{variant.name}</h1>
+                <p className="text-muted-foreground text-sm sm:text-base">
+                  {variant.description ||
+                    'Interactive rules, movement diagrams and live tactics for the current variant.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {rules.map((rule) => {
+                  const Icon = RULE_ICON[rule] ?? Sparkles
+                  return (
+                    <Badge
+                      key={rule}
+                      variant="outline"
+                      className="border-primary/40 bg-primary/10 text-foreground gap-1"
+                    >
+                      <Icon className="size-3 text-primary" />
+                      {RULE_COPY[rule]?.name ?? rule}
+                    </Badge>
+                  )
+                })}
+                {winConditions.map((condition) => {
+                  const Icon = WIN_ICON[condition.kind] ?? Flag
+                  return (
+                    <Badge key={condition.id} variant="secondary" className="gap-1">
+                      <Icon className="text-muted-foreground size-3" />
+                      {WIN_COPY[condition.kind]?.name ?? condition.kind}
+                      {condition.kind === 'points' && condition.threshold
+                        ? ` (${condition.threshold})`
+                        : ''}
+                    </Badge>
+                  )
+                })}
+              </div>
             </div>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{variant.name}</h1>
-              <p className="text-muted-foreground text-sm sm:text-base">
-                {variant.description ||
-                  'A custom chess variant. Every rule on this page comes from the current setup.'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">
-                {board.width} × {board.height} board
-              </Badge>
-              <Badge variant="secondary">{teams.length} armies</Badge>
-              <Badge variant="secondary">{pieceTypes.length} piece types</Badge>
-              <Badge variant="secondary">
-                {winConditions.length} win condition{winConditions.length === 1 ? '' : 's'}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" onClick={() => setView('play')}>
-                <Swords /> Play this variant
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  setMakerTab('rules')
-                  setView('maker')
-                }}
-              >
-                <Wrench /> Edit the rules
-              </Button>
+
+            <div className="flex flex-col gap-3 lg:items-end">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => setView('play')}>
+                  <Swords /> Play now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setMakerTab('rules')
+                    setView('maker')
+                  }}
+                >
+                  <Wrench /> Edit in Maker
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setTab('modes')}>
+                  <Layers /> Switch mode
+                </Button>
+              </div>
+
+              {pieceTypes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {pieceTypes.slice(0, 8).map((piece) => (
+                    <button
+                      key={piece.id}
+                      type="button"
+                      title={`Inspect ${piece.name}`}
+                      onClick={() => openPieceInLab(piece.id)}
+                      className="grid size-9 place-items-center rounded-md border bg-muted/40 transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <PieceGlyph piece={piece} teamIndex={teamForPiece(piece.id)} size={26} />
+                    </button>
+                  ))}
+                  {pieceTypes.length > 8 && (
+                    <button
+                      type="button"
+                      onClick={() => setTab('pieces')}
+                      className="text-muted-foreground hover:text-foreground rounded-md border px-2 py-1.5 font-mono text-xs transition-colors"
+                    >
+                      +{pieceTypes.length - 8}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
-          <Card className="py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex items-center gap-2">
-                  <Map className="text-muted-foreground size-4" /> Starting position
-                </span>
-                <Badge variant="secondary" className="font-mono text-[10px]">
-                  {board.width}×{board.height}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 px-4">
-              <MakerBoard interactive={false} />
-              <Separator />
-              <div className="space-y-2 text-sm">
-                {teams.map((team, i) => (
-                  <ArmyBadge key={team.id} team={team} teamIndex={i} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+      <Tabs value={tab} onValueChange={(next) => setTab(next as LearnTab)} className="space-y-6">
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="h-10 w-full justify-start sm:w-fit">
+            <TabsTrigger value="overview" className="gap-1.5 px-3">
+              <Compass className="size-4" /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="pieces" className="gap-1.5 px-3">
+              <Grid2x2 className="size-4" /> Pieces
+              <span className="bg-background/70 text-muted-foreground ml-0.5 rounded px-1.5 py-0.5 font-mono text-[10px] leading-none">
+                {pieceTypes.length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="tactics" className="gap-1.5 px-3">
+              <Puzzle className="size-4" /> Tactics
+            </TabsTrigger>
+            <TabsTrigger value="modes" className="gap-1.5 px-3">
+              <Layers className="size-4" /> All modes
+              <span className="bg-background/70 text-muted-foreground ml-0.5 rounded px-1.5 py-0.5 font-mono text-[10px] leading-none">
+                {TEMPLATES.length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-          <Card className="py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="text-sm">Terrain key</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2.5 px-4 text-xs">
-              {presentTerrain.map((terrain) => (
-                <div key={terrain} className="flex items-start gap-2">
-                  <TerrainSwatch
-                    terrain={terrain}
-                    className={terrain === 'oneway' ? 'mt-0.5 font-mono text-[8px] text-cyan-100' : 'mt-0.5'}
-                  >
-                    {terrain === 'oneway' ? '1→' : null}
-                  </TerrainSwatch>
-                  <span className="min-w-0">
-                    <span className="font-medium">
-                      {TERRAIN_COPY[terrain].name}
-                      {terrain !== 'normal' && (
-                        <span className="text-muted-foreground font-mono"> ×{terrainCounts[terrain]}</span>
-                      )}
-                    </span>
-                    <span className="text-muted-foreground block">{TERRAIN_COPY[terrain].hint}</span>
-                  </span>
-                </div>
-              ))}
-              {presentTerrain.length === 1 && (
-                <p className="text-muted-foreground border-t pt-2">
-                  No special terrain in this variant — every square is open ground.
-                </p>
-              )}
-              {portalLinks > 0 && (
-                <p className="text-muted-foreground border-t pt-2">
-                  {portalLinks / 2} linked portal pair{portalLinks === 2 ? '' : 's'}
-                  {oneways > 0 && ` · ${oneways} one-way`}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </aside>
+        <TabsContent value="overview" className="mt-0 space-y-6">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,25rem)_minmax(0,1fr)]">
+            <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+              <Card className="py-4">
+                <CardHeader className="px-4 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Map className="text-primary size-4" /> Starting position
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4">
+                  <InteractiveStartBoard variant={variant} onInspectPiece={openPieceInLab} />
+                </CardContent>
+              </Card>
 
-        <div className="min-w-0 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Flag className="text-muted-foreground size-4" /> How the game ends
-              </CardTitle>
-              <CardDescription>
-                Any enabled condition can finish the game. If more than one applies, the first one
-                reached wins.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {winConditions.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No win condition is enabled. The game will keep going until you restart it.
-                </p>
-              ) : (
-                winConditions.map((condition) => {
-                  const copy = WIN_COPY[condition.kind]
-                  return (
-                    <div
-                      key={condition.id}
-                      className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
-                    >
-                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                        <ArrowRight className="size-3.5" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{copy?.name ?? condition.kind}</p>
-                        <p className="text-muted-foreground text-sm">
-                          {copy?.hint ?? 'Custom win condition.'}
-                          {condition.kind === 'points' && (
-                            <>
-                              {' '}
-                              Target:{' '}
-                              <span className="text-foreground font-mono">
-                                {condition.threshold ?? 20} points
+              <Card className="py-4">
+                <CardHeader className="px-4 pb-2">
+                  <CardTitle className="text-sm">Terrain</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2.5 px-4 text-xs">
+                  {specialTerrain.length === 0 ? (
+                    <p className="text-muted-foreground">
+                      Open ground everywhere — no walls, voids or portals in this variant.
+                    </p>
+                  ) : (
+                    <>
+                      {specialTerrain.map((terrain) => (
+                        <div key={terrain} className="flex items-start gap-2.5">
+                          <TerrainSwatch
+                            terrain={terrain}
+                            className={
+                              terrain === 'oneway'
+                                ? 'mt-0.5 font-mono text-[8px] text-cyan-100'
+                                : 'mt-0.5'
+                            }
+                          >
+                            {terrain === 'oneway' ? '1→' : null}
+                          </TerrainSwatch>
+                          <div className="min-w-0">
+                            <span className="font-medium">
+                              {TERRAIN_COPY[terrain].name}{' '}
+                              <span className="text-muted-foreground font-mono">
+                                ×{terrainCounts[terrain]}
                               </span>
-                              .
-                            </>
-                          )}
+                            </span>
+                            <span className="text-muted-foreground block">
+                              {TERRAIN_COPY[terrain].hint}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {(portalLinks > 0 || oneways > 0) && (
+                        <p className="text-muted-foreground border-t pt-2 font-mono text-[11px]">
+                          {[
+                            portalLinks > 0
+                              ? `${portalLinks} portal square${portalLinks === 1 ? '' : 's'}`
+                              : null,
+                            oneways > 0 ? `${oneways} one-way` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </aside>
+
+            <div className="min-w-0 space-y-6">
+              {rules.length > 0 && (
+                <Card className="border-primary/35">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Sparkles className="size-4 text-primary" /> What makes this mode different
+                    </CardTitle>
+                    <CardDescription>
+                      Special rules active on top of standard piece movement.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {rules.map((rule) => {
+                      const copy = RULE_COPY[rule]
+                      const Icon = RULE_ICON[rule] ?? Sparkles
+                      return (
+                        <div
+                          key={rule}
+                          className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3.5"
+                        >
+                          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+                            <Icon className="size-4" />
+                          </span>
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-sm font-semibold">{copy?.name ?? rule}</p>
+                            <p className="text-muted-foreground text-sm leading-relaxed">
+                              {copy?.hint ?? 'A custom rule of this variant.'}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Flag className="text-muted-foreground size-4" /> How to win
+                  </CardTitle>
+                  <CardDescription>
+                    {winConditions.length > 1
+                      ? 'Any enabled goal ends the game immediately — whichever happens first wins.'
+                      : 'How a game of this variant finishes.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {winConditions.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      No win condition is enabled — play freely until you restart.
+                    </p>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {winConditions.map((condition) => {
+                        const copy = WIN_COPY[condition.kind]
+                        const Icon = WIN_ICON[condition.kind] ?? Flag
+                        return (
+                          <div
+                            key={condition.id}
+                            className="flex items-start gap-3 rounded-lg border bg-muted/25 p-3.5"
+                          >
+                            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-primary/12 text-primary">
+                              <Icon className="size-4" />
+                            </span>
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="text-sm font-medium">{copy?.name ?? condition.kind}</p>
+                              <p className="text-muted-foreground text-xs leading-relaxed">
+                                {copy?.hint ?? 'Custom win condition.'}
+                                {condition.kind === 'points' && (
+                                  <>
+                                    {' '}
+                                    Target:{' '}
+                                    <span className="text-foreground font-mono font-medium">
+                                      {condition.threshold ?? 20} pts
+                                    </span>
+                                    .
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {randomPieces.length > 0 && (
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-500/35 bg-amber-500/8 p-3.5">
+                      <Sparkles className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                      <div className="min-w-0 space-y-0.5 text-sm">
+                        <p className="font-medium">Rainbow pieces re-roll every turn</p>
+                        <p className="text-muted-foreground text-xs leading-relaxed">
+                          After every move, each random piece ({randomPieces.join(', ')}) transforms
+                          into another non-royal piece from this variant.
                         </p>
                       </div>
                     </div>
-                  )
-                })
-              )}
-              <p className="text-muted-foreground text-xs">
-                A stalemate — no legal move but no check — is a draw. Reaching the point target or
-                eliminating an army is reported in the turn panel.
-              </p>
-              {randomPieces.length > 0 && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                  <p className="text-sm font-medium">The pieces are rolled anew</p>
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    After every move each random piece is given a new kind, drawn at random from
-                    the kinds of this variant: {randomPieces.join(', ')}. They wear the colours of a
-                    rainbow, so it is clear which ones are random. The royal piece keeps its kind, or
-                    the game would be over at once.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {(variant.rules?.length ?? 0) > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Bomb className="text-muted-foreground size-4" /> The extra rules
-                </CardTitle>
-                <CardDescription>
-                  On top of how the pieces move, this game is played under the rules below.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {variant.rules?.map((rule) => {
-                  const copy = RULE_COPY[rule]
-                  return (
-                    <div
-                      key={rule}
-                      className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3"
-                    >
-                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                        <ArrowRight className="size-3.5" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{copy?.name ?? rule}</p>
-                        <p className="text-muted-foreground text-sm">{copy?.hint ?? 'A custom rule of this variant.'}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="text-muted-foreground size-4" /> The armies
-              </CardTitle>
-              <CardDescription>
-                Each army has its own colour and direction of advance. Movement patterns are written
-                from the piece&apos;s point of view; patterns marked as mirrored flip for the
-                opposing side.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2">
-              {teams.map((team, i) => (
-                <div key={team.id} className="rounded-lg border p-3">
-                  <ArmyBadge team={team} teamIndex={i} />
-                  <div className="text-muted-foreground mt-2 flex items-center justify-between text-xs">
-                    <span>{teamPieces(variant, team.id)} pieces in the starting setup</span>
-                    <span className="font-mono">{team.color}</span>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight">Piece reference</h2>
-                <p className="text-muted-foreground text-sm">
-                  Movement, captures, special rules and promotions for this variant.
-                </p>
-              </div>
-              <Badge variant="outline" className="font-mono text-[10px]">
-                values are capture points
-              </Badge>
-            </div>
-
-            <div className="space-y-3">
-              {pieceTypes.map((piece) => {
-                const captures = piece.capture.length
-                  ? piece.capture.map(patternText).join('; ')
-                  : 'captures the same way it moves'
-                const flags = flagCopy(piece)
-                return (
-                  <div key={piece.id} className="rounded-xl border p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="grid size-12 shrink-0 place-items-center rounded-lg border bg-muted">
-                        <PieceGlyph piece={piece} teamIndex={teamForPiece(piece.id)} size={34} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-semibold">{piece.name}</h3>
-                          <Badge variant="secondary" className="font-mono text-[10px]">
-                            {piece.value} pt{piece.value === 1 ? '' : 's'}
-                          </Badge>
-                          {piece.flags.royal && (
-                            <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                              Royal
-                            </Badge>
-                          )}
-                          <span className="text-muted-foreground ml-auto font-mono text-[10px]">
-                            {setup.filter((s) => s.typeId === piece.id).length} on board
-                          </span>
-                        </div>
-
-                        <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
-                          {piece.move.length ? (
-                            piece.move.map((pattern) => (
-                              <li key={pattern.id} className="flex gap-2">
-                                <span className="text-foreground/60 mt-1 select-none text-[10px]">
-                                  ●
-                                </span>
-                                <span>
-                                  <span className="text-foreground">Moves</span> —{' '}
-                                  {patternText(pattern)}.
-                                </span>
-                              </li>
-                            ))
-                          ) : (
-                            <li className="flex gap-2">
-                              <span className="text-foreground/60 mt-1 select-none text-[10px]">
-                                ●
-                              </span>
-                              <span>
-                                <span className="text-foreground">Moves</span> — cannot move on its
-                                own.
-                              </span>
-                            </li>
-                          )}
-                          <li className="flex gap-2">
-                            <span className="text-foreground/60 mt-1 select-none text-[10px]">
-                              ●
-                            </span>
-                            <span>
-                              <span className="text-foreground">Captures</span> — {captures}.
-                            </span>
-                          </li>
-                          {piece.effects.map((effect, i) => (
-                            <li key={i} className="flex gap-2">
-                              <span className="text-foreground/60 mt-1 select-none text-[10px]">
-                                <Bomb className="size-3" />
-                              </span>
-                              <span>
-                                <span className="text-foreground">Special</span> — {effectText(effect, pieceName)}.
-                              </span>
-                            </li>
-                          ))}
-                          {piece.promotion && (
-                            <li className="flex gap-2">
-                              <span className="text-foreground/60 mt-1 select-none text-[10px]">
-                                <ArrowRight className="size-3" />
-                              </span>
-                              <span>
-                                <span className="text-foreground">Promotes</span> — becomes{' '}
-                                {piece.promotion.typeIds
-                                  .map((id) => pieceName(id))
-                                  .join(' or ')}{' '}
-                                when it reaches the far rank.
-                              </span>
-                            </li>
-                          )}
-                          {flags.map((flag) => (
-                            <li key={flag} className="flex gap-2">
-                              <span className="text-foreground/60 mt-1 select-none text-[10px]">
-                                <ShieldAlert className="size-3" />
-                              </span>
-                              <span>{flag}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Swords className="text-muted-foreground size-4" /> Playing a turn
-              </CardTitle>
-              <CardDescription>
-                Select a piece to see its legal moves, then click a highlighted square or drag the
-                piece there. Clicking a selected piece again clears it.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-muted-foreground space-y-2 text-sm">
-              <p>
-                Captures resolve immediately. Effects such as explosions and spawns happen after the
-                moving piece lands; explosions never hurt their own army.
-              </p>
-              <p>
-                Portals and one-way portals move a piece to a linked square as part of the same
-                move. Walls and void squares stop movement entirely.
-              </p>
-              {canCastle && (
-                <p>
-                  <span className="text-foreground font-medium">Castling</span> — a royal piece and a
-                  friendly rook that have not moved can castle if every square between them is open.
-                  The royal piece moves two squares toward the rook; the rook jumps to the square it
-                  crossed. You cannot castle out of check, through an attacked square, or onto one.
-                </p>
-              )}
-              <p>
-                The turn panel shows whose move it is, whether the royal piece is in check, and any
-                active threat information. Undo steps back one move; restart resets the starting
-                position.
-              </p>
-              <p>
-                The <span className="text-foreground font-medium">Opponent</span> menu turns a
-                side over to a bot. It plays by the same rules as you do, in this very variant —
-                and two bots can play each other while you watch.
-              </p>
-              <p>
-                The same position three times is a draw. Two positions count as the same when the
-                pieces stand in the same squares, the same side is to move, the same castles are
-                still possible and an en passant capture is available in both or in neither.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FlipHorizontal2 className="text-muted-foreground size-4" /> Display &amp; assists
-              </CardTitle>
-              <CardDescription>
-                These settings are personal to this browser. They change how the game looks, not the
-                rules.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border p-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <FlipHorizontal2 className="text-muted-foreground size-4" /> Turn view
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-sm">{TURN_VIEW_COPY[turnView]}</p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <ShieldAlert className="text-muted-foreground size-4" /> Threat visualizer
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-sm">{threatCopy(threats)}</p>
-                  {threats.show && (
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      Arrows point from each attacker to the piece it can capture. Rose means the
-                      target is undefended; amber means a recapture is waiting.
-                    </p>
                   )}
-                </div>
-                <div className="rounded-lg border p-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {soundEnabled ? (
-                      <Volume2 className="text-muted-foreground size-4" />
-                    ) : (
-                      <VolumeX className="text-muted-foreground size-4" />
-                    )}{' '}
-                    Sound
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    {soundEnabled
-                      ? `Move, capture, check, promotion, explosion and game-ending sounds are on, from the ${findPack(soundPack).name} pack.`
-                      : 'Muted. Use the speaker button in the header to turn sounds back on.'}
-                  </p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Map className="text-muted-foreground size-4" /> Board map
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    The starting position on this page is always the current setup. Open Maker to
-                    change the board, pieces or rules.
-                  </p>
-                </div>
-              </div>
-              <Separator />
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => setView('play')}>
-                  <Swords /> Go to the board
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setMakerTab('pieces')
-                    setView('maker')
-                  }}
-                >
-                  <Wrench /> Open the Maker
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
-          <p className="text-muted-foreground px-1 text-xs">
-            Piece drawings: chess pieces by Colin M. L. Burnett, shared under CC BY-SA 3.0.{' '}
-            <a
-              href="/pieces/cburnett/ATTRIBUTION.txt"
-              className="underline underline-offset-2"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Attribution
-            </a>
-            .
-          </p>
-        </div>
-      </div>
+                  {dicePieces.length > 0 && (
+                    <div className="flex items-start gap-3 rounded-lg border border-sky-500/35 bg-sky-500/8 p-3.5">
+                      <Dices className="mt-0.5 size-4 shrink-0 text-sky-500" />
+                      <div className="min-w-0 space-y-0.5 text-sm">
+                        <p className="font-medium">Dice-driven movement</p>
+                        <p className="text-muted-foreground text-xs leading-relaxed">
+                          Selecting {dicePieces.join(', ')} rolls a die to pick which movement pattern
+                          it can use on that turn.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-muted-foreground text-xs">
+                    Stalemate (no legal move while not in check) and threefold repetition are draws.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Grid2x2 className="text-muted-foreground size-4" /> Piece lineup
+                    </CardTitle>
+                    <CardDescription>
+                      Click any piece to test its movement on an interactive sandbox board.
+                    </CardDescription>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setTab('pieces')}>
+                    Open Piece Lab <ArrowRight className="size-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {pieceTypes.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No piece types defined yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {pieceTypes.map((piece) => {
+                        const count = setup.filter((s) => s.typeId === piece.id).length
+                        return (
+                          <button
+                            key={piece.id}
+                            type="button"
+                            onClick={() => openPieceInLab(piece.id)}
+                            className="group flex flex-col items-center gap-2.5 rounded-xl border bg-muted/15 p-3 text-center transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:bg-muted/35 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <PieceDiagram
+                              variant={variant}
+                              piece={piece}
+                              teamIndex={teamForPiece(piece.id)}
+                              size={5}
+                              cellSize={18}
+                            />
+                            <div className="w-full min-w-0 space-y-1">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span className="truncate text-sm font-semibold">{piece.name}</span>
+                                {piece.flags.royal && (
+                                  <Crown className="size-3.5 shrink-0 text-amber-500" />
+                                )}
+                              </div>
+                              <div className="text-muted-foreground flex items-center justify-center gap-2 font-mono text-[11px]">
+                                <span>
+                                  {piece.value} pt{piece.value === 1 ? '' : 's'}
+                                </span>
+                                <span>·</span>
+                                <span>×{count}</span>
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Armies</CardTitle>
+                    <CardDescription className="text-xs">
+                      Mirrored patterns flip vertically for the downward army.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {teams.map((team, index) => (
+                      <ArmyRow
+                        key={team.id}
+                        team={team}
+                        teamIndex={index}
+                        count={teamPieces(variant, team.id)}
+                      />
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Quick reference</CardTitle>
+                    <CardDescription className="text-xs">
+                      Essentials for playing this variant.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-muted-foreground space-y-2 text-xs leading-relaxed">
+                    <p>
+                      <span className="text-foreground font-medium">Controls</span> — click a piece
+                      or drag it to any highlighted legal square.
+                    </p>
+                    {canCastle && (
+                      <p>
+                        <span className="text-foreground font-medium">Castling</span> — an unmoved
+                        royal piece and an unmoved rook can castle across clear, unattacked squares
+                        (moving to their standard castling files in Chess960).
+                      </p>
+                    )}
+                    {hasEffects && (
+                      <p>
+                        <span className="text-foreground font-medium">Effects</span> — explosions,
+                        swaps and spawns trigger right after the piece lands.
+                      </p>
+                    )}
+                    {specialTerrain.length > 0 && (
+                      <p>
+                        <span className="text-foreground font-medium">Terrain</span> — portals
+                        teleport on arrival; walls and void squares block movement.
+                      </p>
+                    )}
+                    <p>
+                      <span className="text-foreground font-medium">Practice</span> — test your eye
+                      in the{' '}
+                      <button
+                        type="button"
+                        onClick={() => setTab('tactics')}
+                        className="text-primary font-medium underline underline-offset-2 hover:opacity-80"
+                      >
+                        Tactics trainer
+                      </button>{' '}
+                      or face the built-in bot from the Play screen.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="pieces" className="mt-0">
+          <PiecePlayground
+            variant={variant}
+            selectedPieceId={selectedPieceId}
+            onSelectPiece={setSelectedPieceId}
+            onEditPiece={editPieceInMaker}
+          />
+        </TabsContent>
+
+        <TabsContent value="tactics" className="mt-0">
+          <TacticsTrainer />
+        </TabsContent>
+
+        <TabsContent value="modes" className="mt-0">
+          <ModeAtlas
+            onLearnVariant={() => {
+              setSelectedPieceId(null)
+              setTab('overview')
+            }}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <p className="text-muted-foreground px-1 text-xs">
+        Piece drawings: chess pieces by Colin M. L. Burnett, shared under CC BY-SA 3.0.{' '}
+        <a
+          href="/pieces/cburnett/ATTRIBUTION.txt"
+          className="underline underline-offset-2 hover:text-foreground"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Attribution
+        </a>
+        .
+      </p>
     </div>
   )
 }

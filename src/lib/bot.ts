@@ -23,6 +23,7 @@ export interface BotResult {
     state: GameState
     from: { x: number; y: number }
     to: { x: number; y: number }
+    promotionTypeId?: string
     side: string
     gain: number
     difficulty: string
