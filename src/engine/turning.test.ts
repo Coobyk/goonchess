@@ -38,19 +38,19 @@ describe('turn chess', () => {
     expect(legalMovesForTeam(game, game.turn)).toHaveLength(20)
   })
 
-  it('randomly turns the moved piece one eighth left or right', () => {
+  it('randomly turns the moved piece one eighth left, right, or not at all', () => {
     const seen = new Set<number>()
     for (let seed = 1; seed <= 30; seed++) {
       const game = createInitialState(turnChess(seed))
       const move = getLegalMoves(game, 4, 6).find((candidate) => candidate.finalTo.x === 4 && candidate.finalTo.y === 4)
       expect(move).toBeTruthy()
       const next = applyMove(game, move!)
-      const orientation = next.pieces[move!.pieceId].orientation
-      expect(orientation === 1 || orientation === 7).toBe(true)
+      const orientation = next.pieces[move!.pieceId].orientation ?? 0
+      expect(orientation === 0 || orientation === 1 || orientation === 7).toBe(true)
       expect(next.randomSeed).not.toBe(game.randomSeed)
       seen.add(orientation!)
     }
-    expect(seen).toEqual(new Set([1, 7]))
+    expect(seen).toEqual(new Set([0, 1, 7]))
   })
 
   it('turns every surviving piece independently after a move', () => {
@@ -60,9 +60,9 @@ describe('turn chess', () => {
       const move = getLegalMoves(game, 4, 6).find((candidate) => candidate.finalTo.x === 4 && candidate.finalTo.y === 4)
       expect(move).toBeTruthy()
       const next = applyMove(game, move!)
-      const orientations = Object.values(next.pieces).map((piece) => piece.orientation)
+      const orientations = Object.values(next.pieces).map((piece) => piece.orientation ?? 0)
       expect(orientations).toHaveLength(32)
-      expect(orientations.every((orientation) => orientation === 1 || orientation === 7)).toBe(true)
+      expect(orientations.every((orientation) => orientation === 0 || orientation === 1 || orientation === 7)).toBe(true)
       if (new Set(orientations).size > 1) sawMixed = true
     }
     expect(sawMixed).toBe(true)

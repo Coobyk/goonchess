@@ -27,9 +27,9 @@ Deployable to Cloudflare Workers with GitHub Actions.
 - **Spinning Chess** — regular chess, rule for rule, except every piece spins
   on its square the whole game: on the board, in flight and under the cursor.
   All the pieces turn in step, so a piece that moves keeps the same spin.
-- **Turn Chess** — after every move, each piece randomly turns 45° left or
-  right, and its moves turn with it. Rooks become bishops, bishops become
-  rooks, and pawns can start walking sideways.
+- **Turn Chess** — after every move, each piece randomly turns 45° left,
+  45° right, or not at all, and its moves turn with it. Rooks become
+  bishops, bishops become rooks, and pawns can start walking sideways.
 - **Piece composer** — draw a piece instead of settling for a letter. The six
   chess pieces are stacked on top of each other: a knight with a bishop's
   crown on its head, a queen wearing a king's crown, an amazon with a knight's

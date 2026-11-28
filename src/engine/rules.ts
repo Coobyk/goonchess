@@ -770,7 +770,9 @@ function turnPieces(state: GameState): void {
   for (const id in state.pieces) pieces[id] = state.pieces[id]
   for (const id of ids) {
     seed = nextSeed(seed)
-    const delta = mulberry32(seed)() < 0.5 ? -1 : 1
+    const roll = mulberry32(seed)()
+    const delta = roll < 1 / 3 ? -1 : roll < 2 / 3 ? 1 : 0
+    if (!delta) continue
     const inst = pieces[id]
     pieces[id] = {
       ...inst,

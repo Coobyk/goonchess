@@ -35,16 +35,20 @@ export function TurningPiece({
     return () => window.clearTimeout(timer)
   }, [delay, target, turn])
 
-  const facing = baseRotation + degrees
   return (
     <span
       className={className}
-      style={{
-        transform: facing ? `rotate(${facing}deg)` : undefined,
-        transition: `transform ${TURN_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-      }}
+      style={{ transform: baseRotation ? `rotate(${baseRotation}deg)` : undefined }}
     >
-      {children}
+      <span
+        className="inline-flex"
+        style={{
+          transform: degrees ? `rotate(${degrees}deg)` : undefined,
+          transition: `transform ${TURN_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        }}
+      >
+        {children}
+      </span>
     </span>
   )
 }
