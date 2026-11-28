@@ -119,10 +119,17 @@ function orient(piece: PieceType, forward: 'up' | 'down', v: Vec, orientation = 
   const angle = steps * Math.PI / 4
   const cos = Math.cos(angle)
   const sin = Math.sin(angle)
-  return {
-    x: Math.round(mirrored.x * cos - mirrored.y * sin),
-    y: Math.round(mirrored.x * sin + mirrored.y * cos),
+  const rx = mirrored.x * cos - mirrored.y * sin
+  const ry = mirrored.x * sin + mirrored.y * cos
+  // A horse has no honest diagonal on a square grid: rotated an odd eighth,
+  // rounding would just permute its own leaps. Instead it walks two square
+  // steps diagonally, towards whichever corner its leap turns into.
+  const ax = Math.abs(mirrored.x)
+  const ay = Math.abs(mirrored.y)
+  if (steps % 2 === 1 && ((ax === 2 && ay === 1) || (ax === 1 && ay === 2))) {
+    return { x: Math.sign(rx) * 2, y: Math.sign(ry) * 2 }
   }
+  return { x: Math.round(rx), y: Math.round(ry) }
 }
 
 /* ----------------------------------------------------------- state setup */

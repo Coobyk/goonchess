@@ -120,6 +120,34 @@ describe('turn chess', () => {
     expect(moves).not.toContain('4,5')
   })
 
+  it('walks a turned horse two square steps diagonally', () => {
+    const game = bare()
+    place(game, 'King', 'white', 7, 0)
+    place(game, 'King', 'black', 0, 7)
+    place(game, 'Knight', 'white', 3, 3, 1)
+
+    const moves = targets(game, 3, 3)
+    expect(moves).toContain('5,5')
+    expect(moves).toContain('5,1')
+    expect(moves).toContain('1,5')
+    expect(moves).toContain('1,1')
+    expect(moves).toHaveLength(4)
+    expect(moves).not.toContain('4,5')
+    expect(moves).not.toContain('5,4')
+  })
+
+  it('keeps a horse a horse after a quarter turn', () => {
+    const game = bare()
+    place(game, 'King', 'white', 7, 0)
+    place(game, 'King', 'black', 0, 7)
+    place(game, 'Knight', 'white', 3, 3, 2)
+
+    const moves = targets(game, 3, 3)
+    expect(moves).toContain('4,5')
+    expect(moves).toContain('5,4')
+    expect(moves).not.toContain('5,5')
+  })
+
   it('replays the same random turns from the game seed', () => {
     let game = createInitialState(turnChess(123))
     game = firstMove(game)
